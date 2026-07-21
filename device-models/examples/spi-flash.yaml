@@ -17,12 +17,56 @@ device:
       opcode: 0x02
       operation: register_write
       address_bytes: 1
+      allowed_states: [ready]
       timing:
         latency_us: 10000
         busy_during_operation: true
   busy:
     register_address: 0x00
     mask: 0x01
+  state_machine:
+    initial_state: resetting
+    states:
+      resetting:
+        entry_actions:
+          - set_register:
+              name: STATUS
+              mask: 0x01
+              value: 0x01
+        transitions:
+          - event: reset_complete
+            target: ready
+        delayed_events:
+          - event: reset_complete
+            delay_us: 5000
+      ready:
+        entry_actions:
+          - set_register:
+              name: STATUS
+              mask: 0x01
+              value: 0x00
+        transitions:
+          - event: write_started
+            target: busy
+            guard:
+              register:
+                name: STATUS
+                mask: 0x01
+                equals: 0x00
+      busy:
+        entry_actions:
+          - set_register:
+              name: STATUS
+              mask: 0x01
+              value: 0x01
+        exit_actions:
+          - set_register:
+              name: STATUS
+              mask: 0x01
+              value: 0x00
+        transitions:
+          - event: operation_completed
+            target: ready
   registers:
     - name: STATUS
       address: 0x00

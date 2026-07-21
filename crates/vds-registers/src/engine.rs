@@ -199,6 +199,31 @@ impl RegisterEngine {
             .ok_or(RegisterError::UnknownAddress { address })
     }
 
+    /// Resolves register metadata by its declarative name.
+    #[must_use]
+    pub fn metadata_by_name(&self, name: &str) -> Option<RegisterMetadata> {
+        self.registers
+            .values()
+            .find(|state| state.definition.name == name)
+            .map(|state| metadata(&state.definition))
+    }
+
+    /// Reads device-owned runtime state without applying client access rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns a structured error when the address is unknown.
+    pub fn read_internal(&self, address: u64) -> Result<RegisterRead, RegisterError> {
+        let state = self
+            .registers
+            .get(&address)
+            .ok_or(RegisterError::UnknownAddress { address })?;
+        Ok(RegisterRead {
+            register: metadata(&state.definition),
+            value: state.current_value,
+        })
+    }
+
     /// Restores every runtime value to its declarative reset value.
     pub fn reset(&mut self) {
         for state in self.registers.values_mut() {
