@@ -189,6 +189,39 @@ pub struct StateFailure {
     pub message: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FaultErrorCode {
+    Timeout,
+    ReturnError,
+    Dropped,
+    ActionFailed,
+}
+
+impl fmt::Display for FaultErrorCode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Timeout => "fault_timeout",
+            Self::ReturnError => "fault_return_error",
+            Self::Dropped => "fault_dropped",
+            Self::ActionFailed => "fault_action_failed",
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[error("{message}")]
+pub struct FaultFailure {
+    pub code: FaultErrorCode,
+    pub fault_id: String,
+    pub command: String,
+    pub duration_ns: Option<u64>,
+    pub trigger: &'static str,
+    pub trigger_count: u64,
+    pub action: &'static str,
+    pub virtual_time_ns: u64,
+    pub message: String,
+}
+
 /// Errors produced while routing or executing a device transaction.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum DeviceError {
@@ -212,4 +245,7 @@ pub enum DeviceError {
 
     #[error(transparent)]
     State(#[from] StateFailure),
+
+    #[error(transparent)]
+    Fault(Box<FaultFailure>),
 }

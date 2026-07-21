@@ -161,6 +161,21 @@ the device ID, source state, target state, trigger, and virtual timestamp.
 Models without `state_machine` or command `allowed_states` retain their prior
 behavior.
 
+## Fault Injection Engine v1
+
+Device YAML may declare deterministic faults targeted by device, decoded
+command, register, and state. Supported triggers are `always`, `first_n`,
+`every_nth`, and exact `operation_count`. Supported actions are timeout, delay,
+returned error, drop, response XOR corruption, forced register value, and
+stuck-at register value.
+
+Matching faults run by descending priority and then YAML order. Timeout,
+returned error, and drop stop evaluation; other actions compose. Counters and
+delay deadlines use simulator state and the existing virtual scheduler. Reset
+clears transient fault state while definitions marked `persistent: true` retain
+their counters and active stuck-at constraints. Models without `faults` retain
+their previous behavior.
+
 ## C client example
 
 Build the static C library and sample application:

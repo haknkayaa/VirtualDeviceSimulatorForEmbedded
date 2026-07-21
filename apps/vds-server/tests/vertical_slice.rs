@@ -355,3 +355,31 @@ async fn c_client_read_id_remains_compatible() {
     assert!(stdout.contains("TX: 9F"));
     assert!(stdout.contains("RX: EF 40 18"));
 }
+
+#[tokio::test]
+async fn timeout_fault_is_structured_and_logged() {
+    let model = example_model_yaml()
+        .replace("delay_us: 5000", "delay_us: 0")
+        .replace(
+            "  registers:",
+            "  faults:\n    - id: read_id_timeout\n      enabled: true\n      priority: 10\n      target:\n        device: spi-flash-0\n        command: READ_ID\n        state: ready\n      trigger:\n        operation_count: 1\n      action:\n        type: timeout\n        duration_ms: 500\n  registers:",
+        );
+    let server = TestServer::start_with_model(Some(&model)).await;
+
+    let response = server.transfer(200, vec![0x9f]).await;
+    match response.result {
+        Some(server_response::Result::Error(error)) => {
+            assert_eq!(error.code, ErrorCode::FaultTimeout as i32);
+            assert!(error.message.contains("timed out"));
+        }
+        other => panic!("expected fault timeout, got {other:?}"),
+    }
+
+    let logs = server.stop_and_logs();
+    assert!(logs.contains("\"event\":\"fault_triggered\""));
+    assert!(logs.contains("\"fault_id\":\"read_id_timeout\""));
+    assert!(logs.contains("\"trigger\":\"operation_count\""));
+    assert!(logs.contains("\"trigger_count\":1"));
+    assert!(logs.contains("\"action\":\"timeout\""));
+    assert!(logs.contains("\"result\":\"applied\""));
+}
