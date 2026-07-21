@@ -1,0 +1,19 @@
+[package]
+name = "vds-protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+build = "build.rs"
+
+[dependencies]
+prost.workspace = true
+tokio.workspace = true
+
+[build-dependencies]
+prost-build.workspace = true
+
+[lints]
+workspace = true
+
