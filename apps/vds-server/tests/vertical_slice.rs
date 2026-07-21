@@ -24,7 +24,8 @@ struct TestServer {
 
 impl TestServer {
     async fn start() -> Self {
-        Self::start_with_model(None).await
+        let model = example_model_yaml().replace("delay_us: 5000", "delay_us: 0");
+        Self::start_with_model(Some(&model)).await
     }
 
     async fn start_with_model(model_yaml: Option<&str>) -> Self {
@@ -118,6 +119,13 @@ impl TestServer {
     }
 }
 
+fn example_model_yaml() -> String {
+    fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../device-models/examples/spi-flash.yaml"),
+    )
+    .expect("example model should be readable")
+}
+
 async fn transfer_to_socket(socket: &Path, request_id: u64, tx: Vec<u8>) -> ServerResponse {
     let mut stream = UnixStream::connect(socket)
         .await
@@ -186,11 +194,9 @@ async fn unknown_opcode_returns_a_structured_error() {
 
 #[tokio::test]
 async fn spi_register_write_then_read_round_trips_and_logs_metadata() {
-    let model = fs::read_to_string(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../device-models/examples/spi-flash.yaml"),
-    )
-    .expect("example model should be readable")
-    .replace("latency_us: 10000", "latency_us: 3600000000");
+    let model = example_model_yaml()
+        .replace("delay_us: 5000", "delay_us: 0")
+        .replace("latency_us: 10000", "latency_us: 3600000000");
     let server = TestServer::start_with_model(Some(&model)).await;
 
     let initial = server.transfer(50, vec![0x03, 0x01]).await;
@@ -299,11 +305,9 @@ async fn concurrent_register_reads_are_consistent() {
 
 #[tokio::test]
 async fn timed_write_logs_start_and_completion() {
-    let model = fs::read_to_string(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../device-models/examples/spi-flash.yaml"),
-    )
-    .expect("example model should be readable")
-    .replace("latency_us: 10000", "latency_us: 0");
+    let model = example_model_yaml()
+        .replace("delay_us: 5000", "delay_us: 0")
+        .replace("latency_us: 10000", "latency_us: 0");
     let server = TestServer::start_with_model(Some(&model)).await;
 
     let response = server.transfer(90, vec![0x02, 0x01, 0x5a]).await;
@@ -316,6 +320,11 @@ async fn timed_write_logs_start_and_completion() {
     assert!(logs.contains("\"event\":\"device_operation_started\""));
     assert!(logs.contains("\"event\":\"device_operation_completed\""));
     assert!(logs.contains("\"actual_virtual_duration_ns\":"));
+    assert!(logs.contains("\"event\":\"state_transition\""));
+    assert!(logs.contains("\"from_state\":\"ready\""));
+    assert!(logs.contains("\"to_state\":\"busy\""));
+    assert!(logs.contains("\"trigger\":\"write_started\""));
+    assert!(logs.contains("\"virtual_time_ns\":"));
     assert!(logs.contains("\"register_name\":\"CONTROL\""));
     assert!(logs.contains("\"old_value\":\"0x12\""));
     assert!(logs.contains("\"new_value\":\"0x5A\""));
