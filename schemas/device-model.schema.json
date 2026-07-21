@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vds4e.dev/schemas/device-model.schema.json",
+  "title": "VDS4E generic device model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "device"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "bus", "model", "commands"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bus": {
+          "const": "spi"
+        },
+        "model": {
+          "const": "generic-spi-command"
+        },
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "opcode"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "opcode": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "response": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              },
+              "operation": {
+                "type": "string",
+                "enum": ["register_read", "register_write"]
+              },
+              "address_bytes": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8
+              },
+              "timing": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["latency_us", "busy_during_operation"],
+                "properties": {
+                  "latency_us": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "busy_during_operation": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "oneOf": [
+              {
+                "required": ["response"],
+                "not": {
+                  "anyOf": [
+                    { "required": ["operation"] },
+                    { "required": ["address_bytes"] }
+                  ]
+                }
+              },
+              {
+                "required": ["operation", "address_bytes"],
+                "not": { "required": ["response"] }
+              }
+            ]
+          }
+        },
+        "registers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "address", "width_bits", "reset_value", "access"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "address": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "width_bits": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64
+              },
+              "reset_value": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "access": {
+                "type": "string",
+                "enum": ["ro", "wo", "rw"]
+              }
+            }
+          }
+        },
+        "busy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["register_address", "mask"],
+          "properties": {
+            "register_address": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "mask": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

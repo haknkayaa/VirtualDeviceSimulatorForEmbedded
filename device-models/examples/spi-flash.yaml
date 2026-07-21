@@ -1,0 +1,41 @@
+schema_version: 1
+
+device:
+  id: spi-flash-0
+  name: Example Generic SPI Flash
+  bus: spi
+  model: generic-spi-command
+  commands:
+    - name: READ_ID
+      opcode: 0x9F
+      response: [0xEF, 0x40, 0x18]
+    - name: READ_REGISTER
+      opcode: 0x03
+      operation: register_read
+      address_bytes: 1
+    - name: WRITE_REGISTER
+      opcode: 0x02
+      operation: register_write
+      address_bytes: 1
+      timing:
+        latency_us: 10000
+        busy_during_operation: true
+  busy:
+    register_address: 0x00
+    mask: 0x01
+  registers:
+    - name: STATUS
+      address: 0x00
+      width_bits: 8
+      reset_value: 0x00
+      access: ro
+    - name: CONTROL
+      address: 0x01
+      width_bits: 8
+      reset_value: 0x12
+      access: rw
+    - name: COMMAND
+      address: 0x03
+      width_bits: 8
+      reset_value: 0x00
+      access: wo
