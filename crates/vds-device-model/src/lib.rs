@@ -9,13 +9,14 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use vds_core::device::{
-    BusType, Device, DeviceError, DeviceTransfer, RegisterAccessType, RegisterErrorCode,
-    RegisterFailure, RegisterOperation, RegisterTrace, StateErrorCode, StateFailure,
-    TimingErrorCode, TimingFailure,
+    BusType, Device, DeviceError, DeviceTransfer, FaultErrorCode, FaultFailure, RegisterAccessType,
+    RegisterErrorCode, RegisterFailure, RegisterOperation, RegisterTrace, StateErrorCode,
+    StateFailure, TimingErrorCode, TimingFailure,
 };
 use vds_core::{
     clock::{RealTimeClock, SimulatorClock},
     event::{DeviceEvent, EventId, EventScheduler, SchedulerError},
+    fault::{FaultAction, FaultContext, FaultDefinition, FaultEngine},
     state_machine::{
         DelayedEventDefinition, StateDefinition, StateMachine, StateMachineDefinition,
         StateMachineError, TransitionDefinition, TransitionOutcome,
@@ -46,6 +47,8 @@ pub struct DeviceDefinition {
     pub busy: Option<BusyDefinition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state_machine: Option<DeviceStateMachineDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub faults: Vec<FaultDefinition>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -265,6 +268,7 @@ impl DeviceModel {
                 }
             }
         }
+        validate_faults(&model.device.faults, &model.device.registers)?;
         Ok(model)
     }
 
@@ -349,6 +353,8 @@ impl DeviceModel {
             operation_busy: false,
             state_machine,
             state_delayed_events: Vec::new(),
+            fault_engine: FaultEngine::new(self.device.faults),
+            stuck_registers: Vec::new(),
         };
         initialize_state_machine(&mut state, clock.now_ns())?;
         Ok(GenericSpiDevice {
@@ -376,6 +382,16 @@ struct DeviceState {
     operation_busy: bool,
     state_machine: Option<StateMachine<DeviceAction, DeviceGuard>>,
     state_delayed_events: Vec<EventId>,
+    fault_engine: FaultEngine,
+    stuck_registers: Vec<ActiveStuck>,
+}
+
+#[derive(Clone)]
+struct ActiveStuck {
+    address: u64,
+    value: u64,
+    mask: Option<u64>,
+    persistent: bool,
 }
 
 enum PendingOperation {
@@ -389,6 +405,12 @@ enum PendingOperation {
     },
     DelayedStateEvent {
         event: String,
+    },
+    FaultDelay {
+        fault_id: String,
+        command: String,
+        duration_ns: u64,
+        started_at_ns: u64,
     },
 }
 
@@ -444,8 +466,27 @@ impl Device for GenericSpiDevice {
             .ok_or(DeviceError::UnknownOpcode(opcode))?;
         let mut state = self.lock_state()?;
         let mut events = self.apply_due_events(&mut state)?;
+        let register = Self::command_register(&state, command, request);
+        let current_state = state
+            .state_machine
+            .as_ref()
+            .map(StateMachine::current_state)
+            .map(str::to_owned);
+        let activations = state.fault_engine.evaluate(FaultContext {
+            device: &self.id,
+            command: &command.name,
+            register: register.as_ref().map(|(_, name)| name.as_str()),
+            state: current_state.as_deref(),
+        });
+        self.apply_faults(
+            &mut state,
+            command,
+            register.as_ref().map(|(address, _)| *address),
+            &activations,
+            &mut events,
+        )?;
         Self::validate_command_state(&state, command)?;
-        match &command.behavior {
+        let mut transfer = match &command.behavior {
             SpiCommandBehavior::FixedResponse(response) => Ok(DeviceTransfer {
                 response: response.clone(),
                 register: None,
@@ -465,7 +506,15 @@ impl Device for GenericSpiDevice {
                 *timing,
                 &mut events,
             ),
+        }?;
+        for activation in &activations {
+            if let FaultAction::CorruptResponse { xor_mask } = activation.action {
+                for byte in &mut transfer.response {
+                    *byte ^= xor_mask;
+                }
+            }
         }
+        Ok(transfer)
     }
 
     fn run_due_events(&self) -> Result<Vec<DeviceEvent>, DeviceError> {
@@ -478,6 +527,8 @@ impl Device for GenericSpiDevice {
         state.scheduler.clear();
         state.state_delayed_events.clear();
         state.registers.reset();
+        state.fault_engine.reset();
+        state.stuck_registers.retain(|stuck| stuck.persistent);
         state.operation_busy = false;
         let Some(mut machine) = state.state_machine.take() else {
             return Ok(Vec::new());
@@ -493,6 +544,206 @@ impl Device for GenericSpiDevice {
 }
 
 impl GenericSpiDevice {
+    fn command_register(
+        state: &DeviceState,
+        command: &SpiCommand,
+        request: &[u8],
+    ) -> Option<(u64, String)> {
+        let address_bytes = match command.behavior {
+            SpiCommandBehavior::RegisterRead { address_bytes }
+            | SpiCommandBehavior::RegisterWrite { address_bytes, .. } => address_bytes,
+            SpiCommandBehavior::FixedResponse(_) => return None,
+        };
+        let end = 1 + usize::from(address_bytes);
+        if request.len() < end {
+            return None;
+        }
+        let address = decode_unsigned(&request[1..end]);
+        state
+            .registers
+            .metadata(address)
+            .ok()
+            .map(|metadata| (address, metadata.name))
+    }
+
+    fn apply_faults(
+        &self,
+        state: &mut DeviceState,
+        command: &SpiCommand,
+        register: Option<u64>,
+        activations: &[vds_core::fault::FaultActivation],
+        events: &mut Vec<DeviceEvent>,
+    ) -> Result<(), DeviceError> {
+        let now_ns = self.clock.now_ns();
+        for activation in activations {
+            events.push(DeviceEvent::FaultTriggered {
+                fault_id: activation.id.clone(),
+                command: command.name.clone(),
+                trigger: activation.trigger.name(),
+                trigger_count: activation.trigger_count,
+                action: activation.action.name(),
+                virtual_time_ns: now_ns,
+                result: "applied",
+            });
+            Self::apply_fault_action(state, command, register, activation, now_ns)?;
+        }
+        Ok(())
+    }
+
+    fn apply_fault_action(
+        state: &mut DeviceState,
+        command: &SpiCommand,
+        register: Option<u64>,
+        activation: &vds_core::fault::FaultActivation,
+        now_ns: u64,
+    ) -> Result<(), DeviceError> {
+        match &activation.action {
+            FaultAction::Timeout { duration_ms } => {
+                return Err(Self::fault_failure(
+                    activation,
+                    &command.name,
+                    FaultErrorCode::Timeout,
+                    Some(ms_to_ns(*duration_ms, &activation.id)?),
+                    now_ns,
+                    "operation timed out by fault",
+                ));
+            }
+            FaultAction::Delay { duration_ms } => {
+                let duration = ms_to_ns(*duration_ms, &activation.id)?;
+                let deadline = now_ns.checked_add(duration).ok_or_else(|| {
+                    Self::fault_failure(
+                        activation,
+                        &command.name,
+                        FaultErrorCode::ActionFailed,
+                        Some(duration),
+                        now_ns,
+                        "fault delay deadline overflows virtual time",
+                    )
+                })?;
+                state
+                    .scheduler
+                    .schedule_at(
+                        deadline,
+                        PendingOperation::FaultDelay {
+                            fault_id: activation.id.clone(),
+                            command: command.name.clone(),
+                            duration_ns: duration,
+                            started_at_ns: now_ns,
+                        },
+                    )
+                    .map_err(|error| {
+                        Self::fault_failure(
+                            activation,
+                            &command.name,
+                            FaultErrorCode::ActionFailed,
+                            Some(duration),
+                            now_ns,
+                            &error.to_string(),
+                        )
+                    })?;
+            }
+            FaultAction::ReturnError { message, .. } => {
+                return Err(Self::fault_failure(
+                    activation,
+                    &command.name,
+                    FaultErrorCode::ReturnError,
+                    None,
+                    now_ns,
+                    message,
+                ));
+            }
+            FaultAction::Drop => {
+                return Err(Self::fault_failure(
+                    activation,
+                    &command.name,
+                    FaultErrorCode::Dropped,
+                    None,
+                    now_ns,
+                    "operation dropped by fault",
+                ));
+            }
+            FaultAction::CorruptResponse { .. } => {}
+            FaultAction::ForceRegisterValue { .. } | FaultAction::StuckAt { .. } => {
+                Self::apply_register_fault(state, command, register, activation, now_ns)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_register_fault(
+        state: &mut DeviceState,
+        command: &SpiCommand,
+        register: Option<u64>,
+        activation: &vds_core::fault::FaultActivation,
+        now_ns: u64,
+    ) -> Result<(), DeviceError> {
+        let address = register.ok_or_else(|| {
+            Self::fault_failure(
+                activation,
+                &command.name,
+                FaultErrorCode::ActionFailed,
+                None,
+                now_ns,
+                "fault target has no resolved register",
+            )
+        })?;
+        match &activation.action {
+            FaultAction::ForceRegisterValue { value } => {
+                state
+                    .registers
+                    .write_internal(address, *value)
+                    .map_err(|error| {
+                        map_register_error(&error, RegisterOperation::Write, Some(*value))
+                    })?;
+            }
+            FaultAction::StuckAt { value, mask } => {
+                state
+                    .stuck_registers
+                    .retain(|stuck| stuck.address != address);
+                state.stuck_registers.push(ActiveStuck {
+                    address,
+                    value: *value,
+                    mask: *mask,
+                    persistent: activation.persistent,
+                });
+                let current = state
+                    .registers
+                    .read_internal(address)
+                    .map_err(|error| map_register_error(&error, RegisterOperation::Read, None))?
+                    .value;
+                let forced = apply_stuck(current, *value, *mask);
+                state
+                    .registers
+                    .write_internal(address, forced)
+                    .map_err(|error| {
+                        map_register_error(&error, RegisterOperation::Write, Some(forced))
+                    })?;
+            }
+            _ => unreachable!("only register fault actions are delegated"),
+        }
+        Ok(())
+    }
+
+    fn fault_failure(
+        activation: &vds_core::fault::FaultActivation,
+        command: &str,
+        code: FaultErrorCode,
+        duration_ns: Option<u64>,
+        now_ns: u64,
+        message: &str,
+    ) -> DeviceError {
+        DeviceError::Fault(Box::new(FaultFailure {
+            code,
+            fault_id: activation.id.clone(),
+            command: command.to_owned(),
+            duration_ns,
+            trigger: activation.trigger.name(),
+            trigger_count: activation.trigger_count,
+            action: activation.action.name(),
+            virtual_time_ns: now_ns,
+            message: message.to_owned(),
+        }))
+    }
     /// Returns the current named state when this device has a state machine.
     ///
     /// # Errors
@@ -597,7 +848,14 @@ impl GenericSpiDevice {
                 request.len()
             )));
         }
-        let value = decode_unsigned(&request[address_end..]);
+        let requested_value = decode_unsigned(&request[address_end..]);
+        let value = state
+            .stuck_registers
+            .iter()
+            .find(|stuck| stuck.address == address)
+            .map_or(requested_value, |stuck| {
+                apply_stuck(requested_value, stuck.value, stuck.mask)
+            });
         state
             .registers
             .validate_write(address, value)
@@ -772,6 +1030,18 @@ impl GenericSpiDevice {
                         .retain(|event_id| *event_id != event.id);
                     Self::dispatch_state_event(state, &state_event, now_ns, &mut emitted)?;
                 }
+                PendingOperation::FaultDelay {
+                    fault_id,
+                    command,
+                    duration_ns,
+                    started_at_ns,
+                } => emitted.push(DeviceEvent::FaultDelayCompleted {
+                    fault_id,
+                    command,
+                    scheduled_duration_ns: duration_ns,
+                    started_at_ns,
+                    completed_at_ns: now_ns,
+                }),
             }
         }
         Ok(emitted)
@@ -1034,6 +1304,45 @@ fn validate_register_reference(
     }
 }
 
+fn validate_faults(
+    faults: &[FaultDefinition],
+    registers: &[RegisterDefinition],
+) -> Result<(), ModelError> {
+    let mut ids = std::collections::HashSet::new();
+    for fault in faults {
+        if !ids.insert(&fault.id) {
+            return Err(ModelError::DuplicateFaultId {
+                id: fault.id.clone(),
+            });
+        }
+        if matches!(
+            fault.trigger,
+            vds_core::fault::FaultTrigger::FirstN(0)
+                | vds_core::fault::FaultTrigger::EveryNth(0)
+                | vds_core::fault::FaultTrigger::OperationCount(0)
+        ) {
+            return Err(ModelError::InvalidFault {
+                id: fault.id.clone(),
+                reason: "trigger count must be greater than zero".to_owned(),
+            });
+        }
+        if matches!(
+            fault.action,
+            FaultAction::ForceRegisterValue { .. } | FaultAction::StuckAt { .. }
+        ) && fault.target.register.is_none()
+        {
+            return Err(ModelError::InvalidFault {
+                id: fault.id.clone(),
+                reason: "register action requires target.register".to_owned(),
+            });
+        }
+        if let Some(register) = fault.target.register.as_deref() {
+            validate_register_reference(registers, register)?;
+        }
+    }
+    Ok(())
+}
+
 fn initialize_state_machine(state: &mut DeviceState, now_ns: u64) -> Result<(), ModelError> {
     let Some(machine) = state.state_machine.as_ref() else {
         return Ok(());
@@ -1211,6 +1520,16 @@ fn encode_unsigned(value: u64, byte_count: usize) -> Vec<u8> {
     value.to_be_bytes()[8 - byte_count..].to_vec()
 }
 
+fn apply_stuck(candidate: u64, value: u64, mask: Option<u64>) -> u64 {
+    mask.map_or(value, |mask| (candidate & !mask) | (value & mask))
+}
+
+fn ms_to_ns(duration_ms: u64, fault_id: &str) -> Result<u64, DeviceError> {
+    duration_ms.checked_mul(1_000_000).ok_or_else(|| {
+        DeviceError::InvalidRequest(format!("fault '{fault_id}' duration overflows nanoseconds"))
+    })
+}
+
 fn map_access(access: AccessType) -> RegisterAccessType {
     match access {
         AccessType::Ro => RegisterAccessType::Ro,
@@ -1359,6 +1678,12 @@ pub enum ModelError {
     #[error("failed to initialize device state machine: {0}")]
     StateInitialization(String),
 
+    #[error("fault id '{id}' is duplicated")]
+    DuplicateFaultId { id: String },
+
+    #[error("fault '{id}' is invalid: {reason}")]
+    InvalidFault { id: String, reason: String },
+
     #[error(transparent)]
     StateMachine(#[from] StateMachineError),
 
@@ -1372,7 +1697,7 @@ mod tests {
 
     use vds_core::{
         clock::ManualClock,
-        device::{Device, DeviceError, StateErrorCode, TimingErrorCode},
+        device::{Device, DeviceError, FaultErrorCode, StateErrorCode, TimingErrorCode},
         event::DeviceEvent,
     };
 
@@ -1913,5 +2238,136 @@ device:
                 .response,
             [0x12]
         );
+    }
+
+    fn fault_model(faults: &str) -> String {
+        format!(
+            r"schema_version: 1
+device:
+  id: spi-flash-0
+  name: Fault Device
+  bus: spi
+  model: generic-spi-command
+  commands:
+    - {{ name: READ_ID, opcode: 0x9F, response: [0xEF, 0x40, 0x18] }}
+    - {{ name: READ_REGISTER, opcode: 0x03, operation: register_read, address_bytes: 1 }}
+    - {{ name: WRITE_REGISTER, opcode: 0x02, operation: register_write, address_bytes: 1 }}
+  registers:
+    - {{ name: CONTROL, address: 0x01, width_bits: 8, reset_value: 0x12, access: rw }}
+  faults:
+{faults}"
+        )
+    }
+
+    #[test]
+    fn fault_yaml_rejects_duplicate_ids_and_unknown_actions() {
+        let duplicate = fault_model(
+            "    - { id: same, target: {}, trigger: always, action: { type: drop } }\n    - { id: same, target: {}, trigger: always, action: { type: drop } }",
+        );
+        assert!(matches!(
+            DeviceModel::from_yaml(&duplicate),
+            Err(ModelError::DuplicateFaultId { .. })
+        ));
+        let unknown = fault_model(
+            "    - { id: bad, target: {}, trigger: always, action: { type: explode } }",
+        );
+        assert!(matches!(
+            DeviceModel::from_yaml(&unknown),
+            Err(ModelError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn fault_actions_are_deterministic_and_structured() {
+        let yaml = fault_model(
+            "    - { id: corrupt, target: { command: READ_ID }, trigger: { every_nth: 2 }, action: { type: corrupt_response, xor_mask: 1 } }\n    - { id: force, target: { command: READ_REGISTER, register: CONTROL }, trigger: always, action: { type: force_register_value, value: 90 } }",
+        );
+        let device = DeviceModel::from_yaml(&yaml)
+            .unwrap()
+            .into_spi_device()
+            .unwrap();
+        assert_eq!(
+            device.transfer(&[0x9f]).unwrap().response,
+            [0xef, 0x40, 0x18]
+        );
+        let corrupted = device.transfer(&[0x9f]).unwrap();
+        assert_eq!(corrupted.response, [0xee, 0x41, 0x19]);
+        assert!(corrupted.events.iter().any(|event| matches!(event, DeviceEvent::FaultTriggered { fault_id, trigger_count: 2, .. } if fault_id == "corrupt")));
+        assert_eq!(device.transfer(&[0x03, 0x01]).unwrap().response, [0x5a]);
+    }
+
+    #[test]
+    fn terminal_faults_return_structured_errors() {
+        for (action, expected) in [
+            (
+                "{ type: timeout, duration_ms: 500 }",
+                FaultErrorCode::Timeout,
+            ),
+            (
+                "{ type: return_error, code: injected, message: failed }",
+                FaultErrorCode::ReturnError,
+            ),
+            ("{ type: drop }", FaultErrorCode::Dropped),
+        ] {
+            let yaml = fault_model(&format!(
+                "    - {{ id: terminal, target: {{ command: READ_ID }}, trigger: always, action: {action} }}"
+            ));
+            let device = DeviceModel::from_yaml(&yaml)
+                .unwrap()
+                .into_spi_device()
+                .unwrap();
+            assert!(
+                matches!(device.transfer(&[0x9f]), Err(DeviceError::Fault(failure)) if failure.code == expected && failure.trigger_count == 1)
+            );
+        }
+    }
+
+    #[test]
+    fn delay_uses_virtual_scheduler_and_stuck_at_blocks_writes() {
+        let clock = Arc::new(ManualClock::default());
+        let yaml = fault_model(
+            "    - { id: delay, target: { command: READ_ID }, trigger: { first_n: 1 }, action: { type: delay, duration_ms: 5 } }\n    - { id: stuck, target: { command: WRITE_REGISTER, register: CONTROL }, trigger: always, action: { type: stuck_at, value: 240, mask: 240 } }",
+        );
+        let device = DeviceModel::from_yaml(&yaml)
+            .unwrap()
+            .into_spi_device_with_clock(clock.clone())
+            .unwrap();
+        device.transfer(&[0x9f]).unwrap();
+        clock.advance(Duration::from_millis(4)).unwrap();
+        assert!(device.run_due_events().unwrap().is_empty());
+        clock.advance(Duration::from_millis(1)).unwrap();
+        assert!(matches!(
+            device.run_due_events().unwrap().as_slice(),
+            [DeviceEvent::FaultDelayCompleted {
+                completed_at_ns: 5_000_000,
+                ..
+            }]
+        ));
+        device.transfer(&[0x02, 0x01, 0x05]).unwrap();
+        assert_eq!(device.transfer(&[0x03, 0x01]).unwrap().response, [0xf5]);
+    }
+
+    #[test]
+    fn reset_clears_transient_counters_but_preserves_persistent_counters() {
+        for persistent in [false, true] {
+            let yaml = fault_model(&format!(
+                "    - {{ id: counted, persistent: {persistent}, target: {{ command: READ_ID }}, trigger: {{ operation_count: 2 }}, action: {{ type: corrupt_response, xor_mask: 1 }} }}"
+            ));
+            let device = DeviceModel::from_yaml(&yaml)
+                .unwrap()
+                .into_spi_device()
+                .unwrap();
+            device.transfer(&[0x9f]).unwrap();
+            device.reset().unwrap();
+            let response = device.transfer(&[0x9f]).unwrap().response;
+            assert_eq!(
+                response,
+                if persistent {
+                    vec![0xee, 0x41, 0x19]
+                } else {
+                    vec![0xef, 0x40, 0x18]
+                }
+            );
+        }
     }
 }

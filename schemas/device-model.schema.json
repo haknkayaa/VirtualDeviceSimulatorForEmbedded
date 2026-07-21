@@ -148,6 +148,10 @@
             }
           }
         },
+        "faults": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fault" }
+        },
         "state_machine": {
           "type": "object",
           "additionalProperties": false,
@@ -170,6 +174,46 @@
     }
   },
   "$defs": {
+    "fault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "target", "trigger", "action"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "enabled": { "type": "boolean" },
+        "priority": { "type": "integer" },
+        "persistent": { "type": "boolean" },
+        "target": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "device": { "type": "string", "minLength": 1 },
+            "command": { "type": "string", "minLength": 1 },
+            "register": { "type": "string", "minLength": 1 },
+            "state": { "type": "string", "minLength": 1 }
+          }
+        },
+        "trigger": {
+          "oneOf": [
+            { "const": "always" },
+            { "type": "object", "additionalProperties": false, "required": ["first_n"], "properties": { "first_n": { "type": "integer", "minimum": 1 } } },
+            { "type": "object", "additionalProperties": false, "required": ["every_nth"], "properties": { "every_nth": { "type": "integer", "minimum": 1 } } },
+            { "type": "object", "additionalProperties": false, "required": ["operation_count"], "properties": { "operation_count": { "type": "integer", "minimum": 1 } } }
+          ]
+        },
+        "action": { "$ref": "#/$defs/fault_action" }
+      }
+    },
+    "fault_action": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["type", "duration_ms"], "properties": { "type": { "const": "timeout" }, "duration_ms": { "type": "integer", "minimum": 0 } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "duration_ms"], "properties": { "type": { "const": "delay" }, "duration_ms": { "type": "integer", "minimum": 0 } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "code", "message"], "properties": { "type": { "const": "return_error" }, "code": { "type": "string", "minLength": 1 }, "message": { "type": "string" } } },
+        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "const": "drop" } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "xor_mask"], "properties": { "type": { "const": "corrupt_response" }, "xor_mask": { "type": "integer", "minimum": 0, "maximum": 255 } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": { "type": { "const": "force_register_value" }, "value": { "type": "integer", "minimum": 0 } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "value"], "properties": { "type": { "const": "stuck_at" }, "value": { "type": "integer", "minimum": 0 }, "mask": { "type": "integer", "minimum": 1 } } }
+      ]
+    },
     "state": {
       "type": "object",
       "additionalProperties": false,

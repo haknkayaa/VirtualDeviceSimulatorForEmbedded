@@ -12,7 +12,9 @@ use tokio::net::{UnixListener, UnixStream};
 use tracing::{info, warn};
 use vds_core::{
     config::ServerConfig,
-    device::{Device, DeviceError, RegisterErrorCode, StateErrorCode, TimingErrorCode},
+    device::{
+        Device, DeviceError, FaultErrorCode, RegisterErrorCode, StateErrorCode, TimingErrorCode,
+    },
     event::DeviceEvent,
     registry::DeviceRegistry,
     transaction::{Transaction, TransactionResult},
@@ -158,6 +160,9 @@ fn handle_request(
                 code: code_name,
                 message: error.to_string(),
             };
+            if let DeviceError::Fault(failure) = &error {
+                log_fault_failure(&spi.device_id, failure);
+            }
             log_transaction(&transaction);
             error_response(request_id, code, error.to_string())
         }
@@ -206,6 +211,12 @@ fn protocol_error_code(error: &DeviceError) -> (ErrorCode, &'static str) {
             StateErrorCode::ActionFailed | StateErrorCode::Internal => {
                 (ErrorCode::StateActionFailed, "state_action_failed")
             }
+        },
+        DeviceError::Fault(failure) => match failure.code {
+            FaultErrorCode::Timeout => (ErrorCode::FaultTimeout, "fault_timeout"),
+            FaultErrorCode::ReturnError => (ErrorCode::FaultReturnError, "fault_return_error"),
+            FaultErrorCode::Dropped => (ErrorCode::FaultDropped, "fault_dropped"),
+            FaultErrorCode::ActionFailed => (ErrorCode::FaultActionFailed, "fault_action_failed"),
         },
     }
 }
@@ -277,8 +288,95 @@ fn log_device_events(device_id: &str, events: &[DeviceEvent]) {
                 result,
                 "device state transitioned"
             ),
+            DeviceEvent::FaultTriggered {
+                fault_id,
+                command,
+                trigger,
+                trigger_count,
+                action,
+                virtual_time_ns,
+                result,
+            } => log_fault_triggered(
+                device_id,
+                fault_id,
+                command,
+                trigger,
+                *trigger_count,
+                action,
+                *virtual_time_ns,
+                result,
+            ),
+            DeviceEvent::FaultDelayCompleted {
+                fault_id,
+                command,
+                scheduled_duration_ns,
+                started_at_ns,
+                completed_at_ns,
+            } => log_fault_delay_completed(
+                device_id,
+                fault_id,
+                command,
+                *scheduled_duration_ns,
+                *started_at_ns,
+                *completed_at_ns,
+            ),
         }
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn log_fault_triggered(
+    device_id: &str,
+    fault_id: &str,
+    command: &str,
+    trigger: &str,
+    trigger_count: u64,
+    action: &str,
+    virtual_time_ns: u64,
+    result: &str,
+) {
+    info!(
+        component = "fault_engine",
+        event = "fault_triggered",
+        fault_id,
+        device_id,
+        command,
+        trigger,
+        trigger_count,
+        action,
+        virtual_time_ns,
+        result,
+        "fault applied"
+    );
+}
+
+fn log_fault_delay_completed(
+    device_id: &str,
+    fault_id: &str,
+    command: &str,
+    scheduled_duration_ns: u64,
+    started_at_ns: u64,
+    completed_at_ns: u64,
+) {
+    info!(
+        component = "fault_engine",
+        event = "fault_delay_completed",
+        fault_id,
+        device_id,
+        command,
+        scheduled_duration_ns,
+        virtual_started_at_ns = started_at_ns,
+        virtual_completed_at_ns = completed_at_ns,
+        result = "completed",
+        "fault delay completed"
+    );
+}
+
+fn log_fault_failure(device_id: &str, failure: &vds_core::device::FaultFailure) {
+    info!(component = "fault_engine", event = "fault_triggered", fault_id = %failure.fault_id,
+        device_id, command = %failure.command, trigger = failure.trigger,
+        trigger_count = failure.trigger_count, action = failure.action,
+        virtual_time_ns = failure.virtual_time_ns, result = "applied", "terminal fault applied");
 }
 
 fn error_response(request_id: u64, code: ErrorCode, message: String) -> ServerResponse {

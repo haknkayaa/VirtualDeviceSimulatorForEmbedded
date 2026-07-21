@@ -69,3 +69,22 @@ machine gate below passes in the same workspace test run.
 | State transitions are structured logs | `timed_write_logs_start_and_completion` |
 | Existing timing behavior remains compatible | `delayed_write_observes_busy_lifecycle` |
 | READ_ID remains compatible | `read_id_round_trips_over_the_unix_socket` |
+
+## Fault Injection Engine v1
+
+No work may begin on scenario behavior until every fault gate below passes in
+the same workspace test run.
+
+| Gate | Automated coverage |
+| --- | --- |
+| YAML parsing and action validation | `fault_yaml_rejects_duplicate_ids_and_unknown_actions` |
+| Disabled faults are ignored | `disabled_fault_is_ignored` |
+| First-N and Every-Nth are deterministic | `first_n_and_every_nth_are_deterministic` |
+| Priority, YAML order, and terminal precedence | `priority_then_yaml_order_and_terminal_stop` |
+| Timeout, returned error, and drop are structured | `terminal_faults_return_structured_errors` |
+| Delay uses the virtual scheduler | `delay_uses_virtual_scheduler_and_stuck_at_blocks_writes` |
+| Response corruption and forced values work | `fault_actions_are_deterministic_and_structured` |
+| Stuck-at constrains normal writes | `delay_uses_virtual_scheduler_and_stuck_at_blocks_writes` |
+| Reset honors transient/persistent behavior | `reset_clears_transient_counters_but_preserves_persistent_counters` |
+| Fault activation is structured in protocol and logs | `timeout_fault_is_structured_and_logged` |
+| Existing state, timing, register, READ_ID and C client behavior remains compatible | `cargo test --workspace` |

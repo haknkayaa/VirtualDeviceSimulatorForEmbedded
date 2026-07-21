@@ -5,6 +5,7 @@ pub mod config;
 pub mod device;
 pub mod error;
 pub mod event;
+pub mod fault;
 pub mod registry;
 pub mod state_machine;
 pub mod transaction;

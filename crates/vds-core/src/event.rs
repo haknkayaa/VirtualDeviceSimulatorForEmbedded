@@ -129,6 +129,22 @@ pub enum DeviceEvent {
         virtual_time_ns: u64,
         result: &'static str,
     },
+    FaultTriggered {
+        fault_id: String,
+        command: String,
+        trigger: &'static str,
+        trigger_count: u64,
+        action: &'static str,
+        virtual_time_ns: u64,
+        result: &'static str,
+    },
+    FaultDelayCompleted {
+        fault_id: String,
+        command: String,
+        scheduled_duration_ns: u64,
+        started_at_ns: u64,
+        completed_at_ns: u64,
+    },
 }
 
 #[cfg(test)]
