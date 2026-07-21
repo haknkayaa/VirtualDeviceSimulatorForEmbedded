@@ -47,3 +47,25 @@ passes in the same workspace test run.
 | READ_ID remains backward compatible | `read_id_round_trips_over_the_unix_socket` |
 | C client wire format remains compatible | `c_client_read_id_remains_compatible` |
 | Transaction logs include timing start/completion | `timed_write_logs_start_and_completion` |
+
+## Device State Machine v1
+
+No work may begin on fault injection or scenario behavior until every state
+machine gate below passes in the same workspace test run.
+
+| Gate | Automated coverage |
+| --- | --- |
+| Initial state loads from YAML | `state_machine_initial_state_and_targets_are_validated` |
+| Unknown initial state is rejected | `state_machine_initial_state_and_targets_are_validated` |
+| Unknown transition target is rejected | `state_machine_initial_state_and_targets_are_validated` |
+| Valid transition succeeds | `valid_transition_returns_exit_and_entry_actions` |
+| Invalid event is rejected | `rejects_invalid_event` |
+| Guard condition controls transition | `rejects_transition_when_guard_is_false` |
+| Entry action executes | `delayed_transition_and_state_actions_execute_at_exact_deadline` |
+| Exit action executes | `delayed_transition_and_state_actions_execute_at_exact_deadline` |
+| Delayed event transitions at exact deadline | `delayed_transition_and_state_actions_execute_at_exact_deadline` |
+| Reset returns to initial state and cancels pending work | `state_machine_reset_cancels_operations_and_reenters_initial_state` |
+| Busy command rejection is state-aware | `delayed_transition_and_state_actions_execute_at_exact_deadline` |
+| State transitions are structured logs | `timed_write_logs_start_and_completion` |
+| Existing timing behavior remains compatible | `delayed_write_observes_busy_lifecycle` |
+| READ_ID remains compatible | `read_id_round_trips_over_the_unix_socket` |
