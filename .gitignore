@@ -1,0 +1,13 @@
+/target/
+/client/c/build/
+*.db
+*.db-shm
+*.db-wal
+*.log
+.env
+.idea/
+node_modules/
+dist/
+
+# Company know-how and private extension work must live outside the public tree.
+private/
