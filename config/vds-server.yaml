@@ -1,0 +1,13 @@
+schema_version: 1
+
+server:
+  control_address: 127.0.0.1:8080
+
+data_plane:
+  unix_socket: /tmp/vds4e.sock
+
+observability:
+  log_level: info
+
+device_models:
+  - device-models/examples/spi-flash.yaml
