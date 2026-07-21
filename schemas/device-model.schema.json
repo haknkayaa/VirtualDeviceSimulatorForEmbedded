@@ -75,6 +75,14 @@
                     "type": "boolean"
                   }
                 }
+              },
+              "allowed_states": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
               }
             },
             "oneOf": [
@@ -139,6 +147,141 @@
               "minimum": 1
             }
           }
+        },
+        "state_machine": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["initial_state", "states"],
+          "properties": {
+            "initial_state": {
+              "type": "string",
+              "minLength": 1
+            },
+            "states": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": {
+                "$ref": "#/$defs/state"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "entry_actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "exit_actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/transition"
+          }
+        },
+        "delayed_events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/delayed_event"
+          }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["set_register"],
+      "properties": {
+        "set_register": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "value"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "mask": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["register"],
+      "properties": {
+        "register": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "equals"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "equals": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "mask": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "target"],
+      "properties": {
+        "event": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "guard": {
+          "$ref": "#/$defs/guard"
+        }
+      }
+    },
+    "delayed_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "delay_us"],
+      "properties": {
+        "event": {
+          "type": "string",
+          "minLength": 1
+        },
+        "delay_us": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }
