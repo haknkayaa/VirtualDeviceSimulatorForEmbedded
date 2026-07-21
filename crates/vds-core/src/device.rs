@@ -127,8 +127,8 @@ pub trait Device: Send + Sync {
     /// # Errors
     ///
     /// Returns a device error if runtime state cannot be reset safely.
-    fn reset(&self) -> Result<(), DeviceError> {
-        Ok(())
+    fn reset(&self) -> Result<Vec<DeviceEvent>, DeviceError> {
+        Ok(Vec::new())
     }
 }
 
@@ -159,6 +159,36 @@ pub struct TimingFailure {
     pub message: String,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StateErrorCode {
+    InvalidEvent,
+    GuardRejected,
+    CommandRejected,
+    ActionFailed,
+    Internal,
+}
+
+impl fmt::Display for StateErrorCode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidEvent => formatter.write_str("state_invalid_event"),
+            Self::GuardRejected => formatter.write_str("state_guard_rejected"),
+            Self::CommandRejected => formatter.write_str("state_command_rejected"),
+            Self::ActionFailed => formatter.write_str("state_action_failed"),
+            Self::Internal => formatter.write_str("state_internal"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[error("{message}")]
+pub struct StateFailure {
+    pub code: StateErrorCode,
+    pub state: String,
+    pub event: Option<String>,
+    pub message: String,
+}
+
 /// Errors produced while routing or executing a device transaction.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum DeviceError {
@@ -179,4 +209,7 @@ pub enum DeviceError {
 
     #[error(transparent)]
     Timing(#[from] TimingFailure),
+
+    #[error(transparent)]
+    State(#[from] StateFailure),
 }

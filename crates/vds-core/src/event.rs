@@ -122,6 +122,13 @@ pub enum DeviceEvent {
         register: RegisterTrace,
         result: &'static str,
     },
+    StateTransition {
+        from_state: String,
+        to_state: String,
+        trigger: String,
+        virtual_time_ns: u64,
+        result: &'static str,
+    },
 }
 
 #[cfg(test)]
