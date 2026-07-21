@@ -12,7 +12,7 @@ use tokio::net::{UnixListener, UnixStream};
 use tracing::{info, warn};
 use vds_core::{
     config::ServerConfig,
-    device::{Device, DeviceError, RegisterErrorCode, TimingErrorCode},
+    device::{Device, DeviceError, RegisterErrorCode, StateErrorCode, TimingErrorCode},
     event::DeviceEvent,
     registry::DeviceRegistry,
     transaction::{Transaction, TransactionResult},
@@ -195,6 +195,18 @@ fn protocol_error_code(error: &DeviceError) -> (ErrorCode, &'static str) {
                 (ErrorCode::TimingError, "timing_error")
             }
         },
+        DeviceError::State(failure) => match failure.code {
+            StateErrorCode::InvalidEvent => (ErrorCode::StateInvalidEvent, "state_invalid_event"),
+            StateErrorCode::GuardRejected => {
+                (ErrorCode::StateGuardRejected, "state_guard_rejected")
+            }
+            StateErrorCode::CommandRejected => {
+                (ErrorCode::StateCommandRejected, "state_command_rejected")
+            }
+            StateErrorCode::ActionFailed | StateErrorCode::Internal => {
+                (ErrorCode::StateActionFailed, "state_action_failed")
+            }
+        },
     }
 }
 
@@ -248,6 +260,23 @@ fn log_device_events(device_id: &str, events: &[DeviceEvent]) {
                     "device operation completed"
                 );
             }
+            DeviceEvent::StateTransition {
+                from_state,
+                to_state,
+                trigger,
+                virtual_time_ns,
+                result,
+            } => info!(
+                component = "state_machine",
+                event = "state_transition",
+                device_id,
+                from_state,
+                to_state,
+                trigger,
+                virtual_time_ns,
+                result,
+                "device state transitioned"
+            ),
         }
     }
 }
