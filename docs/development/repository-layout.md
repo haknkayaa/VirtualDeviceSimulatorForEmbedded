@@ -7,11 +7,12 @@ The Phase 0 and first vertical-slice Cargo workspace members are:
 - `apps/vds-server`: headless daemon entry point
 - `apps/vds-cli`: local data-plane diagnostic client
 - `crates/vds-core`: backend-independent clock, deterministic one-shot
-  scheduler, device, registry, transaction, configuration, and error
-  foundations
+  scheduler, generic finite-state machine, device, registry, transaction,
+  configuration, and error foundations
 - `crates/vds-protocol`: Protobuf contract and length-prefixed framing
 - `crates/vds-device-model`: declarative generic device-model loading and
-  command handling, including pending operations and busy state
+  command handling, including device-specific state definitions, register
+  actions, guards, pending operations, and busy state
 - `crates/vds-registers`: declarative RO/WO/RW register validation and runtime
   value ownership
 

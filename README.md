@@ -5,7 +5,8 @@ Its architecture is defined by
 [`VDS4E_ARCHITECTURE.md`](VDS4E_ARCHITECTURE.md).
 
 The repository currently implements Phase 0, the first headless vertical
-slice, Register Engine v1, and Virtual Clock and Timing Engine v1:
+slice, Register Engine v1, Virtual Clock and Timing Engine v1, and Device State
+Machine v1:
 
 ```text
 C or Rust client -> length-prefixed Protobuf -> Unix socket -> vds-server
@@ -133,6 +134,32 @@ device.run_due_events()?; // CONTROL becomes 0x5A and BUSY clears
 Started and completed operations emit separate structured timing logs. Wall
 clock transaction timestamps and virtual operation durations are kept as
 separate fields.
+
+## Device State Machine v1
+
+The example device declares three states in YAML:
+
+```text
+resetting --reset_complete after 5 ms--> ready
+ready     --write_started-------------> busy
+busy      --operation_completed--------> ready
+```
+
+States can declare ordered transitions, register-based guards, register entry
+and exit actions, and one-shot delayed events. The generic transition engine
+lives in `vds-core`; YAML interpretation, register actions, guards, and runtime
+state remain in `vds-device-model`.
+
+`WRITE_REGISTER` is accepted only in `ready`. A write dispatches
+`write_started`; the SPI decoder never assigns the current state directly.
+Completion from the existing timing scheduler dispatches
+`operation_completed`. Reset cancels pending operations, restores registers,
+returns to `resetting`, and schedules a new `reset_complete` event.
+
+Every successful transition emits a structured `state_transition` log with
+the device ID, source state, target state, trigger, and virtual timestamp.
+Models without `state_machine` or command `allowed_states` retain their prior
+behavior.
 
 ## C client example
 
