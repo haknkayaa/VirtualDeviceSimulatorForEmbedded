@@ -88,3 +88,33 @@ the same workspace test run.
 | Reset honors transient/persistent behavior | `reset_clears_transient_counters_but_preserves_persistent_counters` |
 | Fault activation is structured in protocol and logs | `timeout_fault_is_structured_and_logged` |
 | Existing state, timing, register, READ_ID and C client behavior remains compatible | `cargo test --workspace` |
+
+## Scenario Engine v1
+
+| Gate | Automated coverage |
+| --- | --- |
+| YAML parsing, duplicate IDs, and unknown actions | `parses_yaml_and_rejects_duplicate_ids_and_unknown_actions` |
+| Sequential reset, SPI, time, fault, and assertion execution | `executes_sequential_actions_and_exports_json` |
+| Failure stops and remaining steps are skipped | `failure_stops_and_continue_on_failure_is_optional` |
+| Optional continue-on-failure executes remaining steps | `failure_stops_and_continue_on_failure_is_optional` |
+| Manual time and global scenario timeout | `scenario_timeout_prevents_time_from_advancing_past_deadline` |
+| Event wait success | `event_wait_advances_to_the_scheduled_event` |
+| Event wait timeout | `event_wait_times_out_at_exact_virtual_deadline` |
+| JSON result export | `executes_sequential_actions_and_exports_json` |
+| Deterministic replay | `replay_is_deterministic` |
+| Structured scenario and step logs | `emits_structured_scenario_and_step_logs` |
+| Existing fault, state, timing, register, READ_ID and C client behavior remains compatible | `cargo test --workspace` |
+
+## Control API and Live Event Stream v1
+
+| Gate | Automated coverage |
+| --- | --- |
+| Event ordering and exclusive replay by event ID | `event_ids_are_ordered_and_replay_is_exclusive` |
+| Deterministic bounded-ring eviction | `ring_eviction_is_fifo_and_deterministic` |
+| Slow subscribers do not block publishers or peers | `slow_subscriber_does_not_block_publishers_or_other_subscribers` |
+| Health, device, register, state, reset, and fault endpoints | `health_device_register_state_reset_and_fault_endpoints_work` |
+| Scenario start is asynchronous and result is retrievable | `scenario_run_is_asynchronous_and_result_is_retrievable` |
+| Scenario execution emits typed domain events | `scenario_run_is_asynchronous_and_result_is_retrievable` |
+| Structured API errors and no REST SPI data plane | `structured_errors_and_data_plane_separation_are_enforced` |
+| WebSocket ordered replay and live delivery | `websocket_delivers_ordered_replay_after_event_id` |
+| Existing scenario, fault, state, timing, register, READ_ID, and C client behavior remains compatible | `cargo test --workspace` |

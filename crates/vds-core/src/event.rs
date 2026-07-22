@@ -96,6 +96,13 @@ impl<E> EventScheduler<E> {
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
     }
+
+    #[must_use]
+    pub fn next_deadline_ns(&self) -> Option<u64> {
+        self.events
+            .first_key_value()
+            .map(|((deadline, _), _)| *deadline)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
@@ -145,6 +152,19 @@ pub enum DeviceEvent {
         started_at_ns: u64,
         completed_at_ns: u64,
     },
+}
+
+impl DeviceEvent {
+    #[must_use]
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::OperationStarted { .. } => "device_operation_started",
+            Self::OperationCompleted { .. } => "device_operation_completed",
+            Self::StateTransition { .. } => "state_transition",
+            Self::FaultTriggered { .. } => "fault_triggered",
+            Self::FaultDelayCompleted { .. } => "fault_delay_completed",
+        }
+    }
 }
 
 #[cfg(test)]

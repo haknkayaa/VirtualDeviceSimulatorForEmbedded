@@ -7,13 +7,23 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+axum.workspace = true
+futures-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 vds-core = { path = "../../crates/vds-core" }
 vds-device-model = { path = "../../crates/vds-device-model" }
+vds-events = { path = "../../crates/vds-events" }
 vds-protocol = { path = "../../crates/vds-protocol" }
+vds-scenario = { path = "../../crates/vds-scenario" }
 thiserror.workspace = true
+
+[dev-dependencies]
+tower = { version = "0.5.3", features = ["util"] }
+tokio-tungstenite = "0.28.0"
 
 [lints]
 workspace = true

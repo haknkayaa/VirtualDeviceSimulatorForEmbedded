@@ -1,0 +1,24 @@
+[package]
+name = "vds-scenario"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+jsonschema.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+vds-core = { path = "../vds-core" }
+vds-events = { path = "../vds-events" }
+
+[dev-dependencies]
+tracing-subscriber.workspace = true
+vds-device-model = { path = "../vds-device-model" }
+
+[lints]
+workspace = true

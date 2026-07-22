@@ -235,6 +235,17 @@ impl RegisterEngine {
     pub fn is_empty(&self) -> bool {
         self.registers.is_empty()
     }
+
+    #[must_use]
+    pub fn snapshots(&self) -> Vec<RegisterRead> {
+        self.registers
+            .values()
+            .map(|state| RegisterRead {
+                register: metadata(&state.definition),
+                value: state.current_value,
+            })
+            .collect()
+    }
 }
 
 fn validate_definition(definition: &RegisterDefinition) -> Result<(), RegisterError> {

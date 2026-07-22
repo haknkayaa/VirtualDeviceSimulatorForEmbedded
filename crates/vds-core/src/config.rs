@@ -15,6 +15,8 @@ pub struct ServerConfig {
     pub data_plane: DataPlaneSettings,
     pub observability: ObservabilitySettings,
     pub device_models: Vec<PathBuf>,
+    #[serde(default)]
+    pub scenarios: Vec<PathBuf>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -1,0 +1,431 @@
+mod runs;
+
+use std::{collections::HashMap, fs, sync::Arc};
+
+use axum::{
+    Json, Router,
+    extract::{
+        Path, Query, State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    },
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::{get, post},
+};
+use serde::{Deserialize, Serialize};
+use vds_core::{
+    config::ServerConfig,
+    registry::{DeviceRegistry, DeviceSnapshot},
+};
+use vds_events::{EventBus, EventDraft, EventPayload};
+use vds_scenario::{ScenarioDocument, ScenarioResult};
+
+pub use runs::{RunManager, RunRecord, RunStatus};
+
+#[derive(Clone)]
+pub struct ApiState {
+    pub registry: Arc<DeviceRegistry>,
+    pub events: Arc<EventBus>,
+    pub scenarios: Arc<HashMap<String, ScenarioDocument>>,
+    pub runs: Arc<RunManager>,
+    pub config: ServerConfig,
+}
+
+impl ApiState {
+    /// Creates API state and loads configured scenario documents.
+    ///
+    /// # Errors
+    /// Returns an error when a scenario file cannot be read or parsed.
+    pub fn new(
+        config: ServerConfig,
+        registry: Arc<DeviceRegistry>,
+        events: Arc<EventBus>,
+    ) -> Result<Self, String> {
+        let mut scenarios = HashMap::new();
+        for path in &config.scenarios {
+            let yaml = fs::read_to_string(path).map_err(|error| {
+                format!("failed to read scenario '{}': {error}", path.display())
+            })?;
+            let scenario = ScenarioDocument::from_yaml(&yaml)
+                .map_err(|error| format!("invalid scenario '{}': {error}", path.display()))?;
+            let id = scenario.scenario.id.clone();
+            if scenarios.insert(id.clone(), scenario).is_some() {
+                return Err(format!("duplicate scenario id '{id}'"));
+            }
+        }
+        Ok(Self {
+            registry,
+            events,
+            scenarios: Arc::new(scenarios),
+            runs: Arc::new(RunManager::default()),
+            config,
+        })
+    }
+}
+
+pub fn router(state: ApiState) -> Router {
+    Router::new()
+        .route("/api/v1/health", get(health))
+        .route("/api/v1/devices", get(devices))
+        .route("/api/v1/devices/{id}", get(device))
+        .route("/api/v1/devices/{id}/registers", get(registers))
+        .route("/api/v1/devices/{id}/state", get(device_state))
+        .route("/api/v1/devices/{id}/reset", post(reset_device))
+        .route("/api/v1/scenarios", get(scenarios))
+        .route("/api/v1/scenarios/{id}", get(scenario))
+        .route("/api/v1/scenarios/{id}/run", post(run_scenario))
+        .route("/api/v1/runs/{run_id}", get(run))
+        .route("/api/v1/runs/{run_id}/result", get(run_result))
+        .route("/api/v1/faults", get(faults))
+        .route("/api/v1/faults/{id}/enable", post(enable_fault))
+        .route("/api/v1/faults/{id}/disable", post(disable_fault))
+        .route("/api/v1/events", get(events))
+        .with_state(state)
+}
+
+#[derive(Serialize)]
+struct Health {
+    status: &'static str,
+}
+async fn health() -> Json<Health> {
+    Json(Health { status: "ok" })
+}
+
+#[derive(Serialize)]
+struct DeviceDto {
+    id: String,
+    bus: String,
+    state: Option<String>,
+}
+impl From<DeviceSnapshot> for DeviceDto {
+    fn from(value: DeviceSnapshot) -> Self {
+        Self {
+            id: value.id,
+            bus: value.bus,
+            state: value.state,
+        }
+    }
+}
+
+async fn devices(State(state): State<ApiState>) -> ApiResult<Json<Vec<DeviceDto>>> {
+    Ok(Json(
+        state
+            .registry
+            .snapshots()
+            .map_err(ApiError::device)?
+            .into_iter()
+            .map(Into::into)
+            .collect(),
+    ))
+}
+
+async fn device(
+    State(state): State<ApiState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<DeviceDto>> {
+    let found = state
+        .registry
+        .snapshots()
+        .map_err(ApiError::device)?
+        .into_iter()
+        .find(|device| device.id == id)
+        .ok_or_else(|| {
+            ApiError::not_found("device_not_found", format!("device '{id}' was not found"))
+        })?;
+    Ok(Json(found.into()))
+}
+
+#[derive(Serialize)]
+struct RegisterDto {
+    name: String,
+    address: u64,
+    width_bits: u8,
+    access: String,
+    value: u64,
+}
+async fn registers(
+    State(state): State<ApiState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Vec<RegisterDto>>> {
+    Ok(Json(
+        state
+            .registry
+            .registers(&id)
+            .map_err(ApiError::device)?
+            .into_iter()
+            .map(|register| RegisterDto {
+                name: register.name,
+                address: register.address,
+                width_bits: register.width_bits,
+                access: register.access.to_string(),
+                value: register.value,
+            })
+            .collect(),
+    ))
+}
+
+#[derive(Serialize)]
+struct StateDto {
+    device_id: String,
+    state: Option<String>,
+}
+async fn device_state(
+    State(state): State<ApiState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<StateDto>> {
+    let current = state
+        .registry
+        .current_state(&id)
+        .map_err(ApiError::device)?;
+    Ok(Json(StateDto {
+        device_id: id,
+        state: current,
+    }))
+}
+
+async fn reset_device(
+    State(state): State<ApiState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<StateDto>> {
+    let events = state.registry.reset(&id).map_err(ApiError::device)?;
+    let now = state
+        .registry
+        .virtual_time_ns(&id)
+        .map_err(ApiError::device)?;
+    let _ = state.events.publish(EventDraft {
+        virtual_time_ns: now,
+        device_id: Some(id.clone()),
+        scenario_run_id: None,
+        payload: EventPayload::DeviceReset {
+            result: "success".to_owned(),
+        },
+    });
+    for event in events {
+        let _ = state.events.publish(EventDraft {
+            virtual_time_ns: now,
+            device_id: Some(id.clone()),
+            scenario_run_id: None,
+            payload: EventPayload::from_device_event(&event),
+        });
+    }
+    let current = state
+        .registry
+        .current_state(&id)
+        .map_err(ApiError::device)?;
+    Ok(Json(StateDto {
+        device_id: id,
+        state: current,
+    }))
+}
+
+#[derive(Serialize)]
+struct ScenarioSummary {
+    id: String,
+    name: String,
+    timeout_ms: u64,
+    steps: usize,
+}
+async fn scenarios(State(state): State<ApiState>) -> Json<Vec<ScenarioSummary>> {
+    let mut values = state
+        .scenarios
+        .values()
+        .map(|scenario| ScenarioSummary {
+            id: scenario.scenario.id.clone(),
+            name: scenario.scenario.name.clone(),
+            timeout_ms: scenario.scenario.timeout_ms,
+            steps: scenario.steps.len(),
+        })
+        .collect::<Vec<_>>();
+    values.sort_by(|left, right| left.id.cmp(&right.id));
+    Json(values)
+}
+async fn scenario(
+    State(state): State<ApiState>,
+    Path(id): Path<String>,
+) -> ApiResult<Json<ScenarioDocument>> {
+    state.scenarios.get(&id).cloned().map(Json).ok_or_else(|| {
+        ApiError::not_found(
+            "scenario_not_found",
+            format!("scenario '{id}' was not found"),
+        )
+    })
+}
+async fn run_scenario(
+    State(state): State<ApiState>,
+    Path(id): Path<String>,
+) -> ApiResult<(StatusCode, Json<RunRecord>)> {
+    let scenario = state.scenarios.get(&id).cloned().ok_or_else(|| {
+        ApiError::not_found(
+            "scenario_not_found",
+            format!("scenario '{id}' was not found"),
+        )
+    })?;
+    let record = state
+        .runs
+        .start(scenario, state.config.clone(), Arc::clone(&state.events));
+    Ok((StatusCode::ACCEPTED, Json(record)))
+}
+async fn run(
+    State(state): State<ApiState>,
+    Path(run_id): Path<String>,
+) -> ApiResult<Json<RunRecord>> {
+    state.runs.get(&run_id).map(Json).ok_or_else(|| {
+        ApiError::not_found("run_not_found", format!("run '{run_id}' was not found"))
+    })
+}
+async fn run_result(
+    State(state): State<ApiState>,
+    Path(run_id): Path<String>,
+) -> ApiResult<Json<ScenarioResult>> {
+    let record = state.runs.get(&run_id).ok_or_else(|| {
+        ApiError::not_found("run_not_found", format!("run '{run_id}' was not found"))
+    })?;
+    record.result.map(Json).ok_or_else(|| {
+        ApiError::conflict(
+            "run_not_complete",
+            format!("run '{run_id}' is not complete"),
+        )
+    })
+}
+
+#[derive(Serialize)]
+struct FaultDto {
+    id: String,
+    device_id: String,
+    enabled: bool,
+    priority: i32,
+    persistent: bool,
+    trigger: String,
+    action: String,
+}
+async fn faults(State(state): State<ApiState>) -> ApiResult<Json<Vec<FaultDto>>> {
+    Ok(Json(
+        state
+            .registry
+            .fault_snapshots()
+            .map_err(ApiError::device)?
+            .into_iter()
+            .map(|item| FaultDto {
+                id: item.fault.id,
+                device_id: item.device_id,
+                enabled: item.fault.enabled,
+                priority: item.fault.priority,
+                persistent: item.fault.persistent,
+                trigger: item.fault.trigger.to_owned(),
+                action: item.fault.action.to_owned(),
+            })
+            .collect(),
+    ))
+}
+async fn enable_fault(
+    State(state): State<ApiState>,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    set_fault(&state, &id, true)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+async fn disable_fault(
+    State(state): State<ApiState>,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    set_fault(&state, &id, false)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+fn set_fault(state: &ApiState, id: &str, enabled: bool) -> ApiResult<()> {
+    match state
+        .registry
+        .set_fault_enabled(id, enabled)
+        .map_err(ApiError::device)?
+    {
+        1 => Ok(()),
+        0 => Err(ApiError::not_found(
+            "fault_not_found",
+            format!("fault '{id}' was not found"),
+        )),
+        count => Err(ApiError::conflict(
+            "fault_ambiguous",
+            format!("fault '{id}' matched {count} devices"),
+        )),
+    }
+}
+
+#[derive(Deserialize, Default)]
+struct EventsQuery {
+    after_event_id: Option<u64>,
+}
+async fn events(
+    State(state): State<ApiState>,
+    Query(query): Query<EventsQuery>,
+    ws: WebSocketUpgrade,
+) -> Response {
+    ws.on_upgrade(move |socket| {
+        event_socket(socket, state.events, query.after_event_id.unwrap_or(0))
+    })
+}
+async fn event_socket(mut socket: WebSocket, events: Arc<EventBus>, after_event_id: u64) {
+    let mut subscription = events.subscribe_from(after_event_id);
+    while let Some(event) = subscription.recv().await {
+        let Ok(json) = serde_json::to_string(event.as_ref()) else {
+            continue;
+        };
+        if socket.send(Message::Text(json.into())).await.is_err() {
+            break;
+        }
+    }
+}
+
+type ApiResult<T> = Result<T, ApiError>;
+#[derive(Debug)]
+struct ApiError {
+    status: StatusCode,
+    code: &'static str,
+    message: String,
+}
+impl ApiError {
+    fn not_found(code: &'static str, message: String) -> Self {
+        Self {
+            status: StatusCode::NOT_FOUND,
+            code,
+            message,
+        }
+    }
+    fn conflict(code: &'static str, message: String) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            code,
+            message,
+        }
+    }
+    fn device(error: vds_core::device::DeviceError) -> Self {
+        let status = if matches!(error, vds_core::device::DeviceError::NotFound(_)) {
+            StatusCode::NOT_FOUND
+        } else {
+            StatusCode::BAD_REQUEST
+        };
+        let code = error.code();
+        let message = error.to_string();
+        drop(error);
+        Self {
+            status,
+            code,
+            message,
+        }
+    }
+}
+#[derive(Serialize)]
+struct ErrorBody {
+    code: &'static str,
+    message: String,
+}
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        (
+            self.status,
+            Json(ErrorBody {
+                code: self.code,
+                message: self.message,
+            }),
+        )
+            .into_response()
+    }
+}

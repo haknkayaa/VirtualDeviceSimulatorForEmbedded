@@ -8,6 +8,23 @@ pub enum BusType {
     Spi,
 }
 
+impl fmt::Display for BusType {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Spi => formatter.write_str("spi"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RegisterSnapshot {
+    pub name: String,
+    pub address: u64,
+    pub width_bits: u8,
+    pub access: RegisterAccessType,
+    pub value: u64,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RegisterAccessType {
     Ro,
@@ -130,6 +147,62 @@ pub trait Device: Send + Sync {
     fn reset(&self) -> Result<Vec<DeviceEvent>, DeviceError> {
         Ok(Vec::new())
     }
+
+    /// Reads a device register through the public runtime inspection API.
+    ///
+    /// # Errors
+    /// Returns an error when the register is unavailable.
+    fn read_register(&self, name: &str) -> Result<u64, DeviceError> {
+        Err(DeviceError::InvalidRequest(format!(
+            "device '{}' does not expose register '{name}'",
+            self.id()
+        )))
+    }
+
+    /// Returns the current state-machine state, when present.
+    ///
+    /// # Errors
+    /// Returns an error when device runtime state cannot be inspected.
+    fn current_state(&self) -> Result<Option<String>, DeviceError> {
+        Ok(None)
+    }
+
+    /// Enables or disables one declarative fault. Returns whether it was found.
+    ///
+    /// # Errors
+    /// Returns an error when fault runtime state cannot be updated.
+    fn set_fault_enabled(&self, _fault_id: &str, _enabled: bool) -> Result<bool, DeviceError> {
+        Ok(false)
+    }
+
+    /// Returns the next scheduled device deadline in simulator time.
+    ///
+    /// # Errors
+    /// Returns an error when scheduler state cannot be inspected.
+    fn next_event_deadline_ns(&self) -> Result<Option<u64>, DeviceError> {
+        Ok(None)
+    }
+
+    /// Lists current register snapshots through runtime inspection.
+    ///
+    /// # Errors
+    /// Returns an error when register state cannot be inspected.
+    fn registers(&self) -> Result<Vec<RegisterSnapshot>, DeviceError> {
+        Ok(Vec::new())
+    }
+
+    /// Lists current declarative fault snapshots.
+    ///
+    /// # Errors
+    /// Returns an error when fault state cannot be inspected.
+    fn faults(&self) -> Result<Vec<crate::fault::FaultSnapshot>, DeviceError> {
+        Ok(Vec::new())
+    }
+
+    /// Returns this device's current virtual time.
+    fn virtual_time_ns(&self) -> u64 {
+        0
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -248,4 +321,38 @@ pub enum DeviceError {
 
     #[error(transparent)]
     Fault(Box<FaultFailure>),
+}
+
+impl DeviceError {
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::NotFound(_) => "device_not_found",
+            Self::EmptyRequest | Self::InvalidRequest(_) => "invalid_request",
+            Self::UnknownOpcode(_) => "unknown_opcode",
+            Self::Register(failure) => match failure.code {
+                RegisterErrorCode::UnknownAddress => "register_unknown_address",
+                RegisterErrorCode::ReadNotAllowed => "register_read_not_allowed",
+                RegisterErrorCode::WriteNotAllowed => "register_write_not_allowed",
+                RegisterErrorCode::ValueOverflow => "register_value_overflow",
+                RegisterErrorCode::Internal => "register_internal",
+            },
+            Self::Timing(failure) => match failure.code {
+                TimingErrorCode::DeviceBusy => "device_busy",
+                TimingErrorCode::DeadlineOverflow | TimingErrorCode::Scheduler => "timing_error",
+            },
+            Self::State(failure) => match failure.code {
+                StateErrorCode::InvalidEvent => "state_invalid_event",
+                StateErrorCode::GuardRejected => "state_guard_rejected",
+                StateErrorCode::CommandRejected => "state_command_rejected",
+                StateErrorCode::ActionFailed | StateErrorCode::Internal => "state_action_failed",
+            },
+            Self::Fault(failure) => match failure.code {
+                FaultErrorCode::Timeout => "fault_timeout",
+                FaultErrorCode::ReturnError => "fault_return_error",
+                FaultErrorCode::Dropped => "fault_dropped",
+                FaultErrorCode::ActionFailed => "fault_action_failed",
+            },
+        }
+    }
 }
