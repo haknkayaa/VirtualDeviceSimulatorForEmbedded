@@ -25,6 +25,20 @@ The example device implements `READ_ID` (`0x9F`) and returns `EF 40 18`.
 
 ## Quick start
 
+Start the simulator server and hot-reloading Web UI together from the repository
+root:
+
+```shell
+./dev.sh
+```
+
+Open `http://127.0.0.1:4174`. Keep the terminal open while developing and press
+`Ctrl+C` to stop both processes. On the first run, the script installs Web
+dependencies when `apps/vds-web/node_modules` is missing. Override the UI port
+when needed with `VDS_WEB_PORT=4200 ./dev.sh`.
+
+The individual commands remain available for focused server or client work.
+
 Validate the example configuration:
 
 ```shell
