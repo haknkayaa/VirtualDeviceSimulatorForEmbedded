@@ -118,3 +118,17 @@ the same workspace test run.
 | Structured API errors and no REST SPI data plane | `structured_errors_and_data_plane_separation_are_enforced` |
 | WebSocket ordered replay and live delivery | `websocket_delivers_ordered_replay_after_event_id` |
 | Existing scenario, fault, state, timing, register, READ_ID, and C client behavior remains compatible | `cargo test --workspace` |
+
+## Web UI Foundation v1
+
+| Gate | Automated coverage |
+| --- | --- |
+| Typed REST response and structured error mapping | `REST API mapping` |
+| WebSocket reconnect resumes from the latest cursor | `event stream reconnect` |
+| Replay cursor rejects duplicates and moves monotonically | `event replay cursor` |
+| Device and register snapshots render | `devices page` |
+| Fault enable action uses the control API | `devices page` |
+| Scenario start, polling, steps, and JSON result render | `scenario run lifecycle` |
+| Disconnected and API error states are explicit | `transactions connection states`, `devices page` |
+| Production bundle type-checks and builds | `npm run build` |
+| No REST hardware transaction route is introduced | API client review and `structured_errors_and_data_plane_separation_are_enforced` |

@@ -7,6 +7,8 @@ The Phase 0 and first vertical-slice Cargo workspace members are:
 - `apps/vds-server`: headless daemon, Unix-socket data plane, REST control
   plane, and WebSocket event transport
 - `apps/vds-cli`: local data-plane diagnostic client
+- `apps/vds-web`: optional React/Vite control-plane client with REST snapshots,
+  replay-aware WebSocket events, device controls, and scenario run views
 - `crates/vds-core`: backend-independent clock, deterministic one-shot
   scheduler, generic finite-state machine, device, registry, transaction,
   configuration, and error foundations

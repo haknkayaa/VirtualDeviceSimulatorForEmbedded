@@ -210,6 +210,37 @@ The REST surface intentionally has no SPI-transfer endpoint. Hardware
 transactions continue to use the length-prefixed Protobuf protocol over the
 Unix socket, while REST and WebSocket remain control and observability paths.
 
+## Web UI Foundation v1
+
+The React control plane lives in `apps/vds-web`. It reads authoritative
+snapshots from REST and keeps live events, its in-memory replay cursor, and
+connection status in a separate WebSocket store. The UI includes Dashboard,
+Devices, Transactions, and Scenarios routes; it never sends hardware
+transactions over REST.
+
+With `vds-server` running on the default control address, start the Vite
+development server:
+
+```shell
+cd apps/vds-web
+npm install
+npm run dev
+```
+
+Vite proxies `/api` (including the WebSocket upgrade) to
+`http://127.0.0.1:8080`. Override that target with `VDS_API_PROXY_TARGET` or use
+`VITE_API_ROOT` and `VITE_WS_ROOT` for a separately hosted production frontend.
+
+Frontend quality checks:
+
+```shell
+cd apps/vds-web
+npm run lint
+npm run typecheck
+npm run test:run
+npm run build
+```
+
 ## C client example
 
 Build the static C library and sample application:
