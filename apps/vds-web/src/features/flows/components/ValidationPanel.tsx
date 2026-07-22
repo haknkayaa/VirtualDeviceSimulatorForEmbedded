@@ -13,7 +13,7 @@ export function ValidationPanel({ issues }: { issues: ValidationIssue[] }) {
       {issues.length === 0 && <div className="flow-panel-empty flow-valid"><CheckCircle2 size={21} /><strong>Flow is valid</strong><span>No generic validation issues.</span></div>}
       <div className="flow-issue-list">
         {issues.map((issue, index) => (
-          <button key={`${issue.ruleId}-${issue.nodeId ?? issue.edgeId ?? index}`} onClick={() => select(issue.nodeId ? [issue.nodeId] : [], issue.edgeId ? [issue.edgeId] : [])} type="button">
+          <button key={`${issue.ruleId}-${issue.nodeId ?? ''}-${issue.edgeId ?? ''}-${index}`} onClick={() => select(issue.nodeId ? [issue.nodeId] : [], issue.edgeId ? [issue.edgeId] : [])} type="button">
             {issue.severity === 'error' ? <AlertCircle size={15} /> : <AlertTriangle size={15} />}
             <div><strong>{issue.message}</strong><small>{issue.ruleId}</small></div>
           </button>
