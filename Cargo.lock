@@ -1628,7 +1628,10 @@ name = "vds-cli"
 version = "0.1.0"
 dependencies = [
  "tokio",
+ "vds-core",
  "vds-protocol",
+ "vds-scenario",
+ "vds-server",
 ]
 
 [[package]]

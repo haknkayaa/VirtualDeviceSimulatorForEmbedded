@@ -42,9 +42,18 @@ describe('REST API mapping', () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ run_id: 'run-1', scenario_id: 'visual', status: 'queued' }))
     vi.stubGlobal('fetch', fetchMock)
     const document = { schema_version: 1, scenario: { id: 'visual', name: 'Visual', timeout_ms: 1000 }, steps: [{ id: 'reset', continue_on_failure: false, action: 'reset_device', device: 'dev' }] }
-    await api.runScenarioDefinition(document)
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/scenarios/visual/run', expect.objectContaining({
+    await api.runScenarioDefinition({ document, revision: 4 })
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/scenarios/visual/run?revision=4', expect.objectContaining({
       method: 'POST', body: JSON.stringify(document), headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
     }))
+  })
+
+  it('downloads JUnit XML as an opaque server-generated artifact', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('<testsuite/>', { headers: { 'content-type': 'application/xml', 'content-disposition': 'attachment; filename="visual-run-1.junit.xml"' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const artifact = await api.runResultJunit('run-1')
+    expect(fetchMock).toHaveBeenCalledWith('/api/v1/runs/run-1/result/junit', { headers: { Accept: 'application/xml' } })
+    expect(artifact.filename).toBe('visual-run-1.junit.xml')
+    await expect(artifact.blob.text()).resolves.toBe('<testsuite/>')
   })
 })

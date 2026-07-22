@@ -8,7 +8,7 @@ use axum::{
         Path, Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
-    http::StatusCode,
+    http::{StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -18,7 +18,7 @@ use vds_core::{
     registry::{DeviceRegistry, DeviceSnapshot},
 };
 use vds_events::{EventBus, EventDraft, EventPayload};
-use vds_scenario::{ScenarioDocument, ScenarioResult};
+use vds_scenario::{JUnitReportMetadata, ScenarioDocument, ScenarioResult, to_junit_xml};
 
 pub use runs::{RunManager, RunRecord, RunStatus};
 
@@ -76,6 +76,7 @@ pub fn router(state: ApiState) -> Router {
         .route("/api/v1/scenarios/{id}/run", post(run_scenario))
         .route("/api/v1/runs/{run_id}", get(run))
         .route("/api/v1/runs/{run_id}/result", get(run_result))
+        .route("/api/v1/runs/{run_id}/result/junit", get(run_result_junit))
         .route("/api/v1/faults", get(faults))
         .route("/api/v1/faults/{id}/enable", post(enable_fault))
         .route("/api/v1/faults/{id}/disable", post(disable_fault))
@@ -253,8 +254,16 @@ async fn scenario(
 async fn run_scenario(
     State(state): State<ApiState>,
     Path(id): Path<String>,
+    Query(query): Query<RunScenarioQuery>,
     body: Option<Json<serde_json::Value>>,
 ) -> ApiResult<(StatusCode, Json<RunRecord>)> {
+    let scenario_revision = query.revision.unwrap_or(1);
+    if scenario_revision == 0 {
+        return Err(ApiError::bad_request(
+            "invalid_scenario_revision",
+            "scenario revision must be greater than zero".to_owned(),
+        ));
+    }
     let scenario = if let Some(Json(value)) = body {
         let scenario = ScenarioDocument::from_json_value(value).map_err(|error| {
             ApiError::bad_request("invalid_scenario", format!("invalid scenario: {error}"))
@@ -277,10 +286,18 @@ async fn run_scenario(
             )
         })?
     };
-    let record = state
-        .runs
-        .start(scenario, state.config.clone(), Arc::clone(&state.events));
+    let record = state.runs.start(
+        scenario,
+        scenario_revision,
+        state.config.clone(),
+        Arc::clone(&state.events),
+    );
     Ok((StatusCode::ACCEPTED, Json(record)))
+}
+
+#[derive(Deserialize, Default)]
+struct RunScenarioQuery {
+    revision: Option<u64>,
 }
 async fn run(
     State(state): State<ApiState>,
@@ -303,6 +320,63 @@ async fn run_result(
             format!("run '{run_id}' is not complete"),
         )
     })
+}
+
+async fn run_result_junit(
+    State(state): State<ApiState>,
+    Path(run_id): Path<String>,
+) -> ApiResult<Response> {
+    let record = state.runs.get(&run_id).ok_or_else(|| {
+        ApiError::not_found("run_not_found", format!("run '{run_id}' was not found"))
+    })?;
+    let result = record.result.as_ref().ok_or_else(|| {
+        ApiError::conflict(
+            "run_not_complete",
+            format!("run '{run_id}' is not complete"),
+        )
+    })?;
+    let xml = to_junit_xml(
+        result,
+        JUnitReportMetadata {
+            run_id: &run_id,
+            scenario_revision: record.scenario_revision,
+        },
+    );
+    let filename = junit_filename(&record.scenario_id, &run_id);
+    let mut response = xml.into_response();
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        "application/xml; charset=utf-8"
+            .parse()
+            .expect("static content type is valid"),
+    );
+    response.headers_mut().insert(
+        header::CONTENT_DISPOSITION,
+        format!("attachment; filename=\"{filename}\"")
+            .parse()
+            .expect("sanitized filename creates a valid header"),
+    );
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        "no-store".parse().expect("static cache control is valid"),
+    );
+    Ok(response)
+}
+
+fn junit_filename(scenario_id: &str, run_id: &str) -> String {
+    let safe = |value: &str| {
+        value
+            .chars()
+            .map(|character| {
+                if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
+                    character
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>()
+    };
+    format!("{}-{}.junit.xml", safe(scenario_id), safe(run_id))
 }
 
 #[derive(Serialize)]

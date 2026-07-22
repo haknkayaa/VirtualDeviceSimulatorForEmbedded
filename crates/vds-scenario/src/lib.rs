@@ -2,12 +2,14 @@
 
 mod definition;
 mod executor;
+mod junit;
 mod result;
 mod runtime;
 
 pub use definition::{ScenarioAction, ScenarioDefinition, ScenarioDocument, ScenarioStep};
 pub use executor::ScenarioExecutor;
-pub use result::{CommandResult, ResultStatus, ScenarioResult, StepResult};
+pub use junit::{JUnitReportMetadata, to_junit_xml};
+pub use result::{CommandResult, ResultStatus, ScenarioResult, StepFailureKind, StepResult};
 pub use runtime::{ObservedEvent, RegistryRuntime, ScenarioRuntime};
 
 #[derive(Debug, thiserror::Error)]

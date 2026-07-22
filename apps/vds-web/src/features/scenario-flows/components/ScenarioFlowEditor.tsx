@@ -30,7 +30,7 @@ export function ScenarioFlowEditor({ onSave, onExport, onImport, onNotice }: { o
     const result = compile()
     if (!result.document || result.errors.length) { setPreview(result); onNotice('Run blocked by scenario validation.', true); return }
     setPreview(null)
-    start.mutate(result.document, { onSuccess: (record) => { useScenarioRunStore.getState().begin(record.run_id, result.document!, result.stepNodeMap); useRunStore.getState().setActiveRunId(record.run_id); onNotice(`Run ${record.run_id} queued.`) }, onError: (error) => onNotice(error instanceof Error ? error.message : 'Run request failed.', true) })
+    start.mutate({ document: result.document, revision: document.flow.revision }, { onSuccess: (record) => { useScenarioRunStore.getState().begin(record.run_id, result.document!, result.stepNodeMap); useRunStore.getState().setActiveRunId(record.run_id); onNotice(`Run ${record.run_id} queued.`) }, onError: (error) => onNotice(error instanceof Error ? error.message : 'Run request failed.', true) })
   }
   const updateSettings = (next: ScenarioFlowSettings) => updateMetadata({ scenario: { description: next.description, timeout_ms: next.timeout_ms, continue_on_failure: next.continue_on_failure, tags: next.tags, revision: next.revision } })
   return <div className="scenario-flow-editor"><ScenarioToolbar blocked={readOnly} onPreview={() => setPreview(compile())} onRun={run} onSave={onSave} onSettings={updateSettings} onValidate={validate} running={start.isPending} settings={settings} /><FlowWorkspace onExport={onExport} onImport={onImport} onSave={onSave} />{preview && <CompiledScenarioPreview onClose={() => setPreview(null)} result={preview} />}<ScenarioRunPanel /></div>

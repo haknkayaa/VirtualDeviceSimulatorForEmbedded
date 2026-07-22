@@ -30,6 +30,8 @@ pub struct RunRecord {
     pub run_id: String,
     pub scenario_id: String,
     pub status: RunStatus,
+    #[serde(skip)]
+    pub scenario_revision: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<ScenarioResult>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -56,6 +58,7 @@ impl RunManager {
     pub fn start(
         &self,
         scenario: ScenarioDocument,
+        scenario_revision: u64,
         config: ServerConfig,
         events: Arc<EventBus>,
     ) -> RunRecord {
@@ -65,6 +68,7 @@ impl RunManager {
             run_id: run_id.clone(),
             scenario_id: scenario.scenario.id.clone(),
             status: RunStatus::Queued,
+            scenario_revision,
             result: None,
             error: None,
         };

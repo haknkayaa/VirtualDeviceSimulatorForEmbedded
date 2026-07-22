@@ -8,6 +8,12 @@ pub enum ResultStatus {
     Skipped,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StepFailureKind {
+    Assertion,
+    Execution,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum CommandResult {
@@ -24,6 +30,8 @@ pub struct StepResult {
     pub completed_virtual_ns: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(skip)]
+    pub failure_kind: Option<StepFailureKind>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
