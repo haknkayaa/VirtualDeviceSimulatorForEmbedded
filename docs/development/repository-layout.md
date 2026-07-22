@@ -4,7 +4,8 @@ The directory layout follows section 9 of `VDS4E_ARCHITECTURE.md`.
 
 The Phase 0 and first vertical-slice Cargo workspace members are:
 
-- `apps/vds-server`: headless daemon entry point
+- `apps/vds-server`: headless daemon, Unix-socket data plane, REST control
+  plane, and WebSocket event transport
 - `apps/vds-cli`: local data-plane diagnostic client
 - `crates/vds-core`: backend-independent clock, deterministic one-shot
   scheduler, generic finite-state machine, device, registry, transaction,
@@ -15,6 +16,10 @@ The Phase 0 and first vertical-slice Cargo workspace members are:
   actions, guards, pending operations, and busy state
 - `crates/vds-registers`: declarative RO/WO/RW register validation and runtime
   value ownership
+- `crates/vds-scenario`: declarative scenario parsing, sequential deterministic
+  execution, public runtime orchestration, assertions, and JSON results
+- `crates/vds-events`: typed domain-event envelope and payloads, monotonic event
+  IDs, bounded replay ring, filters, and non-blocking broadcast subscriptions
 
 Other architecture-defined directories are reserved for their documented
 phases. They must not gain placeholder implementations or cross-layer

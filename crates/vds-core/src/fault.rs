@@ -121,6 +121,16 @@ pub struct FaultActivation {
     pub persistent: bool,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FaultSnapshot {
+    pub id: String,
+    pub enabled: bool,
+    pub priority: i32,
+    pub persistent: bool,
+    pub trigger: &'static str,
+    pub action: &'static str,
+}
+
 #[derive(Debug)]
 struct RuntimeFault {
     definition: FaultDefinition,
@@ -189,6 +199,31 @@ impl FaultEngine {
                 fault.count = 0;
             }
         }
+    }
+
+    pub fn set_enabled(&mut self, fault_id: &str, enabled: bool) -> bool {
+        self.faults
+            .iter_mut()
+            .find(|fault| fault.definition.id == fault_id)
+            .is_some_and(|fault| {
+                fault.definition.enabled = enabled;
+                true
+            })
+    }
+
+    #[must_use]
+    pub fn snapshots(&self) -> Vec<FaultSnapshot> {
+        self.faults
+            .iter()
+            .map(|fault| FaultSnapshot {
+                id: fault.definition.id.clone(),
+                enabled: fault.definition.enabled,
+                priority: fault.definition.priority,
+                persistent: fault.definition.persistent,
+                trigger: fault.definition.trigger.name(),
+                action: fault.definition.action.name(),
+            })
+            .collect()
     }
 }
 

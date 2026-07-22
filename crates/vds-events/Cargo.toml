@@ -1,0 +1,15 @@
+[package]
+name = "vds-events"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+tokio.workspace = true
+vds-core = { path = "../vds-core" }
+
+[lints]
+workspace = true

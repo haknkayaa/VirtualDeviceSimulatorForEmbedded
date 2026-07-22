@@ -67,6 +67,16 @@ device:
         transitions:
           - event: operation_completed
             target: ready
+  faults:
+    - id: read_id_timeout
+      enabled: false
+      priority: 10
+      target:
+        command: READ_ID
+      trigger: always
+      action:
+        type: timeout
+        duration_ms: 500
   registers:
     - name: STATUS
       address: 0x00

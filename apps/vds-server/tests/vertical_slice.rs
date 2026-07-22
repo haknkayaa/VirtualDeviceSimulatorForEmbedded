@@ -360,10 +360,8 @@ async fn c_client_read_id_remains_compatible() {
 async fn timeout_fault_is_structured_and_logged() {
     let model = example_model_yaml()
         .replace("delay_us: 5000", "delay_us: 0")
-        .replace(
-            "  registers:",
-            "  faults:\n    - id: read_id_timeout\n      enabled: true\n      priority: 10\n      target:\n        device: spi-flash-0\n        command: READ_ID\n        state: ready\n      trigger:\n        operation_count: 1\n      action:\n        type: timeout\n        duration_ms: 500\n  registers:",
-        );
+        .replace("enabled: false", "enabled: true")
+        .replace("trigger: always", "trigger:\n        operation_count: 1");
     let server = TestServer::start_with_model(Some(&model)).await;
 
     let response = server.transfer(200, vec![0x9f]).await;

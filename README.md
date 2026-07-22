@@ -4,9 +4,9 @@ VDS4E is a deterministic and observable virtual embedded hardware laboratory.
 Its architecture is defined by
 [`VDS4E_ARCHITECTURE.md`](VDS4E_ARCHITECTURE.md).
 
-The repository currently implements Phase 0, the first headless vertical
-slice, Register Engine v1, Virtual Clock and Timing Engine v1, and Device State
-Machine v1:
+The repository currently implements the first headless vertical slice plus the
+register, virtual-time, state-machine, fault, scenario, control API, and live
+domain-event layers:
 
 ```text
 C or Rust client -> length-prefixed Protobuf -> Unix socket -> vds-server
@@ -175,6 +175,40 @@ delay deadlines use simulator state and the existing virtual scheduler. Reset
 clears transient fault state while definitions marked `persistent: true` retain
 their counters and active stuck-at constraints. Models without `faults` retain
 their previous behavior.
+
+## Scenario Engine v1
+
+Declarative scenario YAML executes sequentially against the same device
+registry and SPI transaction path used by normal clients. Scenario steps can
+reset devices, advance a shared manual clock, send SPI transfers, enable or
+disable faults, assert responses/errors/registers/states, and wait for
+structured device events.
+
+Command results are stored by `save_as` and consumed by later assertions. The
+first failed step stops execution and marks remaining steps skipped unless that
+step declares `continue_on_failure: true`. Scenario and step results contain
+only virtual timestamps and serialize directly to JSON, so replay with the same
+models and starting clock is deterministic. See
+`scenarios/examples/delayed-write-with-timeout.yaml` for a complete example.
+
+## Control API and live events v1
+
+The server listens on the configured `server.control_address` and exposes a
+REST control plane under `/api/v1`. It provides health, device/register/state,
+reset, scenario/run, and fault-management endpoints. Scenario starts return
+`202 Accepted` with a run ID; status and the final JSON result are retrieved
+from `/api/v1/runs/{run_id}` and `/api/v1/runs/{run_id}/result`.
+
+`GET /api/v1/events` upgrades to a WebSocket stream of typed domain events.
+The in-memory event bus assigns monotonically increasing IDs and retains the
+latest 10,000 events. A reconnecting client can pass
+`?after_event_id=<last_seen_id>` to replay strictly newer retained events before
+continuing with live delivery. Slow subscribers never block simulator work;
+they can recover retained events by ID after lagging.
+
+The REST surface intentionally has no SPI-transfer endpoint. Hardware
+transactions continue to use the length-prefixed Protobuf protocol over the
+Unix socket, while REST and WebSocket remain control and observability paths.
 
 ## C client example
 

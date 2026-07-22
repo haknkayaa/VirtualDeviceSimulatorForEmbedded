@@ -10,8 +10,8 @@ use std::{
 use serde::{Deserialize, Serialize};
 use vds_core::device::{
     BusType, Device, DeviceError, DeviceTransfer, FaultErrorCode, FaultFailure, RegisterAccessType,
-    RegisterErrorCode, RegisterFailure, RegisterOperation, RegisterTrace, StateErrorCode,
-    StateFailure, TimingErrorCode, TimingFailure,
+    RegisterErrorCode, RegisterFailure, RegisterOperation, RegisterSnapshot, RegisterTrace,
+    StateErrorCode, StateFailure, TimingErrorCode, TimingFailure,
 };
 use vds_core::{
     clock::{RealTimeClock, SimulatorClock},
@@ -540,6 +540,57 @@ impl Device for GenericSpiDevice {
         let mut events = Vec::new();
         Self::apply_transition(&mut state, outcome, self.clock.now_ns(), &mut events)?;
         Ok(events)
+    }
+
+    fn read_register(&self, name: &str) -> Result<u64, DeviceError> {
+        let state = self.lock_state()?;
+        let metadata = state.registers.metadata_by_name(name).ok_or_else(|| {
+            DeviceError::InvalidRequest(format!("device '{}' has no register '{name}'", self.id))
+        })?;
+        state
+            .registers
+            .read_internal(metadata.address)
+            .map(|read| read.value)
+            .map_err(|error| map_register_error(&error, RegisterOperation::Read, None))
+    }
+
+    fn current_state(&self) -> Result<Option<String>, DeviceError> {
+        GenericSpiDevice::current_state(self)
+    }
+
+    fn set_fault_enabled(&self, fault_id: &str, enabled: bool) -> Result<bool, DeviceError> {
+        Ok(self
+            .lock_state()?
+            .fault_engine
+            .set_enabled(fault_id, enabled))
+    }
+
+    fn next_event_deadline_ns(&self) -> Result<Option<u64>, DeviceError> {
+        Ok(self.lock_state()?.scheduler.next_deadline_ns())
+    }
+
+    fn registers(&self) -> Result<Vec<RegisterSnapshot>, DeviceError> {
+        Ok(self
+            .lock_state()?
+            .registers
+            .snapshots()
+            .into_iter()
+            .map(|read| RegisterSnapshot {
+                name: read.register.name,
+                address: read.register.address,
+                width_bits: read.register.width_bits,
+                access: map_access(read.register.access),
+                value: read.value,
+            })
+            .collect())
+    }
+
+    fn faults(&self) -> Result<Vec<vds_core::fault::FaultSnapshot>, DeviceError> {
+        Ok(self.lock_state()?.fault_engine.snapshots())
+    }
+
+    fn virtual_time_ns(&self) -> u64 {
+        self.clock.now_ns()
     }
 }
 

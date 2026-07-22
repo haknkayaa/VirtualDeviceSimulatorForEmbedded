@@ -11,6 +11,7 @@ use std::{
 use tokio::net::{UnixListener, UnixStream};
 use tracing::{info, warn};
 use vds_core::{
+    clock::{RealTimeClock, SimulatorClock},
     config::ServerConfig,
     device::{
         Device, DeviceError, FaultErrorCode, RegisterErrorCode, StateErrorCode, TimingErrorCode,
@@ -20,6 +21,7 @@ use vds_core::{
     transaction::{Transaction, TransactionResult},
 };
 use vds_device_model::{DeviceModel, ModelError};
+use vds_events::{EventBus, EventDraft, EventPayload};
 use vds_protocol::{
     framing::{read_message, write_message},
     v1::{
@@ -28,6 +30,8 @@ use vds_protocol::{
     },
 };
 
+pub mod http;
+
 /// Builds a registry from all configured declarative device models.
 ///
 /// # Errors
@@ -35,10 +39,21 @@ use vds_protocol::{
 /// Returns an error when a model is invalid, unsupported, or has a duplicate
 /// device identifier.
 pub fn load_registry(config: &ServerConfig) -> Result<DeviceRegistry, ServerError> {
+    load_registry_with_clock(config, Arc::new(RealTimeClock::new()))
+}
+
+/// Builds a registry whose devices share the supplied simulator clock.
+///
+/// # Errors
+/// Returns an error when a model is invalid or has a duplicate device ID.
+pub fn load_registry_with_clock(
+    config: &ServerConfig,
+    clock: Arc<dyn SimulatorClock>,
+) -> Result<DeviceRegistry, ServerError> {
     let mut registry = DeviceRegistry::new();
     for path in &config.device_models {
         let model = DeviceModel::load(path)?;
-        let device = model.into_spi_device()?;
+        let device = model.into_spi_device_with_clock(Arc::clone(&clock))?;
         info!(
             component = "device_registry",
             device_id = device.id(),
@@ -47,6 +62,7 @@ pub fn load_registry(config: &ServerConfig) -> Result<DeviceRegistry, ServerErro
         );
         registry.register(Arc::new(device))?;
     }
+    drop(clock);
     Ok(registry)
 }
 
@@ -58,7 +74,17 @@ pub fn load_registry(config: &ServerConfig) -> Result<DeviceRegistry, ServerErro
 /// or the listener fails.
 pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
     let registry = Arc::new(load_registry(&config)?);
-    let socket_path = config.data_plane.unix_socket;
+    let events = Arc::new(EventBus::default());
+    spawn_event_logger(Arc::clone(&events));
+    let api_state = http::ApiState::new(config.clone(), Arc::clone(&registry), Arc::clone(&events))
+        .map_err(ServerError::Api)?;
+    let control_listener = tokio::net::TcpListener::bind(&config.server.control_address).await?;
+    let control_address = control_listener.local_addr()?;
+    let api = http::router(api_state);
+    let http_server = async move { axum::serve(control_listener, api).await };
+    tokio::pin!(http_server);
+
+    let socket_path = config.data_plane.unix_socket.clone();
     prepare_socket(&socket_path).await?;
     let listener = UnixListener::bind(&socket_path)?;
     let _socket_guard = SocketGuard(socket_path.clone());
@@ -70,6 +96,7 @@ pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
         device_count = registry.len(),
         "Unix socket data plane listening"
     );
+    info!(component = "control_plane", %control_address, "REST and WebSocket control plane listening");
 
     loop {
         tokio::select! {
@@ -77,12 +104,14 @@ pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
                 let (stream, _) = accepted?;
                 let registry = Arc::clone(&registry);
                 let transaction_ids = Arc::clone(&transaction_ids);
+                let events = Arc::clone(&events);
                 tokio::spawn(async move {
-                    if let Err(error) = serve_connection(stream, registry, transaction_ids).await {
+                    if let Err(error) = serve_connection(stream, registry, transaction_ids, events).await {
                         warn!(component = "data_plane", %error, "client connection closed with error");
                     }
                 });
             }
+            result = &mut http_server => return result.map_err(ServerError::Io),
             signal = tokio::signal::ctrl_c() => {
                 signal?;
                 info!(component = "vds-server", "shutdown signal received");
@@ -90,6 +119,24 @@ pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
             }
         }
     }
+}
+
+fn spawn_event_logger(events: Arc<EventBus>) {
+    tokio::spawn(async move {
+        let mut subscription = events.subscribe_from(0);
+        while let Some(event) = subscription.recv().await {
+            info!(
+                component = "domain_events",
+                event_id = event.event_id,
+                event = event.event_type.as_str(),
+                virtual_time_ns = event.timestamp_virtual_ns,
+                wall_time_ns = event.timestamp_wall_ns,
+                device_id = event.device_id.as_deref().unwrap_or(""),
+                scenario_run_id = event.scenario_run_id.as_deref().unwrap_or(""),
+                "domain event published"
+            );
+        }
+    });
 }
 
 async fn prepare_socket(path: &Path) -> Result<(), ServerError> {
@@ -110,6 +157,7 @@ async fn serve_connection(
     mut stream: UnixStream,
     registry: Arc<DeviceRegistry>,
     transaction_ids: Arc<AtomicU64>,
+    events: Arc<EventBus>,
 ) -> Result<(), ServerError> {
     loop {
         let request: ClientRequest = match read_message(&mut stream).await {
@@ -117,7 +165,7 @@ async fn serve_connection(
             Err(error) if error.kind() == ErrorKind::UnexpectedEof => return Ok(()),
             Err(error) => return Err(error.into()),
         };
-        let response = handle_request(request, &registry, &transaction_ids);
+        let response = handle_request(request, &registry, &transaction_ids, &events);
         write_message(&mut stream, &response).await?;
     }
 }
@@ -126,6 +174,7 @@ fn handle_request(
     request: ClientRequest,
     registry: &DeviceRegistry,
     transaction_ids: &AtomicU64,
+    events: &EventBus,
 ) -> ServerResponse {
     let request_id = request.request_id;
     let Some(client_request::Payload::SpiTransfer(spi)) = request.payload else {
@@ -138,11 +187,41 @@ fn handle_request(
 
     let transaction_id = transaction_ids.fetch_add(1, Ordering::Relaxed);
     let mut transaction = Transaction::now(transaction_id, spi.device_id.clone(), spi.tx.clone());
+    let virtual_time_ns = registry.virtual_time_ns(&spi.device_id).unwrap_or(0);
+    let _ = events.publish(EventDraft {
+        virtual_time_ns,
+        device_id: Some(spi.device_id.clone()),
+        scenario_run_id: None,
+        payload: EventPayload::TransactionStarted {
+            transaction_id: Some(transaction_id),
+            request: spi.tx.clone(),
+        },
+    });
     match registry.transfer(&spi.device_id, &spi.tx) {
         Ok(transfer) => {
             transaction.response.clone_from(&transfer.response);
             transaction.register.clone_from(&transfer.register);
             log_device_events(&spi.device_id, &transfer.events);
+            let _ = events.publish(EventDraft {
+                virtual_time_ns,
+                device_id: Some(spi.device_id.clone()),
+                scenario_run_id: None,
+                payload: EventPayload::TransactionCompleted {
+                    transaction_id: Some(transaction_id),
+                    response: transfer.response.clone(),
+                    result: "success".to_owned(),
+                    error_code: None,
+                },
+            });
+            if let Some(register) = &transfer.register {
+                let _ = events.publish(EventDraft {
+                    virtual_time_ns,
+                    device_id: Some(spi.device_id.clone()),
+                    scenario_run_id: None,
+                    payload: EventPayload::from_register(register),
+                });
+            }
+            publish_device_events(events, &spi.device_id, &transfer.events, virtual_time_ns);
             log_transaction(&transaction);
             ServerResponse {
                 request_id,
@@ -162,10 +241,65 @@ fn handle_request(
             };
             if let DeviceError::Fault(failure) = &error {
                 log_fault_failure(&spi.device_id, failure);
+                let _ = events.publish(EventDraft {
+                    virtual_time_ns: failure.virtual_time_ns,
+                    device_id: Some(spi.device_id.clone()),
+                    scenario_run_id: None,
+                    payload: EventPayload::FaultTriggered {
+                        fault_id: failure.fault_id.clone(),
+                        command: failure.command.clone(),
+                        trigger: failure.trigger.to_owned(),
+                        trigger_count: failure.trigger_count,
+                        action: failure.action.to_owned(),
+                        result: "applied".to_owned(),
+                    },
+                });
             }
+            let _ = events.publish(EventDraft {
+                virtual_time_ns,
+                device_id: Some(spi.device_id.clone()),
+                scenario_run_id: None,
+                payload: EventPayload::TransactionCompleted {
+                    transaction_id: Some(transaction_id),
+                    response: Vec::new(),
+                    result: "error".to_owned(),
+                    error_code: Some(code_name.to_owned()),
+                },
+            });
             log_transaction(&transaction);
             error_response(request_id, code, error.to_string())
         }
+    }
+}
+
+fn publish_device_events(
+    bus: &EventBus,
+    device_id: &str,
+    events: &[DeviceEvent],
+    fallback_time_ns: u64,
+) {
+    for event in events {
+        let virtual_time_ns = match event {
+            DeviceEvent::OperationStarted { started_at_ns, .. } => *started_at_ns,
+            DeviceEvent::OperationCompleted {
+                completed_at_ns, ..
+            }
+            | DeviceEvent::FaultDelayCompleted {
+                completed_at_ns, ..
+            } => *completed_at_ns,
+            DeviceEvent::StateTransition {
+                virtual_time_ns, ..
+            }
+            | DeviceEvent::FaultTriggered {
+                virtual_time_ns, ..
+            } => *virtual_time_ns,
+        };
+        let _ = bus.publish(EventDraft {
+            virtual_time_ns: virtual_time_ns.max(fallback_time_ns),
+            device_id: Some(device_id.to_owned()),
+            scenario_run_id: None,
+            payload: EventPayload::from_device_event(event),
+        });
     }
 }
 
@@ -500,4 +634,7 @@ pub enum ServerError {
 
     #[error("refusing to replace non-socket path '{0}'")]
     UnsafeSocketPath(PathBuf),
+
+    #[error("control API initialization failed: {0}")]
+    Api(String),
 }
