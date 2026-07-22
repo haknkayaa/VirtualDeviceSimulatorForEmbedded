@@ -1,5 +1,7 @@
 # Virtual Device Simulator for Embedded (VDS4E)
 
+[![CI](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/ci.yml)
+
 VDS4E is a deterministic and observable virtual embedded hardware laboratory.
 Its architecture is defined by
 [`VDS4E_ARCHITECTURE.md`](VDS4E_ARCHITECTURE.md).
