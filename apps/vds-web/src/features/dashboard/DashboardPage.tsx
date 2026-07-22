@@ -3,6 +3,7 @@ import { Activity, Boxes, Radio, ShieldAlert } from 'lucide-react'
 
 import { useDevices, useFaults, useHealth, useRun } from '../../api/queries'
 import { AsyncState } from '../../components/AsyncState'
+import { BrandLogo } from '../../components/BrandLogo'
 import { GlassPanel } from '../../components/GlassPanel'
 import { MetricCard } from '../../components/MetricCard'
 import { PageHeader } from '../../components/PageHeader'
@@ -53,7 +54,8 @@ export function DashboardPage() {
             ))}
           </div>
         </GlassPanel>
-        <GlassPanel eyebrow="Orchestration" title="Active scenario run">
+        <GlassPanel className="dashboard-run-panel" eyebrow="Orchestration" title="Active scenario run">
+          <BrandLogo className="panel-brand-watermark" decorative />
           {!activeRunId && <AsyncState detail="Start a scenario to track it here." kind="empty" title="No active run" />}
           {activeRun.isError && <AsyncState detail={activeRun.error.message} kind="error" title="Run status unavailable" />}
           {activeRun.data && (

@@ -1,6 +1,7 @@
-import { Activity, Boxes, Gauge, GitBranch, PlaySquare, Radio, Waves } from 'lucide-react'
+import { Activity, Boxes, Gauge, GitBranch, PlaySquare, Radio } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 
+import { BrandLogo } from '../components/BrandLogo'
 import { EventDetailDrawer } from '../components/EventDetailDrawer'
 import { StatusBadge } from '../components/StatusBadge'
 import { useEventStore } from '../stores/eventStore'
@@ -19,10 +20,9 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand-lockup">
-          <div className="brand-mark"><Waves aria-hidden="true" size={23} /></div>
-          <div><strong>VDS4E</strong><span>control plane</span></div>
-        </div>
+        <NavLink aria-label="VDS4E dashboard" className="brand-lockup" to="/">
+          <BrandLogo className="sidebar-brand-logo" decorative />
+        </NavLink>
         <nav aria-label="Primary navigation">
           {navigation.map(({ to, label, icon: Icon, end }) => (
             <NavLink className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} end={end} key={to} to={to}>

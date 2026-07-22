@@ -49,10 +49,10 @@ h2 { margin-bottom: 0; font-size: 1.05rem; letter-spacing: -.015em; }
   background: rgba(10, 12, 18, .76); border-right: 1px solid var(--border);
   backdrop-filter: blur(20px);
 }
-.brand-lockup { display: flex; align-items: center; gap: 11px; padding: 0 8px 28px; }
-.brand-mark { display: grid; place-items: center; width: 38px; height: 38px; color: #061015; background: linear-gradient(135deg, var(--cyan), #8cffe2); border-radius: 11px; box-shadow: 0 0 30px rgba(88,217,231,.18); }
-.brand-lockup strong { display: block; font-size: 1.05rem; letter-spacing: .08em; }
-.brand-lockup span { display: block; margin-top: 1px; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; }
+.brand-lockup { display: block; width: 100%; padding: 1px 7px 27px; }
+.sidebar-brand-logo { display: block; width: min(100%, 178px); opacity: .96; transition: opacity .16s ease; }
+.sidebar-brand-logo img { display: block; width: 100%; height: auto; }
+.brand-lockup:hover .sidebar-brand-logo { opacity: 1; }
 .sidebar nav { display: grid; gap: 5px; }
 .nav-link { display: flex; align-items: center; gap: 11px; min-height: 43px; padding: 0 12px; color: #9da5b6; border: 1px solid transparent; border-radius: 9px; font-size: .9rem; font-weight: 600; transition: color .16s ease, background .16s ease, border-color .16s ease; }
 .nav-link:hover { color: #fff; background: rgba(255,255,255,.035); }
@@ -82,6 +82,10 @@ h2 { margin-bottom: 0; font-size: 1.05rem; letter-spacing: -.015em; }
 .accent-cyan { color: var(--cyan); } .accent-violet { color: var(--violet); } .accent-amber { color: var(--amber); }
 .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .dashboard-transactions { grid-column: 1 / -1; }
+.dashboard-run-panel { position: relative; isolation: isolate; overflow: hidden; }
+.dashboard-run-panel > :not(.panel-brand-watermark) { position: relative; z-index: 1; }
+.panel-brand-watermark { position: absolute; right: -18px; bottom: -12px; z-index: 0; width: min(48%, 270px); opacity: .035; pointer-events: none; user-select: none; }
+.panel-brand-watermark img { display: block; width: 100%; height: auto; }
 
 .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid; border-radius: 99px; font-size: .67rem; font-weight: 700; letter-spacing: .035em; text-transform: uppercase; white-space: nowrap; }
 .status-badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
