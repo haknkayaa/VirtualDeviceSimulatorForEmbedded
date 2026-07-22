@@ -10,7 +10,10 @@ export function NodePalette() {
   const search = useFlowStore((state) => state.paletteSearch)
   const setSearch = useFlowStore((state) => state.setPaletteSearch)
   const readOnly = useFlowStore((state) => state.readOnly)
-  const nodes = nodeRegistry.list().filter((entry) => `${entry.displayName} ${entry.description} ${entry.category}`.toLowerCase().includes(search.toLowerCase()))
+  const flowKind = useFlowStore((state) => state.document.flow.kind)
+  const nodes = nodeRegistry.list()
+    .filter((entry) => !entry.flowKinds || entry.flowKinds.includes(flowKind))
+    .filter((entry) => `${entry.displayName} ${entry.description} ${entry.category}`.toLowerCase().includes(search.toLowerCase()))
   return (
     <aside className="flow-palette flow-frosted" aria-label="Node palette">
       <header><div><span className="eyebrow">Registry</span><strong>Node palette</strong></div><span>{nodes.length}</span></header>
@@ -37,7 +40,7 @@ export function NodePalette() {
           )
         })}
       </div>
-      <p>Drag a registered type onto the canvas. These nodes contain no simulator semantics.</p>
+      <p>Drag a registered {flowKind} type onto the canvas.</p>
     </aside>
   )
 }

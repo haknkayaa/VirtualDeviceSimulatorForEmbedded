@@ -72,6 +72,28 @@ async fn json_request(
     (status, body)
 }
 
+async fn json_request_with_body(
+    app: axum::Router,
+    method: &str,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method(method)
+                .uri(uri)
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    (status, serde_json::from_slice(&bytes).unwrap())
+}
+
 #[tokio::test]
 async fn health_device_register_state_reset_and_fault_endpoints_work() {
     let app = router(state());
@@ -158,6 +180,35 @@ async fn scenario_run_is_asynchronous_and_result_is_retrievable() {
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
     panic!("scenario run did not complete");
+}
+
+#[tokio::test]
+async fn compiled_visual_scenario_uses_the_existing_run_endpoint_and_executor() {
+    let app = router(state());
+    let definition = serde_json::json!({
+        "schema_version": 1,
+        "scenario": { "id": "visual_reset", "name": "Visual Reset", "timeout_ms": 1000 },
+        "steps": [{ "id": "reset", "continue_on_failure": false, "action": "reset_device", "device": "spi-flash-0" }]
+    });
+    let (status, record) = json_request_with_body(
+        app.clone(),
+        "POST",
+        "/api/v1/scenarios/visual_reset/run",
+        definition,
+    )
+    .await;
+    assert_eq!(status, StatusCode::ACCEPTED);
+    assert_eq!(record["scenario_id"], "visual_reset");
+
+    let mismatch = serde_json::json!({
+        "schema_version": 1,
+        "scenario": { "id": "other", "name": "Other", "timeout_ms": 1 },
+        "steps": [{ "id": "reset", "action": "reset_device", "device": "spi-flash-0" }]
+    });
+    let (status, error) =
+        json_request_with_body(app, "POST", "/api/v1/scenarios/not-other/run", mismatch).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(error["code"], "scenario_id_mismatch");
 }
 
 #[tokio::test]

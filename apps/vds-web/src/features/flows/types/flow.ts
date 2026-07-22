@@ -111,6 +111,7 @@ export interface NodeRegistryEntry {
   validationRules: NodeValidationRule[]
   compilerAdapter?: (node: FlowNodeDocument) => unknown
   runtimeStatusRenderer?: ComponentType<RuntimeStatusRendererProps>
+  flowKinds?: string[]
 }
 
 export interface EdgeRegistryEntry {

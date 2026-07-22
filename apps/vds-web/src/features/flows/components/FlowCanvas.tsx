@@ -35,6 +35,7 @@ interface FlowCanvasProps {
 export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: FlowCanvasProps) {
   const store = useFlowStore()
   const instance = useReactFlow<FlowCanvasNode, FlowCanvasEdge>()
+  const registeredNodeTypes = useMemo(() => canvasNodeTypes(), [])
   const nodes = useMemo<FlowCanvasNode[]>(() => store.document.nodes.map((node) => ({
     id: node.id,
     type: nodeRegistry.has(node.kind) ? node.kind : 'unknown',
@@ -125,7 +126,7 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
         nodes={nodes}
         nodesConnectable={!store.readOnly}
         nodesDraggable={!store.readOnly}
-        nodeTypes={canvasNodeTypes}
+        nodeTypes={registeredNodeTypes}
         onConnect={onConnect}
         onConnectEnd={() => store.setConnectionPreview(null)}
         onEdgesChange={onEdgesChange}

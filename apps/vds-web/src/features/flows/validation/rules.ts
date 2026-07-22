@@ -51,6 +51,7 @@ const edgeReferencesRule: FlowValidationRule = ({ document, nodeRegistry }) => {
 }
 
 const boundaryNodesRule: FlowValidationRule = ({ document }) => {
+  if (document.flow.kind !== 'generic') return []
   const starts = document.nodes.filter((node) => node.kind === 'start')
   const ends = document.nodes.filter((node) => node.kind === 'end')
   const issues: ValidationIssue[] = []

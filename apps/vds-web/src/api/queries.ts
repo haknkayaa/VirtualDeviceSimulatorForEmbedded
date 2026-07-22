@@ -92,6 +92,10 @@ export function useStartScenario() {
   return useMutation({ mutationFn: api.runScenario })
 }
 
+export function useStartScenarioDefinition() {
+  return useMutation({ mutationFn: api.runScenarioDefinition })
+}
+
 export function useRun(id: string | null) {
   return useQuery({
     queryKey: queryKeys.run(id ?? ''),

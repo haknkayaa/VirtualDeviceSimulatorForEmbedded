@@ -132,3 +132,19 @@ the same workspace test run.
 | Disconnected and API error states are explicit | `transactions connection states`, `devices page` |
 | Production bundle type-checks and builds | `npm run build` |
 | No REST hardware transaction route is introduced | API client review and `structured_errors_and_data_plane_separation_are_enforced` |
+
+## Visual Scenario Editor v1
+
+| Gate | Automated coverage |
+| --- | --- |
+| All visual scenario node kinds register through the generic registry | `scenario node registry` |
+| Linear graphs compile deterministically independent of coordinates and edge insertion | `scenario flow compiler` |
+| Start and End remain visual-only | `scenario flow compiler` |
+| All ten existing runtime actions map to the existing scenario schema | `scenario flow compiler` |
+| Branches, cycles, disconnected nodes, invalid parameters, and forward result references are rejected | `scenario flow validation`, `scenario flow compiler` |
+| Runtime events map to external highlights without changing document history | `scenario runtime mapping` |
+| Browser-compiled definitions use the existing run manager and executor | `compiled_visual_scenario_uses_the_existing_run_endpoint_and_executor` |
+| Empty-body configured scenario runs remain backward compatible | `scenario_run_is_asynchronous_and_result_is_retrievable` |
+| No REST hardware transaction route is introduced | `structured_errors_and_data_plane_separation_are_enforced` |
+
+Device Behavior Editor work has not started. Passing this gate does not authorize that phase.

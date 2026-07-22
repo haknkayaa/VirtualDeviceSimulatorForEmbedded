@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
 
 import { GlassPanel } from '../../../components/GlassPanel'
 import { PageHeader } from '../../../components/PageHeader'
@@ -18,6 +19,7 @@ export function FlowsPage() {
     <div className="page-stack">
       <PageHeader eyebrow="Offline visual authoring" title="Flows" description="Versioned local documents powered by a generic node registry. No simulator runtime behavior is attached." />
       <GlassPanel className="flows-catalog" eyebrow="Local workspace" title="Flow documents"><FlowList items={items} /></GlassPanel>
+      <GlassPanel className="flows-catalog" eyebrow="Domain editor" title="Visual scenarios"><Link className="flow-list-new" to="/flows/scenarios"><span><strong>Open Scenario Flow Editor</strong><span>Compile deterministic linear graphs into vds-scenario.</span></span></Link></GlassPanel>
     </div>
   )
 }
