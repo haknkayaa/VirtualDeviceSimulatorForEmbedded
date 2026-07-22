@@ -102,6 +102,14 @@ impl ScenarioDocument {
     pub fn from_yaml(yaml: &str) -> Result<Self, ScenarioError> {
         let yaml_value: serde_yaml::Value = serde_yaml::from_str(yaml)?;
         let instance = serde_json::to_value(yaml_value)?;
+        Self::from_json_value(instance)
+    }
+
+    /// Parses, schema-validates, and semantically validates a JSON scenario value.
+    ///
+    /// # Errors
+    /// Returns an error for schema violations, unknown fields, or duplicate IDs.
+    pub fn from_json_value(instance: serde_json::Value) -> Result<Self, ScenarioError> {
         let schema: serde_json::Value = serde_json::from_str(SCHEMA)
             .map_err(|error| ScenarioError::InvalidSchema(error.to_string()))?;
         let validator = jsonschema::validator_for(&schema)

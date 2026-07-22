@@ -253,13 +253,30 @@ async fn scenario(
 async fn run_scenario(
     State(state): State<ApiState>,
     Path(id): Path<String>,
+    body: Option<Json<serde_json::Value>>,
 ) -> ApiResult<(StatusCode, Json<RunRecord>)> {
-    let scenario = state.scenarios.get(&id).cloned().ok_or_else(|| {
-        ApiError::not_found(
-            "scenario_not_found",
-            format!("scenario '{id}' was not found"),
-        )
-    })?;
+    let scenario = if let Some(Json(value)) = body {
+        let scenario = ScenarioDocument::from_json_value(value).map_err(|error| {
+            ApiError::bad_request("invalid_scenario", format!("invalid scenario: {error}"))
+        })?;
+        if scenario.scenario.id != id {
+            return Err(ApiError::bad_request(
+                "scenario_id_mismatch",
+                format!(
+                    "path scenario '{id}' does not match body scenario '{}'",
+                    scenario.scenario.id
+                ),
+            ));
+        }
+        scenario
+    } else {
+        state.scenarios.get(&id).cloned().ok_or_else(|| {
+            ApiError::not_found(
+                "scenario_not_found",
+                format!("scenario '{id}' was not found"),
+            )
+        })?
+    };
     let record = state
         .runs
         .start(scenario, state.config.clone(), Arc::clone(&state.events));
@@ -382,6 +399,13 @@ struct ApiError {
     message: String,
 }
 impl ApiError {
+    fn bad_request(code: &'static str, message: String) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            code,
+            message,
+        }
+    }
     fn not_found(code: &'static str, message: String) -> Self {
         Self {
             status: StatusCode::NOT_FOUND,

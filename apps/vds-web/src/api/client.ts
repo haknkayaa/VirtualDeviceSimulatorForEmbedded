@@ -60,6 +60,10 @@ export const api = {
   scenario: (id: string) => request<ScenarioDocument>(`/scenarios/${encodeURIComponent(id)}`),
   runScenario: (id: string) =>
     request<RunRecord>(`/scenarios/${encodeURIComponent(id)}/run`, { method: 'POST' }),
+  runScenarioDefinition: (document: ScenarioDocument) =>
+    request<RunRecord>(`/scenarios/${encodeURIComponent(document.scenario.id)}/run`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(document),
+    }),
   run: (id: string) => request<RunRecord>(`/runs/${encodeURIComponent(id)}`),
   runResult: (id: string) => request<ScenarioResult>(`/runs/${encodeURIComponent(id)}/result`),
 }

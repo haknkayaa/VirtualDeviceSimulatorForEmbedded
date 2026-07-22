@@ -58,6 +58,7 @@ interface FlowStoreState {
   updateNodeData: (id: string, patch: JsonObject) => void
   updateEdgeData: (id: string, patch: JsonObject) => void
   updateFlowName: (name: string) => void
+  updateMetadata: (patch: JsonObject) => void
   moveNodes: (positions: Record<string, XYPosition>) => void
   connect: (connection: FlowConnection, kind?: string, id?: string) => boolean
   reconnect: (edgeId: string, connection: FlowConnection) => boolean
@@ -165,6 +166,7 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
     updateNodeData: (id, patch) => { commit((document) => withUpdated(document, { nodes: document.nodes.map((node) => node.id === id ? { ...node, data: { ...node.data, ...patch } } : node) })) },
     updateEdgeData: (id, patch) => { commit((document) => withUpdated(document, { edges: document.edges.map((edge) => edge.id === id ? { ...edge, data: { ...edge.data, ...patch } } : edge) })) },
     updateFlowName: (name) => { commit((document) => ({ ...document, flow: { ...document.flow, name, updated_at: new Date().toISOString() } })) },
+    updateMetadata: (patch) => { commit((document) => withUpdated(document, { metadata: { ...document.metadata, ...patch } })) },
     moveNodes: (positions) => {
       if (get().readOnly) return
       const document = withUpdated(get().document, { nodes: get().document.nodes.map((node) => positions[node.id] ? { ...node, position: positions[node.id] } : node) })

@@ -10,6 +10,8 @@ const TransactionsPage = lazy(() => import('./features/transactions/Transactions
 const ScenariosPage = lazy(() => import('./features/scenarios/ScenariosPage').then((module) => ({ default: module.ScenariosPage })))
 const FlowsPage = lazy(() => import('./features/flows/routes/FlowsPage').then((module) => ({ default: module.FlowsPage })))
 const FlowEditorPage = lazy(() => import('./features/flows/routes/FlowEditorPage').then((module) => ({ default: module.FlowEditorPage })))
+const ScenarioFlowsPage = lazy(() => import('./features/scenario-flows/routes/ScenarioFlowsPage').then((module) => ({ default: module.ScenarioFlowsPage })))
+const ScenarioFlowEditorPage = lazy(() => import('./features/scenario-flows/routes/ScenarioFlowEditorPage').then((module) => ({ default: module.ScenarioFlowEditorPage })))
 
 export function App() {
   return (
@@ -22,6 +24,9 @@ export function App() {
           <Route element={<TransactionsPage />} path="transactions" />
           <Route element={<ScenariosPage />} path="scenarios" />
           <Route element={<FlowsPage />} path="flows" />
+          <Route element={<ScenarioFlowsPage />} path="flows/scenarios" />
+          <Route element={<ScenarioFlowEditorPage />} path="flows/scenarios/new" />
+          <Route element={<ScenarioFlowEditorPage />} path="flows/scenarios/:flowId" />
           <Route element={<FlowEditorPage />} path="flows/new" />
           <Route element={<FlowEditorPage />} path="flows/:flowId" />
           <Route element={<Navigate replace to="/" />} path="*" />
