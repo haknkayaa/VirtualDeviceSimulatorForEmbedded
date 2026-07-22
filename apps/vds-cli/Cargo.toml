@@ -8,8 +8,10 @@ repository.workspace = true
 
 [dependencies]
 tokio.workspace = true
+vds-core = { path = "../../crates/vds-core" }
 vds-protocol = { path = "../../crates/vds-protocol" }
+vds-scenario = { path = "../../crates/vds-scenario" }
+vds-server = { path = "../vds-server" }
 
 [lints]
 workspace = true
-

@@ -193,12 +193,51 @@ async fn compiled_visual_scenario_uses_the_existing_run_endpoint_and_executor() 
     let (status, record) = json_request_with_body(
         app.clone(),
         "POST",
-        "/api/v1/scenarios/visual_reset/run",
+        "/api/v1/scenarios/visual_reset/run?revision=7",
         definition,
     )
     .await;
     assert_eq!(status, StatusCode::ACCEPTED);
     assert_eq!(record["scenario_id"], "visual_reset");
+    assert!(record.get("scenario_revision").is_none());
+    let run_id = record["run_id"].as_str().unwrap();
+    for _ in 0..100 {
+        let (_, run) = json_request(app.clone(), "GET", &format!("/api/v1/runs/{run_id}")).await;
+        if run["status"] == "passed" {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/v1/runs/{run_id}/result/junit"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers()["content-type"],
+        "application/xml; charset=utf-8"
+    );
+    assert_eq!(
+        response.headers()["content-disposition"],
+        format!("attachment; filename=\"visual_reset-{run_id}.junit.xml\"")
+    );
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    let xml = String::from_utf8(
+        to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap()
+            .to_vec(),
+    )
+    .unwrap();
+    assert!(xml.contains("<testsuite name=\"visual_reset\" tests=\"1\""));
+    assert!(xml.contains("name=\"vds4e.run_id\""));
+    assert!(xml.contains("name=\"vds4e.scenario_revision\" value=\"7\""));
 
     let mismatch = serde_json::json!({
         "schema_version": 1,

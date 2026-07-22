@@ -148,3 +148,16 @@ the same workspace test run.
 | No REST hardware transaction route is introduced | `structured_errors_and_data_plane_separation_are_enforced` |
 
 Device Behavior Editor work has not started. Passing this gate does not authorize that phase.
+
+## JUnit XML Export v1
+
+| Gate | Automated coverage |
+| --- | --- |
+| Passing, assertion failure, execution error, and skipped steps map to JUnit elements | `junit::tests::maps_pass_failure_error_and_skipped_with_deterministic_durations` |
+| XML escaping, XML 1.0 character safety, duration conversion, and deterministic output | `junit::tests::maps_pass_failure_error_and_skipped_with_deterministic_durations` |
+| Sensitive raw diagnostics are omitted | `junit::tests::maps_pass_failure_error_and_skipped_with_deterministic_durations` |
+| Existing JSON result shape remains unchanged | `junit::tests::preserves_the_existing_json_result_shape` |
+| CLI writes JSON and JUnit artifacts through the existing executor | `scenario_command_writes_json_and_junit_files` |
+| API returns JUnit body and artifact headers | `compiled_visual_scenario_uses_the_existing_run_endpoint_and_executor` |
+| Visual Scenario Editor delegates XML creation to the API | `ScenarioResultPanel`, `REST API mapping` |
+| Existing scenario runtime semantics remain compatible | `cargo test --workspace` |

@@ -5,7 +5,7 @@ use vds_events::{EventBus, EventDraft, EventPayload};
 
 use crate::{
     CommandResult, ObservedEvent, ResultStatus, ScenarioAction, ScenarioDocument, ScenarioResult,
-    ScenarioRuntime, StepResult,
+    ScenarioRuntime, StepFailureKind, StepResult,
 };
 
 pub struct ScenarioExecutor<R> {
@@ -63,6 +63,7 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
                     started_virtual_ns: now,
                     completed_virtual_ns: now,
                     error: None,
+                    failure_kind: None,
                 });
                 continue;
             }
@@ -80,13 +81,14 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
                 self.execute(&step.action, deadline)
             };
             let completed = self.runtime.now_ns();
-            let (status, error) = match outcome {
-                Ok(()) => (ResultStatus::Passed, None),
+            let (status, error, failure_kind) = match outcome {
+                Ok(()) => (ResultStatus::Passed, None, None),
                 Err(error) => {
                     if !step.continue_on_failure {
                         stopped = true;
                     }
-                    (ResultStatus::Failed, Some(error))
+                    let kind = classify_failure(&step.action, &error);
+                    (ResultStatus::Failed, Some(error), Some(kind))
                 }
             };
             log_step(
@@ -114,6 +116,7 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
                 started_virtual_ns: step_started,
                 completed_virtual_ns: completed,
                 error,
+                failure_kind,
             });
         }
         self.finish_result(document, started, steps)
@@ -390,6 +393,28 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
                 payload,
             });
         }
+    }
+}
+
+fn classify_failure(action: &ScenarioAction, error: &str) -> StepFailureKind {
+    let assertion_failed = match action {
+        ScenarioAction::AssertRegister { .. } => {
+            error.starts_with("register '") && error.contains(" expected ")
+        }
+        ScenarioAction::AssertState { .. } => error.starts_with("state expected "),
+        ScenarioAction::AssertResponse { .. } => {
+            error.starts_with("response mismatch:") || error.contains("not a response")
+        }
+        ScenarioAction::AssertError { .. } => {
+            error.starts_with("error code expected ")
+                || error.contains("is a response, not an error")
+        }
+        _ => false,
+    };
+    if assertion_failed {
+        StepFailureKind::Assertion
+    } else {
+        StepFailureKind::Execution
     }
 }
 

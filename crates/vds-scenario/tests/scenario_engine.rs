@@ -7,6 +7,7 @@ use vds_core::{clock::ManualClock, registry::DeviceRegistry};
 use vds_device_model::DeviceModel;
 use vds_scenario::{
     RegistryRuntime, ResultStatus, ScenarioDocument, ScenarioError, ScenarioExecutor,
+    StepFailureKind,
 };
 
 const DEVICE: &str = r"
@@ -108,6 +109,10 @@ fn failure_stops_and_continue_on_failure_is_optional() {
     let result = executor().run(&ScenarioDocument::from_yaml(&stopped).unwrap());
     assert_eq!(result.steps_failed, 1);
     assert!(result.steps_skipped > 0);
+    assert_eq!(
+        result.steps[3].failure_kind,
+        Some(StepFailureKind::Assertion)
+    );
 
     let continued = stopped.replace(
         "id: check_ready, action: assert_state",
@@ -132,6 +137,10 @@ steps:
     assert_eq!(result.status, ResultStatus::Failed);
     assert_eq!(result.duration_virtual_ns, 7_000_000);
     assert_eq!(result.steps_skipped, 1);
+    assert_eq!(
+        result.steps[0].failure_kind,
+        Some(StepFailureKind::Execution)
+    );
 }
 
 #[test]

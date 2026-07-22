@@ -101,3 +101,8 @@ export interface RunRecord {
   result?: ScenarioResult
   error?: string
 }
+
+export interface DownloadArtifact {
+  blob: Blob
+  filename: string
+}

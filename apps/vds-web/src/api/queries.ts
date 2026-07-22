@@ -116,3 +116,7 @@ export function useRunResult(id: string | null, status: RunStatus | undefined) {
     retry: false,
   })
 }
+
+export function useDownloadRunJunit() {
+  return useMutation({ mutationFn: api.runResultJunit })
+}
