@@ -1,4 +1,4 @@
-import { Activity, Boxes, Gauge, PlaySquare, Radio, Waves } from 'lucide-react'
+import { Activity, Boxes, Gauge, GitBranch, PlaySquare, Radio, Waves } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { EventDetailDrawer } from '../components/EventDetailDrawer'
@@ -10,6 +10,7 @@ const navigation = [
   { to: '/devices', label: 'Devices', icon: Boxes, end: false },
   { to: '/transactions', label: 'Transactions', icon: Activity, end: false },
   { to: '/scenarios', label: 'Scenarios', icon: PlaySquare, end: false },
+  { to: '/flows', label: 'Flows', icon: GitBranch, end: false },
 ] as const
 
 export function AppShell() {
