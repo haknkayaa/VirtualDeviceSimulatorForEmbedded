@@ -4,9 +4,11 @@ import { afterEach } from 'vitest'
 
 import { useEventStore } from '../stores/eventStore'
 import { useRunStore } from '../stores/runStore'
+import { useFlowStore } from '../features/flows/store/flowStore'
 
 afterEach(() => {
   cleanup()
   useEventStore.getState().reset()
   useRunStore.getState().setActiveRunId(null)
+  useFlowStore.getState().reset()
 })

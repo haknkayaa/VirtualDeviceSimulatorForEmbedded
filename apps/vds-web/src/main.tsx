@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom'
 
 import { App } from './App'
 import { EventStreamBridge } from './components/EventStreamBridge'
+import '@xyflow/react/dist/style.css'
 import './styles/app.css'
 
 const queryClient = new QueryClient({
