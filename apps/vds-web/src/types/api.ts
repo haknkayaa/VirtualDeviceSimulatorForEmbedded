@@ -11,6 +11,10 @@ export interface Device {
   id: string
   bus: string
   state: string | null
+  name?: string
+  type?: string
+  model?: string
+  version?: string
 }
 
 export interface DeviceState {

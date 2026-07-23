@@ -9,7 +9,7 @@ function installDeviceApi() {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     if (url === '/api/v1/devices') return jsonResponse([{ id: 'spi-flash-0', bus: 'spi', state: 'ready' }])
-    if (url === '/api/v1/devices/spi-flash-0') return jsonResponse({ id: 'spi-flash-0', bus: 'spi', state: 'ready' })
+    if (url === '/api/v1/devices/spi-flash-0') return jsonResponse({ id: 'spi-flash-0', name: 'Reference Flash', bus: 'spi', type: 'Flash memory', model: 'generic-spi-command', version: '1.0', state: 'ready' })
     if (url.endsWith('/registers')) return jsonResponse([{ name: 'CONTROL', address: 1, width_bits: 8, access: 'rw', value: 18 }])
     if (url.endsWith('/state')) return jsonResponse({ device_id: 'spi-flash-0', state: 'ready' })
     if (url === '/api/v1/faults') return jsonResponse([{ id: 'read_id_timeout', device_id: 'spi-flash-0', enabled: false, priority: 10, persistent: false, trigger: 'always', action: 'timeout' }])
@@ -30,11 +30,29 @@ describe('devices page', () => {
     expect(await screen.findByText('CONTROL')).toBeInTheDocument()
     expect(screen.getAllByText('spi-flash-0').length).toBeGreaterThan(0)
     expect(screen.getByText('0x12')).toBeInTheDocument()
+    expect(screen.getByText('Reference Flash')).toBeInTheDocument()
+    expect(screen.getByText('Flash memory')).toBeInTheDocument()
+    expect(screen.getByText('generic-spi-command')).toBeInTheDocument()
+    expect(screen.getByText('1.0')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'State Machine' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Live Read' })).toHaveAttribute('aria-pressed', 'false')
+    await userEvent.click(screen.getByRole('tab', { name: 'Faults' }))
     await userEvent.click(screen.getByRole('button', { name: 'Enable read_id_timeout' }))
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/faults/read_id_timeout/enable',
       expect.objectContaining({ method: 'POST' }),
     )
+  })
+
+  it('shows explicit placeholders for device data outside the current API contract', async () => {
+    installDeviceApi()
+    renderRoute(<DevicesPage />, '/devices/spi-flash-0', '/devices/:deviceId')
+
+    await screen.findByText('CONTROL')
+    await userEvent.click(screen.getByRole('tab', { name: 'Commands' }))
+    expect(screen.getByText('Not exposed yet')).toBeInTheDocument()
+    expect(screen.getByText('Command metadata is not exposed by the current Control API.')).toBeInTheDocument()
   })
 
   it('renders a structured error state when the registry is unavailable', async () => {
