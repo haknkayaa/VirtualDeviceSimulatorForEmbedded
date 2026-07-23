@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { DevicesPage } from './DevicesPage'
+import { useEventStore } from '../../stores/eventStore'
 import { jsonResponse, renderRoute } from '../../test/render'
 
 function installDeviceApi() {
@@ -24,7 +25,10 @@ function installDeviceApi() {
 }
 
 describe('devices page', () => {
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => {
+    useEventStore.getState().reset()
+    vi.unstubAllGlobals()
+  })
 
   it('renders device/register snapshots and toggles faults through REST', async () => {
     const fetchMock = installDeviceApi()
@@ -33,9 +37,9 @@ describe('devices page', () => {
     expect((await screen.findAllByText('CONTROL')).length).toBeGreaterThan(0)
     expect(screen.getAllByText('0x12').length).toBeGreaterThan(0)
     expect(screen.getByText('Reference Flash')).toBeInTheDocument()
-    expect(screen.getByText('Flash memory')).toBeInTheDocument()
-    expect(screen.getByText('generic-spi-command')).toBeInTheDocument()
-    expect(screen.getByText('1.0')).toBeInTheDocument()
+    expect(screen.getAllByText('Flash memory').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('generic-spi-command').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('1.0').length).toBeGreaterThan(0)
     expect(screen.getByRole('tab', { name: 'State Machine' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Register Map' })).toBeInTheDocument()
     expect(screen.getByText('2 Registers')).toBeInTheDocument()
@@ -46,12 +50,44 @@ describe('devices page', () => {
     expect(screen.getByText('0x0030')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Live Read' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('heading', { name: 'Recent Transactions' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Value Controls' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Validation & State' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Device Information' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Write' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Write & Verify' })).toBeDisabled()
     await userEvent.click(screen.getByRole('tab', { name: 'Faults' }))
     await userEvent.click(screen.getByRole('button', { name: 'Enable read_id_timeout' }))
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/faults/read_id_timeout/enable',
       expect.objectContaining({ method: 'POST' }),
     )
+  })
+
+  it('renders recent register events in the device footer without a separate transaction path', async () => {
+    installDeviceApi()
+    useEventStore.getState().acceptEvent({
+      event_id: 7,
+      event_type: 'register_write',
+      timestamp_virtual_ns: 2_000_000,
+      timestamp_wall_ns: 0,
+      device_id: 'spi-flash-0',
+      payload: {
+        kind: 'register_write',
+        name: 'CONTROL',
+        address: 1,
+        old_value: 0,
+        new_value: 18,
+      },
+    })
+    renderRoute(<DevicesPage />, '/devices/spi-flash-0', '/devices/:deviceId')
+
+    await screen.findAllByText('CONTROL')
+    expect(screen.getByText('2.000 ms')).toBeInTheDocument()
+    expect(screen.getByText('Write', { selector: '.transaction-write' })).toBeInTheDocument()
+    expect(screen.getAllByText('0x12').length).toBeGreaterThan(1)
+    expect(screen.getByText('Live snapshot')).toBeInTheDocument()
+    expect(screen.getByText('100%')).toBeInTheDocument()
   })
 
   it('filters the register map and edits a local bitfield draft without issuing a write', async () => {

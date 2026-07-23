@@ -18,6 +18,7 @@ import { VirtualEventList } from '../../components/VirtualEventList'
 import { useEventStore } from '../../stores/eventStore'
 import { humanize } from '../../utils/format'
 import { BitfieldInspector } from './BitfieldInspector'
+import { DeviceFooterPanels } from './DeviceFooterPanels'
 import { DeviceProfileCard } from './DeviceProfileCard'
 import { RegisterMap } from './RegisterMap'
 import { RegisterMapOverview } from './RegisterMapOverview'
@@ -240,6 +241,21 @@ export function DevicesPage() {
           {renderInspectorContent()}
         </aside>
       </div>
+      {deviceId && (
+        <DeviceFooterPanels
+          key={selectedRegister?.address ?? 'none'}
+          currentState={state.data?.state ?? device.data?.state ?? null}
+          device={device.data}
+          events={deviceEvents}
+          isRefreshing={registers.isFetching}
+          liveRead={liveRead}
+          onLiveReadChange={setLiveRead}
+          onRefreshRegisters={() => void refetchRegisters()}
+          onSelectRegister={setSelectedRegisterAddress}
+          registers={registerList}
+          selectedRegister={selectedRegister}
+        />
+      )}
     </div>
   )
 }
