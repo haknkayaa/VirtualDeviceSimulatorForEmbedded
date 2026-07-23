@@ -8,6 +8,7 @@ const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').th
 const DevicesPage = lazy(() => import('./features/devices/DevicesPage').then((module) => ({ default: module.DevicesPage })))
 const TransactionsPage = lazy(() => import('./features/transactions/TransactionsPage').then((module) => ({ default: module.TransactionsPage })))
 const ScenariosPage = lazy(() => import('./features/scenarios/ScenariosPage').then((module) => ({ default: module.ScenariosPage })))
+const DeviceLibraryPage = lazy(() => import('./features/device-library/DeviceLibraryPage').then((module) => ({ default: module.DeviceLibraryPage })))
 const FlowsPage = lazy(() => import('./features/flows/routes/FlowsPage').then((module) => ({ default: module.FlowsPage })))
 const FlowEditorPage = lazy(() => import('./features/flows/routes/FlowEditorPage').then((module) => ({ default: module.FlowEditorPage })))
 const ScenarioFlowsPage = lazy(() => import('./features/scenario-flows/routes/ScenarioFlowsPage').then((module) => ({ default: module.ScenarioFlowsPage })))
@@ -25,6 +26,7 @@ export function App() {
           <Route element={<DevicesPage />} path="devices/:deviceId" />
           <Route element={<TransactionsPage />} path="transactions" />
           <Route element={<ScenariosPage />} path="scenarios" />
+          <Route element={<DeviceLibraryPage />} path="device-library" />
           <Route element={<FlowsPage />} path="flows" />
           <Route element={<ScenarioFlowsPage />} path="flows/scenarios" />
           <Route element={<ScenarioFlowEditorPage />} path="flows/scenarios/new" />

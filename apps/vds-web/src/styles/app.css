@@ -267,7 +267,7 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
   .app-shell { grid-template-columns: 1fr; }
   .sidebar { position: relative; width: 100%; height: auto; padding: 12px; border-width: 0 0 1px; border-radius: 0; }
   .brand-lockup { width: 175px; padding: 0 5px 10px; }
-  .sidebar nav { grid-template-columns: repeat(5, 1fr); }
+  .sidebar nav { grid-template-columns: repeat(6, 1fr); }
   .nav-link { justify-content: center; padding: 0 7px; }
   .nav-link span { display: none; }
   .sidebar-stream { position: absolute; right: 12px; top: 12px; margin: 0; padding: 7px 9px; }
