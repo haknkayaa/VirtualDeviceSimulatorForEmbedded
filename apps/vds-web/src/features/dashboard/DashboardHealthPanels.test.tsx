@@ -19,6 +19,7 @@ describe('dashboard health panels', () => {
     expect(screen.getByText('vds-protocol')).toBeInTheDocument()
     expect(screen.getByText('vds-registers')).toBeInTheDocument()
     expect(screen.getByText('vds-scenario')).toBeInTheDocument()
+    expect(screen.getAllByText('RUNNING')).toHaveLength(9)
     expect(
       screen.getByRole('heading', { name: 'System Health' }).compareDocumentPosition(
         screen.getByRole('heading', { name: 'Server Health' }),
@@ -35,6 +36,13 @@ describe('dashboard health panels', () => {
     expect(screen.getByText('Disk')).toBeInTheDocument()
     expect(screen.getByText('Network Traffic')).toBeInTheDocument()
     expect(screen.getAllByText('Not exposed').length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('marks server-backed modules as failed when server health is unavailable', () => {
+    render(<DashboardHealthPanels healthStatus="offline" />)
+
+    expect(screen.getAllByText('FAIL')).toHaveLength(8)
+    expect(screen.getAllByText('RUNNING')).toHaveLength(1)
   })
 
   it('formats typed host telemetry when supplied by the health contract', () => {

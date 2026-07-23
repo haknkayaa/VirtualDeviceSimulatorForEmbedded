@@ -26,6 +26,8 @@ const workspaceNavigation = [
   { to: '/flows', label: 'Flow editor', end: false },
 ] as const
 
+const currentYear = new Date().getFullYear()
+
 export function AppShell() {
   const { theme, toggleTheme } = useTheme()
   const connectionStatus = useEventStore((state) => state.connectionStatus)
@@ -83,6 +85,17 @@ export function AppShell() {
           </div>
         </header>
         <main className="main-content"><Outlet /></main>
+        <footer className="app-footer">
+          <div>
+            <strong>VDS<span>4E</span></strong>
+            <span>Virtual Device Simulator for Embedded</span>
+          </div>
+          <div>
+            <code>v0.1.0-alpha</code>
+            <span>Local control plane</span>
+            <span>© {currentYear} VDS4E</span>
+          </div>
+        </footer>
       </div>
       <EventDetailDrawer />
     </div>
