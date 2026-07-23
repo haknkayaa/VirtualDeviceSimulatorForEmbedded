@@ -30,4 +30,4 @@ Compiled documents are posted to the existing `POST /api/v1/scenarios/{id}/run` 
 
 ## Phase gate
 
-Visual Scenario Editor v1 does not include or begin the Device Behavior Editor, Topology Editor, or Fault Flow Editor phases.
+Visual Scenario Editor v1 remains independent of the later Device Behavior Editor. Topology Editor and Fault Flow Editor work have not started.

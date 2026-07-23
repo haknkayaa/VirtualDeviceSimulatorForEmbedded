@@ -36,6 +36,10 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
   const store = useFlowStore()
   const instance = useReactFlow<FlowCanvasNode, FlowCanvasEdge>()
   const registeredNodeTypes = useMemo(() => canvasNodeTypes(), [])
+  const registeredEdgeTypes = useMemo(() => canvasEdgeTypes(), [])
+  const defaultEdgeKind = typeof store.document.metadata.default_edge_kind === 'string' && edgeRegistry.has(store.document.metadata.default_edge_kind)
+    ? store.document.metadata.default_edge_kind
+    : 'default'
   const nodes = useMemo<FlowCanvasNode[]>(() => store.document.nodes.map((node) => ({
     id: node.id,
     type: nodeRegistry.has(node.kind) ? node.kind : 'unknown',
@@ -60,8 +64,13 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
     selected: store.selectedEdgeIds.includes(edge.id),
     reconnectable: !store.readOnly,
     markerEnd: { type: MarkerType.ArrowClosed },
-    data: { document: edge, issues: issues.filter((issue) => issue.edgeId === edge.id), readOnly: store.readOnly },
-  })), [issues, store.document.edges, store.readOnly, store.selectedEdgeIds])
+    data: {
+      document: edge,
+      issues: issues.filter((issue) => issue.edgeId === edge.id),
+      readOnly: store.readOnly,
+      runtimeStatus: store.runtimeStatuses[edge.id] ?? 'idle',
+    },
+  })), [issues, store.document.edges, store.readOnly, store.runtimeStatuses, store.selectedEdgeIds])
 
   const fitView = useCallback(() => { void instance.fitView({ padding: 0.2, duration: 260 }) }, [instance])
   const shortcutOptions = useMemo(() => ({ fitView, save: onSave, canvasFocused }), [canvasFocused, fitView, onSave])
@@ -98,9 +107,9 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
     target: connection.target,
     targetHandle: connection.targetHandle ?? null,
   }), [])
-  const onConnect = useCallback((connection: Connection) => { store.connect(connectionFrom(connection)) }, [connectionFrom, store])
+  const onConnect = useCallback((connection: Connection) => { store.connect(connectionFrom(connection), defaultEdgeKind) }, [connectionFrom, defaultEdgeKind, store])
   const onReconnect = useCallback<OnReconnect<FlowCanvasEdge>>((edge, connection) => { store.reconnect(edge.id, connectionFrom(connection)) }, [connectionFrom, store])
-  const isValidConnection = useCallback<IsValidConnection<FlowCanvasEdge>>((connection) => validateFlowConnection(store.document, connectionFrom(connection)), [connectionFrom, store.document])
+  const isValidConnection = useCallback<IsValidConnection<FlowCanvasEdge>>((connection) => validateFlowConnection(store.document, connectionFrom(connection), defaultEdgeKind), [connectionFrom, defaultEdgeKind, store.document])
 
   return (
     <div
@@ -112,11 +121,11 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
       <ReactFlow<FlowCanvasNode, FlowCanvasEdge>
         colorMode="dark"
         defaultViewport={store.document.viewport}
-        defaultEdgeOptions={{ type: 'default' }}
+        defaultEdgeOptions={{ type: defaultEdgeKind }}
         deleteKeyCode={null}
         edges={edges}
         edgesReconnectable={!store.readOnly}
-        edgeTypes={canvasEdgeTypes as unknown as EdgeTypes}
+        edgeTypes={registeredEdgeTypes as unknown as EdgeTypes}
         elementsSelectable
         elevateEdgesOnSelect
         fitViewOptions={{ padding: 0.2 }}
