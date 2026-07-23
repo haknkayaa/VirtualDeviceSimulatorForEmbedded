@@ -50,7 +50,7 @@ pub fn load_registry_with_clock(
     config: &ServerConfig,
     clock: Arc<dyn SimulatorClock>,
 ) -> Result<DeviceRegistry, ServerError> {
-    let mut registry = DeviceRegistry::new();
+    let registry = DeviceRegistry::new();
     for path in &config.device_models {
         let model = DeviceModel::load(path)?;
         let device = model.into_spi_device_with_clock(Arc::clone(&clock))?;
@@ -73,11 +73,17 @@ pub fn load_registry_with_clock(
 /// Returns an error when models cannot be loaded, the socket cannot be created,
 /// or the listener fails.
 pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
-    let registry = Arc::new(load_registry(&config)?);
+    let clock: Arc<dyn SimulatorClock> = Arc::new(RealTimeClock::new());
+    let registry = Arc::new(load_registry_with_clock(&config, Arc::clone(&clock))?);
     let events = Arc::new(EventBus::default());
     spawn_event_logger(Arc::clone(&events));
-    let api_state = http::ApiState::new(config.clone(), Arc::clone(&registry), Arc::clone(&events))
-        .map_err(ServerError::Api)?;
+    let api_state = http::ApiState::new(
+        config.clone(),
+        Arc::clone(&registry),
+        Arc::clone(&events),
+        clock,
+    )
+    .map_err(ServerError::Api)?;
     let control_listener = tokio::net::TcpListener::bind(&config.server.control_address).await?;
     let control_address = control_listener.local_addr()?;
     let api = http::router(api_state);

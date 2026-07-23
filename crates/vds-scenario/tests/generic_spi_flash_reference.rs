@@ -12,7 +12,7 @@ fn executor() -> ScenarioExecutor<RegistryRuntime> {
         .expect("reference model must parse")
         .into_spi_device_with_clock(clock.clone())
         .expect("reference model must build");
-    let mut registry = DeviceRegistry::new();
+    let registry = DeviceRegistry::new();
     registry.register(Arc::new(device)).unwrap();
     ScenarioExecutor::new(RegistryRuntime::new(Arc::new(registry), clock))
 }

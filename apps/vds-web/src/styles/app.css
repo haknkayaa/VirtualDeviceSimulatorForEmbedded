@@ -220,11 +220,6 @@ h2 { margin-bottom: 0; font-size: .85rem; letter-spacing: -.01em; }
 .device-instance-header strong { display: block; margin-top: 3px; color: var(--text-strong); font-size: .78rem; }
 .device-instance-count { display: grid !important; place-items: center; min-width: 23px; height: 23px; color: var(--cyan) !important; background: rgba(75,163,255,.08); border: 1px solid rgba(75,163,255,.18); border-radius: 6px; font-family: 'SFMono-Regular',Consolas,monospace; }
 .device-add-button { width: 100%; min-height: 35px; font-size: .67rem; }
-.device-add-help { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 8px; padding: 9px; color: var(--cyan); background: rgba(75,163,255,.055); border: 1px solid rgba(75,163,255,.15); border-radius: 8px; }
-.device-add-help strong,.device-add-help span,.device-add-help a { display: block; }
-.device-add-help strong { color: var(--text-strong); font-size: .64rem; }
-.device-add-help span { margin-top: 3px; color: var(--muted); font-size: .55rem; line-height: 1.45; }
-.device-add-help a { margin-top: 7px; color: var(--cyan); font-size: .58rem; font-weight: 750; }
 .device-instance-list { display: grid; gap: 6px; max-height: calc(100vh - 330px); overflow-y: auto; }
 .device-instance-link { position: relative; display: grid; grid-template-columns: 31px minmax(0,1fr); gap: 8px; padding: 9px; color: var(--text); background: rgba(255,255,255,.016); border: 1px solid var(--border); border-radius: 8px; }
 .device-instance-link:hover { background: rgba(75,163,255,.04); border-color: rgba(75,163,255,.18); }
@@ -239,6 +234,26 @@ h2 { margin-bottom: 0; font-size: .85rem; letter-spacing: -.01em; }
 .device-instance-status i { width: 5px; height: 5px; background: var(--muted); border-radius: 50%; }
 .device-instance-status.online { color: var(--green); }.device-instance-status.online i { background: var(--green); box-shadow: 0 0 7px rgba(80,216,149,.5); }
 .device-instance-message { padding: 12px 7px; color: var(--muted); font-size: .58rem; line-height: 1.4; }.device-instance-message.error { color: var(--red); }
+.dialog-backdrop { position: fixed; z-index: 120; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(2,9,15,.7); backdrop-filter: blur(8px); }
+.add-device-dialog { display: grid; gap: 16px; width: min(520px,100%); max-height: calc(100vh - 48px); overflow-y: auto; padding: 18px; box-shadow: 0 30px 90px rgba(0,0,0,.48); }
+.add-device-dialog > header { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; align-items: start; gap: 11px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.add-device-dialog-icon { display: grid; place-items: center; width: 42px; height: 42px; color: var(--cyan); background: rgba(75,163,255,.08); border: 1px solid rgba(75,163,255,.18); border-radius: 10px; }
+.add-device-dialog header p { margin: 0 0 3px; color: var(--cyan); font-size: .56rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.add-device-dialog header h2 { margin: 0; color: var(--text-strong); font-size: 1rem; }
+.add-device-dialog header div > span { display: block; margin-top: 4px; color: var(--muted); font-size: .64rem; }
+.add-device-fields { display: grid; gap: 12px; }
+.add-device-fields label,.add-device-field { display: grid; gap: 6px; color: var(--text); font-size: .64rem; font-weight: 700; }
+.add-device-field label { display: block; }
+.add-device-fields label > span { color: var(--muted); font-size: .55rem; letter-spacing: .05em; text-transform: uppercase; }
+.add-device-fields input,.add-device-fields select { width: 100%; min-height: 38px; padding: 0 10px; color: var(--text); background: var(--surface-input); border: 1px solid var(--border-strong); border-radius: 7px; font-size: .68rem; }
+.add-device-fields input:focus,.add-device-fields select:focus { outline: 2px solid rgba(75,163,255,.22); border-color: var(--cyan); }
+.add-device-fields input:disabled { color: var(--muted); opacity: .78; }
+.add-device-fields small { color: var(--muted); font-size: .54rem; font-weight: 500; }.add-device-fields small.field-error { color: var(--red); }
+.add-device-readonly-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.add-device-runtime-note { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: start; gap: 8px; padding: 10px; color: var(--amber); background: rgba(242,169,59,.055); border: 1px solid rgba(242,169,59,.16); border-radius: 8px; }
+.add-device-runtime-note span { color: var(--muted); font-size: .57rem; line-height: 1.5; }
+.add-device-error { margin: 0; padding: 9px 10px; color: var(--red); background: rgba(255,113,136,.055); border: 1px solid rgba(255,113,136,.16); border-radius: 7px; font-size: .62rem; }
+.add-device-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 13px; border-top: 1px solid var(--border); }
 .device-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
 .device-summary strong { font-size: .83rem; text-transform: capitalize; }
 .device-page-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
@@ -510,6 +525,7 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
 @media (max-width: 520px) {
   .metric-grid, .runtime-device-grid, .stream-health-stats, .device-summary, .filter-bar, .detail-grid { grid-template-columns: 1fr; }
   .device-instance-list { grid-template-columns: 1fr; }
+  .dialog-backdrop { padding: 10px; }.add-device-dialog { max-height: calc(100vh - 20px); }.add-device-readonly-grid { grid-template-columns: 1fr; }
   .app-footer > div:last-child > span:first-of-type { display: none; }
   .device-nav, .scenario-list { grid-template-columns: 1fr; }
   .event-row { grid-template-columns: 45px 8px 1fr; }

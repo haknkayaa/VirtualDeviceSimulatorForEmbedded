@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from './client'
-import type { RunStatus } from '../types/api'
+import type { CreateDeviceInput, RunStatus } from '../types/api'
 
 export const queryKeys = {
   health: ['health'] as const,
   devices: ['devices'] as const,
+  deviceTemplates: ['device-models'] as const,
   device: (id: string) => ['devices', id] as const,
   registers: (id: string) => ['devices', id, 'registers'] as const,
   state: (id: string) => ['devices', id, 'state'] as const,
@@ -24,6 +25,28 @@ export function useHealth() {
 
 export function useDevices() {
   return useQuery({ queryKey: queryKeys.devices, queryFn: api.devices })
+}
+
+export function useDeviceTemplates(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.deviceTemplates,
+    queryFn: api.deviceTemplates,
+    enabled,
+  })
+}
+
+export function useCreateDevice() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: CreateDeviceInput) => api.createDevice(input),
+    onSuccess: (device) => {
+      queryClient.setQueryData(queryKeys.device(device.id), device)
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.devices }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.faults }),
+      ])
+    },
+  })
 }
 
 export function useDevice(id: string | undefined) {

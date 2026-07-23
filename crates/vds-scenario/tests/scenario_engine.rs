@@ -66,7 +66,7 @@ fn executor() -> ScenarioExecutor<RegistryRuntime> {
         .unwrap()
         .into_spi_device_with_clock(clock.clone())
         .unwrap();
-    let mut registry = DeviceRegistry::new();
+    let registry = DeviceRegistry::new();
     registry.register(Arc::new(device)).unwrap();
     ScenarioExecutor::new(RegistryRuntime::new(Arc::new(registry), clock))
 }

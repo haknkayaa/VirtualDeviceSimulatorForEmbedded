@@ -28,6 +28,18 @@ export interface Device {
   version?: string
 }
 
+export interface DeviceTemplate {
+  id: string
+  name: string
+  bus: string
+  model: string
+}
+
+export interface CreateDeviceInput {
+  template_id: string
+  device_id: string
+}
+
 export interface DeviceState {
   device_id: string
   state: string | null
