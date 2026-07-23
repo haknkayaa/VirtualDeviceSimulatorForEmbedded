@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { exampleDeviceBehaviorFlow } from '../serialization/deviceBehaviorFlowDocument'
+import { exampleDeviceBehaviorFlow, genericSpiFlashBehaviorFlow } from '../serialization/deviceBehaviorFlowDocument'
 import { compileDeviceBehaviorFlow, serializeCompiledDeviceBehavior } from './compileDeviceBehaviorFlow'
 
 describe('device behavior compiler', () => {
@@ -27,5 +27,16 @@ describe('device behavior compiler', () => {
     const result = compileDeviceBehaviorFlow(moved)
     expect(result.document).toBeNull()
     expect(result.errors).toContainEqual(expect.objectContaining({ code: 'behavior-missing-initial' }))
+  })
+
+  it('compiles the complete public SPI flash visual reference', () => {
+    const result = compileDeviceBehaviorFlow(genericSpiFlashBehaviorFlow)
+    expect(result.errors).toEqual([])
+    expect(result.document?.state_machine.initial_state).toBe('resetting')
+    expect(Object.keys(result.document?.state_machine.states ?? {})).toHaveLength(8)
+    expect(result.document?.state_machine.states.programming.transitions).toContainEqual({
+      event: 'operation_completed',
+      target: 'ready',
+    })
   })
 })

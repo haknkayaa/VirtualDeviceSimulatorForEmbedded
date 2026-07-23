@@ -1,0 +1,11 @@
+schema_version: 1
+scenario: { id: generic-flash-reset-cancels, name: Reset cancels pending program, timeout_ms: 100 }
+steps:
+  - { id: settle_reset, action: advance_time, duration_ms: 5 }
+  - { id: enable, action: send_spi, device: generic-spi-flash-128m, tx: "06", save_as: enabled }
+  - { id: program, action: send_spi, device: generic-spi-flash-128m, tx: "02 00 03 00 00", save_as: programmed }
+  - { id: reset_enable, action: send_spi, device: generic-spi-flash-128m, tx: "66", save_as: reset_enabled }
+  - { id: reset, action: send_spi, device: generic-spi-flash-128m, tx: "99", save_as: reset }
+  - { id: settle_again, action: advance_time, duration_ms: 5 }
+  - { id: read, action: send_spi, device: generic-spi-flash-128m, tx: "03 00 03 00 00", save_as: data }
+  - { id: assert_not_committed, action: assert_response, source: data, expected: "FF" }

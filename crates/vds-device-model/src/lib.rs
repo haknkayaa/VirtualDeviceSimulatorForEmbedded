@@ -40,7 +40,11 @@ pub struct DeviceDefinition {
     pub name: String,
     pub bus: String,
     pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spi: Option<SpiBusDefinition>,
     pub commands: Vec<SpiCommandDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory: Option<MemoryDefinition>,
     #[serde(default)]
     pub registers: Vec<RegisterDefinition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -49,6 +53,22 @@ pub struct DeviceDefinition {
     pub state_machine: Option<DeviceStateMachineDefinition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub faults: Vec<FaultDefinition>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpiBusDefinition {
+    pub mode: u8,
+    pub transfer_bits: u8,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MemoryDefinition {
+    pub size_bytes: u64,
+    pub page_size_bytes: u64,
+    pub sector_size_bytes: u64,
+    pub erased_value: u8,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -69,6 +89,12 @@ pub struct SpiCommandDefinition {
     pub operation: Option<SpiCommandOperation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub address_bytes: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub register: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_delay_us: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timing: Option<CommandTimingDefinition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -154,6 +180,10 @@ pub struct RegisterGuardDefinition {
 pub enum SpiCommandOperation {
     RegisterRead,
     RegisterWrite,
+    MemoryRead,
+    PageProgram,
+    SectorErase,
+    ChipErase,
 }
 
 impl DeviceModel {
@@ -178,6 +208,7 @@ impl DeviceModel {
     ///
     /// Returns an error for malformed YAML, schema violations, or duplicate
     /// command opcodes.
+    #[allow(clippy::too_many_lines)]
     pub fn from_yaml(yaml: &str) -> Result<Self, ModelError> {
         let yaml_value: serde_yaml::Value = serde_yaml::from_str(yaml)?;
         let instance = serde_json::to_value(yaml_value)?;
@@ -194,6 +225,13 @@ impl DeviceModel {
         }
 
         let model: Self = serde_json::from_value(instance)?;
+        if model
+            .device
+            .spi
+            .is_some_and(|spi| spi.mode != 0 || spi.transfer_bits != 8)
+        {
+            return Err(ModelError::InvalidSpiConfiguration);
+        }
         let mut seen = HashMap::new();
         for command in &model.device.commands {
             if let Some(previous) = seen.insert(command.opcode, &command.name) {
@@ -203,26 +241,69 @@ impl DeviceModel {
                     second: command.name.clone(),
                 });
             }
-            match (
-                command.response.as_ref(),
-                command.operation,
-                command.address_bytes,
-            ) {
-                (Some(_), None, None) | (None, Some(_), Some(1..=8)) => {}
-                _ => {
-                    return Err(ModelError::InvalidCommand {
-                        name: command.name.clone(),
-                        reason: "define either response, or operation with address_bytes 1..=8"
-                            .to_owned(),
-                    });
+            let valid_shape = match (command.response.as_ref(), command.operation) {
+                (Some(_), None) => command.address_bytes.is_none() && command.register.is_none(),
+                (
+                    None,
+                    Some(SpiCommandOperation::RegisterRead | SpiCommandOperation::RegisterWrite),
+                ) => {
+                    command.register.is_some()
+                        ^ command
+                            .address_bytes
+                            .is_some_and(|bytes| (1..=8).contains(&bytes))
                 }
+                (
+                    None,
+                    Some(
+                        SpiCommandOperation::MemoryRead
+                        | SpiCommandOperation::PageProgram
+                        | SpiCommandOperation::SectorErase,
+                    ),
+                ) => {
+                    command
+                        .address_bytes
+                        .is_some_and(|bytes| (1..=8).contains(&bytes))
+                        && command.register.is_none()
+                }
+                (None, Some(SpiCommandOperation::ChipErase)) => {
+                    command.address_bytes.is_none() && command.register.is_none()
+                }
+                _ => false,
+            };
+            if !valid_shape {
+                return Err(ModelError::InvalidCommand {
+                    name: command.name.clone(),
+                    reason: "define a fixed response or a supported operation with its required address/register selector".to_owned(),
+                });
             }
             if command.timing.is_some()
-                && command.operation != Some(SpiCommandOperation::RegisterWrite)
+                && !matches!(
+                    command.operation,
+                    Some(
+                        SpiCommandOperation::RegisterWrite
+                            | SpiCommandOperation::PageProgram
+                            | SpiCommandOperation::SectorErase
+                            | SpiCommandOperation::ChipErase
+                    )
+                )
             {
                 return Err(ModelError::InvalidCommand {
                     name: command.name.clone(),
-                    reason: "timing v1 is supported only for register_write".to_owned(),
+                    reason: "timing is supported only for mutating operations".to_owned(),
+                });
+            }
+            if matches!(
+                command.operation,
+                Some(
+                    SpiCommandOperation::PageProgram
+                        | SpiCommandOperation::SectorErase
+                        | SpiCommandOperation::ChipErase
+                )
+            ) && command.timing.is_none()
+            {
+                return Err(ModelError::InvalidCommand {
+                    name: command.name.clone(),
+                    reason: "mutating memory operation requires timing".to_owned(),
                 });
             }
             if command
@@ -234,6 +315,24 @@ impl DeviceModel {
                     name: command.name.clone(),
                     reason: "busy_during_operation requires device.busy".to_owned(),
                 });
+            }
+            if matches!(
+                command.operation,
+                Some(
+                    SpiCommandOperation::MemoryRead
+                        | SpiCommandOperation::PageProgram
+                        | SpiCommandOperation::SectorErase
+                        | SpiCommandOperation::ChipErase
+                )
+            ) && model.device.memory.is_none()
+            {
+                return Err(ModelError::InvalidCommand {
+                    name: command.name.clone(),
+                    reason: "memory operation requires device.memory".to_owned(),
+                });
+            }
+            if let Some(register) = &command.register {
+                validate_register_reference(&model.device.registers, register)?;
             }
             if !command.allowed_states.is_empty() {
                 let Some(machine) = &model.device.state_machine else {
@@ -252,6 +351,17 @@ impl DeviceModel {
                         reason: format!("allowed state '{state}' is not defined"),
                     });
                 }
+            }
+        }
+        if let Some(memory) = model.device.memory {
+            if memory.size_bytes == 0
+                || memory.page_size_bytes == 0
+                || memory.sector_size_bytes == 0
+                || memory.size_bytes % memory.sector_size_bytes != 0
+                || memory.sector_size_bytes % memory.page_size_bytes != 0
+                || usize::try_from(memory.size_bytes).is_err()
+            {
+                return Err(ModelError::InvalidMemory);
             }
         }
         if let Some(machine) = &model.device.state_machine {
@@ -288,6 +398,7 @@ impl DeviceModel {
     /// # Errors
     ///
     /// Returns an error if the model or busy-register binding is invalid.
+    #[allow(clippy::too_many_lines)]
     pub fn into_spi_device_with_clock(
         self,
         clock: Arc<dyn SimulatorClock>,
@@ -305,15 +416,55 @@ impl DeviceModel {
             .into_iter()
             .map(|command| {
                 let name = command.name;
-                let behavior = match (command.response, command.operation, command.address_bytes) {
-                    (Some(response), None, None) => SpiCommandBehavior::FixedResponse(response),
-                    (None, Some(SpiCommandOperation::RegisterRead), Some(address_bytes)) => {
-                        SpiCommandBehavior::RegisterRead { address_bytes }
+                let behavior = match (
+                    command.response,
+                    command.operation,
+                    command.address_bytes,
+                    command.register,
+                ) {
+                    (Some(response), None, None, None) => {
+                        SpiCommandBehavior::FixedResponse(response)
                     }
-                    (None, Some(SpiCommandOperation::RegisterWrite), Some(address_bytes)) => {
+                    (None, Some(SpiCommandOperation::RegisterRead), address_bytes, register) => {
+                        SpiCommandBehavior::RegisterRead {
+                            address_bytes,
+                            register,
+                        }
+                    }
+                    (None, Some(SpiCommandOperation::RegisterWrite), address_bytes, register) => {
                         SpiCommandBehavior::RegisterWrite {
                             address_bytes,
+                            register,
                             timing: command.timing,
+                        }
+                    }
+                    (None, Some(SpiCommandOperation::MemoryRead), Some(address_bytes), None) => {
+                        SpiCommandBehavior::MemoryRead { address_bytes }
+                    }
+                    (None, Some(SpiCommandOperation::PageProgram), Some(address_bytes), None) => {
+                        SpiCommandBehavior::PageProgram {
+                            address_bytes,
+                            timing: command.timing.unwrap_or(CommandTimingDefinition {
+                                latency_us: 0,
+                                busy_during_operation: false,
+                            }),
+                        }
+                    }
+                    (None, Some(SpiCommandOperation::SectorErase), Some(address_bytes), None) => {
+                        SpiCommandBehavior::SectorErase {
+                            address_bytes,
+                            timing: command.timing.unwrap_or(CommandTimingDefinition {
+                                latency_us: 0,
+                                busy_during_operation: false,
+                            }),
+                        }
+                    }
+                    (None, Some(SpiCommandOperation::ChipErase), None, None) => {
+                        SpiCommandBehavior::ChipErase {
+                            timing: command.timing.unwrap_or(CommandTimingDefinition {
+                                latency_us: 0,
+                                busy_during_operation: false,
+                            }),
                         }
                     }
                     _ => unreachable!("commands are validated while parsing"),
@@ -323,6 +474,8 @@ impl DeviceModel {
                     SpiCommand {
                         name,
                         allowed_states: command.allowed_states,
+                        event: command.event,
+                        event_delay_us: command.event_delay_us,
                         behavior,
                     },
                 )
@@ -349,6 +502,13 @@ impl DeviceModel {
             .transpose()?;
         let mut state = DeviceState {
             registers,
+            memory: self.device.memory.map(|definition| FlashMemory {
+                bytes: vec![
+                    definition.erased_value;
+                    usize::try_from(definition.size_bytes).unwrap_or(0)
+                ],
+                definition,
+            }),
             scheduler: EventScheduler::new(),
             operation_busy: false,
             state_machine,
@@ -378,12 +538,18 @@ pub struct GenericSpiDevice {
 
 struct DeviceState {
     registers: RegisterEngine,
+    memory: Option<FlashMemory>,
     scheduler: EventScheduler<PendingOperation>,
     operation_busy: bool,
     state_machine: Option<StateMachine<DeviceAction, DeviceGuard>>,
     state_delayed_events: Vec<EventId>,
     fault_engine: FaultEngine,
     stuck_registers: Vec<ActiveStuck>,
+}
+
+struct FlashMemory {
+    definition: MemoryDefinition,
+    bytes: Vec<u8>,
 }
 
 #[derive(Clone)]
@@ -412,22 +578,54 @@ enum PendingOperation {
         duration_ns: u64,
         started_at_ns: u64,
     },
+    MemoryCommit {
+        offset: usize,
+        bytes: Vec<u8>,
+        completion_event: String,
+    },
+    MemoryErase {
+        offset: usize,
+        length: usize,
+        erased_value: u8,
+        completion_event: String,
+    },
+    CommandEvent {
+        event: String,
+    },
 }
 
 struct SpiCommand {
     name: String,
     allowed_states: Vec<String>,
+    event: Option<String>,
+    event_delay_us: Option<u64>,
     behavior: SpiCommandBehavior,
 }
 
 enum SpiCommandBehavior {
     FixedResponse(Vec<u8>),
     RegisterRead {
-        address_bytes: u8,
+        address_bytes: Option<u8>,
+        register: Option<String>,
     },
     RegisterWrite {
-        address_bytes: u8,
+        address_bytes: Option<u8>,
+        register: Option<String>,
         timing: Option<CommandTimingDefinition>,
+    },
+    MemoryRead {
+        address_bytes: u8,
+    },
+    PageProgram {
+        address_bytes: u8,
+        timing: CommandTimingDefinition,
+    },
+    SectorErase {
+        address_bytes: u8,
+        timing: CommandTimingDefinition,
+    },
+    ChipErase {
+        timing: CommandTimingDefinition,
     },
 }
 
@@ -458,6 +656,7 @@ impl Device for GenericSpiDevice {
         BusType::Spi
     }
 
+    #[allow(clippy::too_many_lines)]
     fn transfer(&self, request: &[u8]) -> Result<DeviceTransfer, DeviceError> {
         let opcode = request.first().copied().ok_or(DeviceError::EmptyRequest)?;
         let command = self
@@ -492,13 +691,36 @@ impl Device for GenericSpiDevice {
                 register: None,
                 events,
             }),
-            SpiCommandBehavior::RegisterRead { address_bytes } => {
-                Self::read_register(&state.registers, request, *address_bytes, events)
-            }
+            SpiCommandBehavior::RegisterRead {
+                address_bytes,
+                register,
+            } => Self::read_register(
+                &state.registers,
+                request,
+                *address_bytes,
+                register.as_deref(),
+                events,
+            ),
             SpiCommandBehavior::RegisterWrite {
                 address_bytes,
+                register,
                 timing,
             } => self.write_register(
+                &mut state,
+                request,
+                &command.name,
+                *address_bytes,
+                register.as_deref(),
+                *timing,
+                &mut events,
+            ),
+            SpiCommandBehavior::MemoryRead { address_bytes } => {
+                Self::read_memory(&state, request, *address_bytes, events)
+            }
+            SpiCommandBehavior::PageProgram {
+                address_bytes,
+                timing,
+            } => self.start_page_program(
                 &mut state,
                 request,
                 &command.name,
@@ -506,7 +728,55 @@ impl Device for GenericSpiDevice {
                 *timing,
                 &mut events,
             ),
+            SpiCommandBehavior::SectorErase {
+                address_bytes,
+                timing,
+            } => self.start_sector_erase(
+                &mut state,
+                request,
+                &command.name,
+                *address_bytes,
+                *timing,
+                &mut events,
+            ),
+            SpiCommandBehavior::ChipErase { timing } => {
+                self.start_chip_erase(&mut state, request, &command.name, *timing, &mut events)
+            }
         }?;
+        if let Some(event) = &command.event {
+            if event == "reset" {
+                state.scheduler.clear();
+                state.state_delayed_events.clear();
+                self.set_busy(&mut state, false)?;
+            }
+            if let Some(delay_us) = command.event_delay_us {
+                let deadline = self
+                    .clock
+                    .now_ns()
+                    .checked_add(delay_us.saturating_mul(1_000))
+                    .ok_or_else(|| {
+                        DeviceError::InvalidRequest(
+                            "command event delay overflows virtual time".to_owned(),
+                        )
+                    })?;
+                state
+                    .scheduler
+                    .schedule_at(
+                        deadline,
+                        PendingOperation::CommandEvent {
+                            event: event.clone(),
+                        },
+                    )
+                    .map_err(|error| DeviceError::InvalidRequest(error.to_string()))?;
+            } else {
+                Self::dispatch_state_event(
+                    &mut state,
+                    event,
+                    self.clock.now_ns(),
+                    &mut transfer.events,
+                )?;
+            }
+        }
         for activation in &activations {
             if let FaultAction::CorruptResponse { xor_mask } = activation.action {
                 for byte in &mut transfer.response {
@@ -600,11 +870,25 @@ impl GenericSpiDevice {
         command: &SpiCommand,
         request: &[u8],
     ) -> Option<(u64, String)> {
-        let address_bytes = match command.behavior {
-            SpiCommandBehavior::RegisterRead { address_bytes }
-            | SpiCommandBehavior::RegisterWrite { address_bytes, .. } => address_bytes,
-            SpiCommandBehavior::FixedResponse(_) => return None,
+        let (address_bytes, register) = match &command.behavior {
+            SpiCommandBehavior::RegisterRead {
+                address_bytes,
+                register,
+            }
+            | SpiCommandBehavior::RegisterWrite {
+                address_bytes,
+                register,
+                ..
+            } => (*address_bytes, register.as_deref()),
+            _ => return None,
         };
+        if let Some(name) = register {
+            return state
+                .registers
+                .metadata_by_name(name)
+                .map(|metadata| (metadata.address, metadata.name));
+        }
+        let address_bytes = address_bytes?;
         let end = 1 + usize::from(address_bytes);
         if request.len() < end {
             return None;
@@ -840,17 +1124,27 @@ impl GenericSpiDevice {
     fn read_register(
         engine: &RegisterEngine,
         request: &[u8],
-        address_bytes: u8,
+        address_bytes: Option<u8>,
+        register: Option<&str>,
         events: Vec<DeviceEvent>,
     ) -> Result<DeviceTransfer, DeviceError> {
-        let expected = 1 + usize::from(address_bytes);
+        let expected = 1 + address_bytes.map_or(0, usize::from);
         if request.len() != expected {
             return Err(DeviceError::InvalidRequest(format!(
                 "register read expects {expected} bytes, received {}",
                 request.len()
             )));
         }
-        let address = decode_unsigned(&request[1..]);
+        let address = if let Some(register) = register {
+            engine
+                .metadata_by_name(register)
+                .ok_or_else(|| {
+                    DeviceError::InvalidRequest(format!("unknown register '{register}'"))
+                })?
+                .address
+        } else {
+            decode_unsigned(&request[1..])
+        };
         let read = engine
             .read(address)
             .map_err(|error| map_register_error(&error, RegisterOperation::Read, None))?;
@@ -870,22 +1164,34 @@ impl GenericSpiDevice {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn write_register(
         &self,
         state: &mut DeviceState,
         request: &[u8],
         command_name: &str,
-        address_bytes: u8,
+        address_bytes: Option<u8>,
+        register: Option<&str>,
         timing: Option<CommandTimingDefinition>,
         events: &mut Vec<DeviceEvent>,
     ) -> Result<DeviceTransfer, DeviceError> {
-        let address_end = 1 + usize::from(address_bytes);
+        let address_end = 1 + address_bytes.map_or(0, usize::from);
         if request.len() < address_end {
             return Err(DeviceError::InvalidRequest(format!(
                 "register write requires {address_end} address bytes including opcode"
             )));
         }
-        let address = decode_unsigned(&request[1..address_end]);
+        let address = if let Some(register) = register {
+            state
+                .registers
+                .metadata_by_name(register)
+                .ok_or_else(|| {
+                    DeviceError::InvalidRequest(format!("unknown register '{register}'"))
+                })?
+                .address
+        } else {
+            decode_unsigned(&request[1..address_end])
+        };
         let metadata = state
             .registers
             .metadata(address)
@@ -930,6 +1236,223 @@ impl GenericSpiDevice {
                 old_value: Some(write.old_value),
                 new_value: Some(write.new_value),
             }),
+            events: std::mem::take(events),
+        })
+    }
+
+    fn read_memory(
+        state: &DeviceState,
+        request: &[u8],
+        address_bytes: u8,
+        events: Vec<DeviceEvent>,
+    ) -> Result<DeviceTransfer, DeviceError> {
+        let address_end = 1 + usize::from(address_bytes);
+        if request.len() < address_end {
+            return Err(DeviceError::InvalidRequest(
+                "memory read is missing address bytes".to_owned(),
+            ));
+        }
+        let memory = state
+            .memory
+            .as_ref()
+            .ok_or_else(|| DeviceError::InvalidRequest("device has no memory".to_owned()))?;
+        let address = usize::try_from(decode_unsigned(&request[1..address_end]))
+            .map_err(|_| DeviceError::InvalidRequest("memory address is too large".to_owned()))?;
+        let length = request.len() - address_end;
+        let end = address
+            .checked_add(length)
+            .ok_or_else(|| DeviceError::InvalidRequest("memory read range overflows".to_owned()))?;
+        if end > memory.bytes.len() {
+            return Err(DeviceError::InvalidRequest(
+                "memory read is out of range".to_owned(),
+            ));
+        }
+        Ok(DeviceTransfer {
+            response: memory.bytes[address..end].to_vec(),
+            register: None,
+            events,
+        })
+    }
+
+    fn start_page_program(
+        &self,
+        state: &mut DeviceState,
+        request: &[u8],
+        command: &str,
+        address_bytes: u8,
+        timing: CommandTimingDefinition,
+        events: &mut Vec<DeviceEvent>,
+    ) -> Result<DeviceTransfer, DeviceError> {
+        let address_end = 1 + usize::from(address_bytes);
+        if request.len() <= address_end {
+            return Err(DeviceError::InvalidRequest(
+                "page program requires address and data".to_owned(),
+            ));
+        }
+        let memory = state
+            .memory
+            .as_ref()
+            .ok_or_else(|| DeviceError::InvalidRequest("device has no memory".to_owned()))?;
+        let offset = usize::try_from(decode_unsigned(&request[1..address_end]))
+            .map_err(|_| DeviceError::InvalidRequest("program address is too large".to_owned()))?;
+        let data = &request[address_end..];
+        let end = offset
+            .checked_add(data.len())
+            .ok_or_else(|| DeviceError::InvalidRequest("program range overflows".to_owned()))?;
+        let page_size =
+            usize::try_from(memory.definition.page_size_bytes).expect("validated memory geometry");
+        if end > memory.bytes.len() || offset / page_size != (end - 1) / page_size {
+            return Err(DeviceError::InvalidRequest(
+                "page program crosses a page boundary or memory end".to_owned(),
+            ));
+        }
+        let programmed = memory.bytes[offset..end]
+            .iter()
+            .zip(data)
+            .map(|(old, new)| old & new)
+            .collect();
+        self.schedule_memory_operation(
+            state,
+            command,
+            timing,
+            PendingOperation::MemoryCommit {
+                offset,
+                bytes: programmed,
+                completion_event: "operation_completed".to_owned(),
+            },
+            events,
+        )
+    }
+
+    fn start_sector_erase(
+        &self,
+        state: &mut DeviceState,
+        request: &[u8],
+        command: &str,
+        address_bytes: u8,
+        timing: CommandTimingDefinition,
+        events: &mut Vec<DeviceEvent>,
+    ) -> Result<DeviceTransfer, DeviceError> {
+        let address_end = 1 + usize::from(address_bytes);
+        if request.len() != address_end {
+            return Err(DeviceError::InvalidRequest(
+                "sector erase expects opcode and address only".to_owned(),
+            ));
+        }
+        let memory = state
+            .memory
+            .as_ref()
+            .ok_or_else(|| DeviceError::InvalidRequest("device has no memory".to_owned()))?;
+        let address = usize::try_from(decode_unsigned(&request[1..address_end]))
+            .map_err(|_| DeviceError::InvalidRequest("erase address is too large".to_owned()))?;
+        let length = usize::try_from(memory.definition.sector_size_bytes)
+            .expect("validated memory geometry");
+        let offset = address / length * length;
+        if offset
+            .checked_add(length)
+            .is_none_or(|end| end > memory.bytes.len())
+        {
+            return Err(DeviceError::InvalidRequest(
+                "sector erase is out of range".to_owned(),
+            ));
+        }
+        self.schedule_memory_operation(
+            state,
+            command,
+            timing,
+            PendingOperation::MemoryErase {
+                offset,
+                length,
+                erased_value: memory.definition.erased_value,
+                completion_event: "operation_completed".to_owned(),
+            },
+            events,
+        )
+    }
+
+    fn start_chip_erase(
+        &self,
+        state: &mut DeviceState,
+        request: &[u8],
+        command: &str,
+        timing: CommandTimingDefinition,
+        events: &mut Vec<DeviceEvent>,
+    ) -> Result<DeviceTransfer, DeviceError> {
+        if request.len() != 1 {
+            return Err(DeviceError::InvalidRequest(
+                "chip erase expects opcode only".to_owned(),
+            ));
+        }
+        let memory = state
+            .memory
+            .as_ref()
+            .ok_or_else(|| DeviceError::InvalidRequest("device has no memory".to_owned()))?;
+        self.schedule_memory_operation(
+            state,
+            command,
+            timing,
+            PendingOperation::MemoryErase {
+                offset: 0,
+                length: memory.bytes.len(),
+                erased_value: memory.definition.erased_value,
+                completion_event: "operation_completed".to_owned(),
+            },
+            events,
+        )
+    }
+
+    fn schedule_memory_operation(
+        &self,
+        state: &mut DeviceState,
+        command: &str,
+        timing: CommandTimingDefinition,
+        pending: PendingOperation,
+        events: &mut Vec<DeviceEvent>,
+    ) -> Result<DeviceTransfer, DeviceError> {
+        let now_ns = self.clock.now_ns();
+        if state.operation_busy {
+            return Err(timing_failure(
+                TimingErrorCode::DeviceBusy,
+                command,
+                now_ns,
+                None,
+                "device is busy",
+            ));
+        }
+        let duration_ns = timing.latency_us.checked_mul(1_000).ok_or_else(|| {
+            timing_failure(
+                TimingErrorCode::DeadlineOverflow,
+                command,
+                now_ns,
+                None,
+                "operation duration overflows",
+            )
+        })?;
+        let deadline = now_ns.checked_add(duration_ns).ok_or_else(|| {
+            timing_failure(
+                TimingErrorCode::DeadlineOverflow,
+                command,
+                now_ns,
+                None,
+                "operation deadline overflows",
+            )
+        })?;
+        state
+            .scheduler
+            .schedule_at(deadline, pending)
+            .map_err(|error| map_scheduler_error(error, command, now_ns, deadline))?;
+        if timing.busy_during_operation {
+            self.set_busy(state, true)?;
+        }
+        events.push(DeviceEvent::OperationStarted {
+            command: command.to_owned(),
+            scheduled_duration_ns: duration_ns,
+            started_at_ns: now_ns,
+            busy: state.operation_busy,
+        });
+        Ok(DeviceTransfer {
+            response: Vec::new(),
+            register: None,
             events: std::mem::take(events),
         })
     }
@@ -1093,6 +1616,34 @@ impl GenericSpiDevice {
                     started_at_ns,
                     completed_at_ns: now_ns,
                 }),
+                PendingOperation::MemoryCommit {
+                    offset,
+                    bytes,
+                    completion_event,
+                } => {
+                    let memory = state.memory.as_mut().ok_or_else(|| {
+                        DeviceError::InvalidRequest("device has no memory".to_owned())
+                    })?;
+                    memory.bytes[offset..offset + bytes.len()].copy_from_slice(&bytes);
+                    self.set_busy(state, false)?;
+                    Self::dispatch_state_event(state, &completion_event, now_ns, &mut emitted)?;
+                }
+                PendingOperation::MemoryErase {
+                    offset,
+                    length,
+                    erased_value,
+                    completion_event,
+                } => {
+                    let memory = state.memory.as_mut().ok_or_else(|| {
+                        DeviceError::InvalidRequest("device has no memory".to_owned())
+                    })?;
+                    memory.bytes[offset..offset + length].fill(erased_value);
+                    self.set_busy(state, false)?;
+                    Self::dispatch_state_event(state, &completion_event, now_ns, &mut emitted)?;
+                }
+                PendingOperation::CommandEvent { event } => {
+                    Self::dispatch_state_event(state, &event, now_ns, &mut emitted)?;
+                }
             }
         }
         Ok(emitted)
@@ -1703,6 +2254,12 @@ pub enum ModelError {
 
     #[error("SPI command '{name}' is invalid: {reason}")]
     InvalidCommand { name: String, reason: String },
+
+    #[error("device memory geometry is invalid")]
+    InvalidMemory,
+
+    #[error("generic SPI command devices currently require mode 0 and 8-bit transfers")]
+    InvalidSpiConfiguration,
 
     #[error("invalid BUSY register binding at 0x{address:X} with mask 0x{mask:X}")]
     InvalidBusyBinding { address: u64, mask: u64 },

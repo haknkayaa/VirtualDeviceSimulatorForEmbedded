@@ -11,6 +11,17 @@ observability:
 
 device_models:
   - device-models/examples/spi-flash.yaml
+  - device-models/examples/generic-spi-flash/model.yaml
 
 scenarios:
   - scenarios/examples/delayed-write-with-timeout.yaml
+  - device-models/examples/generic-spi-flash/scenarios/01-read-id.yaml
+  - device-models/examples/generic-spi-flash/scenarios/02-write-enable-lifecycle.yaml
+  - device-models/examples/generic-spi-flash/scenarios/03-page-program-success.yaml
+  - device-models/examples/generic-spi-flash/scenarios/04-program-without-wel.yaml
+  - device-models/examples/generic-spi-flash/scenarios/05-sector-erase-success.yaml
+  - device-models/examples/generic-spi-flash/scenarios/06-busy-timing.yaml
+  - device-models/examples/generic-spi-flash/scenarios/07-deep-power-down.yaml
+  - device-models/examples/generic-spi-flash/scenarios/08-reset-cancels-program.yaml
+  - device-models/examples/generic-spi-flash/scenarios/09-program-timeout-fault.yaml
+  - device-models/examples/generic-spi-flash/scenarios/10-corrupted-read.yaml

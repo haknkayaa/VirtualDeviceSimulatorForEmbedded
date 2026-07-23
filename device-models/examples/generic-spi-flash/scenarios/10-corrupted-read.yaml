@@ -1,0 +1,8 @@
+schema_version: 1
+scenario: { id: generic-flash-corrupted-read, name: Corrupted read data, timeout_ms: 100 }
+steps:
+  - { id: settle_reset, action: advance_time, duration_ms: 5 }
+  - { id: enable_fault, action: enable_fault, fault: read_data_corruption }
+  - { id: read, action: send_spi, device: generic-spi-flash-128m, tx: "03 00 05 00 00", save_as: corrupted }
+  - { id: assert_corrupted, action: assert_response, source: corrupted, expected: "FE" }
+  - { id: disable_fault, action: disable_fault, fault: read_data_corruption }

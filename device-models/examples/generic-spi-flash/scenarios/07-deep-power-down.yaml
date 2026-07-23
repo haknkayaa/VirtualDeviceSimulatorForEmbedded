@@ -1,0 +1,10 @@
+schema_version: 1
+scenario: { id: generic-flash-deep-power-down, name: Deep power-down rejection, timeout_ms: 100 }
+steps:
+  - { id: settle_reset, action: advance_time, duration_ms: 5 }
+  - { id: sleep, action: send_spi, device: generic-spi-flash-128m, tx: "B9", save_as: sleeping }
+  - { id: read_id, action: send_spi, device: generic-spi-flash-128m, tx: "9F", save_as: rejected }
+  - { id: assert_rejected, action: assert_error, source: rejected, expected_code: state_command_rejected }
+  - { id: wake, action: send_spi, device: generic-spi-flash-128m, tx: "AB", save_as: waking }
+  - { id: wait_release, action: advance_time, duration_ms: 1 }
+  - { id: assert_ready, action: assert_state, device: generic-spi-flash-128m, expected: ready }
