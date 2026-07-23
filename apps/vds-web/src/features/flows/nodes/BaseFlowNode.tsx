@@ -17,6 +17,7 @@ export function BaseFlowNode({ data, selected }: NodeProps<FlowCanvasNode>) {
     <article
       className={`flow-node flow-node-${issueTone} runtime-${data.runtimeStatus}${selected ? ' selected' : ''}`}
       data-accent={definition?.accentToken ?? 'muted'}
+      data-node-kind={data.document.kind}
       data-runtime-status={data.runtimeStatus}
     >
       {definition?.inputPorts.map((port, index) => (

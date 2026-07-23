@@ -66,11 +66,12 @@ const orphanRule: FlowValidationRule = ({ document }) => {
   return document.nodes.filter((node) => !connected.has(node.id)).map((node): ValidationIssue => ({ ruleId: 'orphan-node', severity: 'warning', message: `${node.id} is not connected.`, nodeId: node.id }))
 }
 
-const selfLoopRule: FlowValidationRule = ({ document }) => document.edges
+const selfLoopRule: FlowValidationRule = ({ document }) => document.metadata.allow_cycles === true ? [] : document.edges
   .filter((edge) => edge.source === edge.target)
   .map((edge): ValidationIssue => ({ ruleId: 'self-loop', severity: 'warning', message: `Self-loop on ${edge.source}.`, edgeId: edge.id }))
 
 const cycleRule: FlowValidationRule = ({ document }) => {
+  if (document.metadata.allow_cycles === true) return []
   const adjacency = new Map<string, string[]>()
   document.nodes.forEach((node) => adjacency.set(node.id, []))
   document.edges.forEach((edge) => adjacency.get(edge.source)?.push(edge.target))

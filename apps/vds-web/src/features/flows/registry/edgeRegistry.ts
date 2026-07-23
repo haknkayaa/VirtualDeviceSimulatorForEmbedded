@@ -26,5 +26,6 @@ export const edgeRegistry = new FlowEdgeRegistry().register({
   validationRules: [],
 })
 
-export const canvasEdgeTypes = Object.fromEntries(edgeRegistry.list().map((entry) => [entry.kind, entry.component]))
-canvasEdgeTypes.unknown = BaseFlowEdge
+export function canvasEdgeTypes() {
+  return { ...Object.fromEntries(edgeRegistry.list().map((entry) => [entry.kind, entry.component])), unknown: BaseFlowEdge }
+}

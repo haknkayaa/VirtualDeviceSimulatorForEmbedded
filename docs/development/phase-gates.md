@@ -147,7 +147,19 @@ the same workspace test run.
 | Empty-body configured scenario runs remain backward compatible | `scenario_run_is_asynchronous_and_result_is_retrievable` |
 | No REST hardware transaction route is introduced | `structured_errors_and_data_plane_separation_are_enforced` |
 
-Device Behavior Editor work has not started. Passing this gate does not authorize that phase.
+## Visual Device Behavior Editor v1
+
+| Gate | Automated coverage |
+| --- | --- |
+| All behavior node kinds and the typed transition edge register through the generic registries | `device behavior registries` |
+| Edge-centric state graphs compile deterministically independent of coordinates and insertion order | `device behavior compiler` |
+| Initial state, entry/exit actions, guards, delayed events, and cyclic transitions map to the existing schema | `device behavior compiler`, `device behavior validation` |
+| Ambiguous transitions, unsupported guards, invalid delays, and invalid register actions are rejected | `device behavior validation` |
+| REST snapshot and WebSocket replay map to transient runtime highlights without changing history | `behavior runtime mapping` |
+| Local save and deterministic import/export preserve semantic data | `device behavior persistence` |
+| No new runtime or REST hardware transaction route is introduced | architecture review and API client review |
+
+Topology Editor work has not started. Passing this gate does not authorize that phase.
 
 ## JUnit XML Export v1
 

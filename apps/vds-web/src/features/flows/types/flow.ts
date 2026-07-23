@@ -7,7 +7,20 @@ export type JsonObject = { [key: string]: JsonValue }
 
 export const FLOW_SCHEMA_VERSION = 1 as const
 export type FlowSchemaVersion = typeof FLOW_SCHEMA_VERSION
-export type FlowRuntimeStatus = 'idle' | 'queued' | 'running' | 'passed' | 'failed' | 'skipped' | 'warning'
+export type FlowRuntimeStatus =
+  | 'idle'
+  | 'queued'
+  | 'running'
+  | 'passed'
+  | 'failed'
+  | 'skipped'
+  | 'warning'
+  | 'active'
+  | 'pending'
+  | 'transitioned'
+  | 'rejected'
+  | 'error'
+  | 'reset'
 export type FlowDensity = 'compact' | 'comfortable'
 export type FlowLayoutDirection = 'LR' | 'TB'
 export type ValidationSeverity = 'error' | 'warning'
@@ -156,6 +169,7 @@ export type FlowCanvasEdge = Edge<{
   document: FlowEdgeDocument
   issues: ValidationIssue[]
   readOnly: boolean
+  runtimeStatus: FlowRuntimeStatus
 }, string>
 
 export interface FlowLayoutOptions {
