@@ -1,10 +1,11 @@
-import { Activity, Boxes, Gauge, GitBranch, PlaySquare, Radio } from 'lucide-react'
+import { Activity, Bell, Boxes, CircleHelp, Gauge, GitBranch, Moon, PlaySquare, Radio, Settings, Sun } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { BrandLogo } from '../components/BrandLogo'
 import { EventDetailDrawer } from '../components/EventDetailDrawer'
 import { StatusBadge } from '../components/StatusBadge'
 import { useEventStore } from '../stores/eventStore'
+import { useTheme } from '../hooks/useTheme'
 import { formatVirtualTime } from '../utils/format'
 
 const navigation = [
@@ -24,6 +25,7 @@ const workspaceNavigation = [
 ] as const
 
 export function AppShell() {
+  const { theme, toggleTheme } = useTheme()
   const connectionStatus = useEventStore((state) => state.connectionStatus)
   const lastEventId = useEventStore((state) => state.lastEventId)
   const retainedEvents = useEventStore((state) => state.events.length)
@@ -32,7 +34,7 @@ export function AppShell() {
     <div className="app-shell">
       <aside className="sidebar">
         <NavLink aria-label="VDS4E dashboard" className="brand-lockup" to="/">
-          <BrandLogo className="sidebar-brand-logo" decorative />
+          <BrandLogo className="sidebar-brand-logo" decorative variant={theme} />
         </NavLink>
         <nav aria-label="Primary navigation">
           {navigation.map(({ to, label, icon: Icon, end }) => (
@@ -61,8 +63,21 @@ export function AppShell() {
             ))}
           </nav>
           <div className="workspace-context">
-            <div><span>Environment</span><strong>Local simulator</strong></div>
-            <StatusBadge status={connectionStatus} />
+            <div className="header-actions" role="group" aria-label="Workspace actions">
+              <button aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} onClick={toggleTheme} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} type="button">
+                {theme === 'dark' ? <Sun aria-hidden="true" size={17} /> : <Moon aria-hidden="true" size={17} />}
+              </button>
+              <button aria-label="Notifications" title="Notifications" type="button"><Bell aria-hidden="true" size={17} /><span className="header-action-dot" /></button>
+              <button aria-label="Help" title="Help" type="button"><CircleHelp aria-hidden="true" size={17} /></button>
+              <button aria-label="Settings" title="Settings" type="button"><Settings aria-hidden="true" size={17} /></button>
+            </div>
+            <label className="environment-context">
+              <span>Environment</span>
+              <select aria-label="Environment" defaultValue="local">
+                <option value="local">Local simulator</option>
+                <option disabled value="new">+ New Environment</option>
+              </select>
+            </label>
           </div>
         </header>
         <main className="main-content"><Outlet /></main>
