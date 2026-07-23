@@ -1,7 +1,6 @@
 import {
   Activity,
   Blocks,
-  Box,
   Cpu,
   Database,
   Gauge,
@@ -9,7 +8,6 @@ import {
   HardDrive,
   MemoryStick,
   Network,
-  RadioTower,
   Server,
   TerminalSquare,
 } from 'lucide-react'
@@ -17,21 +15,21 @@ import {
 import { GlassPanel } from '../../components/GlassPanel'
 import { StatusBadge } from '../../components/StatusBadge'
 import type { SystemMetrics } from '../../types/api'
-import type { EventConnectionStatus } from '../../types/events'
 
 interface DashboardHealthPanelsProps {
-  connectionStatus: EventConnectionStatus
   healthStatus?: string
   systemMetrics?: SystemMetrics
 }
 
-const runtimeModules = [
-  'vds-core',
-  'vds-device-model',
-  'vds-events',
-  'vds-protocol',
-  'vds-registers',
-  'vds-scenario',
+const platformModules = [
+  { id: 'vds-web', detail: 'Operator UI', icon: Globe2 },
+  { id: 'vds-cli', detail: 'Automation client', icon: TerminalSquare },
+  { id: 'vds-core', detail: 'Routing & fault engine', icon: Cpu },
+  { id: 'vds-device-model', detail: 'Device runtime', icon: Gauge },
+  { id: 'vds-events', detail: 'Domain event bus', icon: Activity },
+  { id: 'vds-protocol', detail: 'Protobuf contracts', icon: Network },
+  { id: 'vds-registers', detail: 'Register engine', icon: Database },
+  { id: 'vds-scenario', detail: 'Scenario runtime', icon: Blocks },
 ] as const
 
 function percent(used?: number, total?: number) {
@@ -48,7 +46,6 @@ function formatBytes(value?: number) {
 }
 
 export function DashboardHealthPanels({
-  connectionStatus,
   healthStatus,
   systemMetrics,
 }: DashboardHealthPanelsProps) {
@@ -80,50 +77,6 @@ export function DashboardHealthPanels({
   return (
     <aside aria-label="Platform health" className="dashboard-health-stack">
       <GlassPanel
-        action={<StatusBadge status={healthStatus === 'ok' ? 'healthy' : healthStatus ?? 'checking'} />}
-        className="server-health-panel"
-        eyebrow="Platform nodes"
-        title="Server Health"
-      >
-        <div className="platform-node-map">
-          <article className="platform-node platform-node-primary">
-            <span><Server aria-hidden="true" size={16} /></span>
-            <div><strong>vds-server</strong><small>Control API · WebSocket · Unix socket</small></div>
-            <i className={healthStatus === 'ok' ? 'online' : ''} />
-          </article>
-          <div aria-hidden="true" className="node-map-rail" />
-          <div className="platform-node-clients">
-            <article className="platform-node">
-              <span><Globe2 aria-hidden="true" size={15} /></span>
-              <div><strong>vds-web</strong><small>Operator UI</small></div>
-              <i className="online" />
-            </article>
-            <article className="platform-node">
-              <span><TerminalSquare aria-hidden="true" size={15} /></span>
-              <div><strong>vds-cli</strong><small>Automation client</small></div>
-              <i className="available" />
-            </article>
-            <article className="platform-node">
-              <span><RadioTower aria-hidden="true" size={15} /></span>
-              <div><strong>Event stream</strong><small>Domain telemetry</small></div>
-              <i className={connectionStatus === 'connected' ? 'online' : ''} />
-            </article>
-            <article className="platform-node">
-              <span><Box aria-hidden="true" size={15} /></span>
-              <div><strong>C client SDK</strong><small>Application data plane</small></div>
-              <i className="available" />
-            </article>
-          </div>
-        </div>
-        <div className="runtime-module-list">
-          <span><Blocks aria-hidden="true" size={12} /> Linked runtime modules</span>
-          <div>
-            {runtimeModules.map((module) => <code key={module}>{module}</code>)}
-          </div>
-        </div>
-      </GlassPanel>
-
-      <GlassPanel
         action={<span className="system-telemetry-state"><Activity aria-hidden="true" size={13} /> Host telemetry</span>}
         className="system-health-panel"
         eyebrow="Host resources"
@@ -148,6 +101,31 @@ export function DashboardHealthPanels({
                 <span><Database aria-hidden="true" size={11} /> TX <b>{formatBytes(systemMetrics?.network_tx_bytes_per_sec)}/s</b></span>
               </div>
             </div>
+          </div>
+        </div>
+      </GlassPanel>
+
+      <GlassPanel
+        action={<StatusBadge status={healthStatus === 'ok' ? 'healthy' : healthStatus ?? 'checking'} />}
+        className="server-health-panel"
+        eyebrow="Platform nodes"
+        title="Server Health"
+      >
+        <div className="platform-node-map">
+          <article className="platform-node platform-node-primary">
+            <span><Server aria-hidden="true" size={16} /></span>
+            <div><strong>vds-server</strong><small>Control API · WebSocket · Unix socket</small></div>
+            <i className={healthStatus === 'ok' ? 'online' : ''} />
+          </article>
+          <div aria-hidden="true" className="node-map-rail" />
+          <div className="platform-node-clients">
+            {platformModules.map((module) => (
+              <article className="platform-node" key={module.id}>
+                <span><module.icon aria-hidden="true" size={15} /></span>
+                <div><strong title={module.id}>{module.id}</strong><small>{module.detail}</small></div>
+                <i className={module.id === 'vds-web' ? 'online' : 'available'} />
+              </article>
+            ))}
           </div>
         </div>
       </GlassPanel>

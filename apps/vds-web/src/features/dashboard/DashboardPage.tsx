@@ -51,7 +51,6 @@ export function DashboardPage() {
           </div>
         </GlassPanel>
         <DashboardHealthPanels
-          connectionStatus={connectionStatus}
           healthStatus={health.data?.status}
           systemMetrics={health.data?.system}
         />

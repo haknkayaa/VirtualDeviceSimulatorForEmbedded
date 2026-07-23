@@ -134,10 +134,7 @@ h2 { margin-bottom: 0; font-size: .85rem; letter-spacing: -.01em; }
 .node-map-rail { position: absolute; z-index: 0; left: 20px; top: 40px; bottom: 44px; width: 1px; background: linear-gradient(var(--cyan),rgba(75,163,255,.08)); }
 .platform-node-clients { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-left: 13px; }
 .platform-node-clients .platform-node { min-width: 0; }
-.runtime-module-list { margin-top: 9px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.05); }
-.runtime-module-list > span { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: .51rem; text-transform: uppercase; letter-spacing: .05em; }
-.runtime-module-list > div { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.runtime-module-list code { padding: 3px 5px; color: #8094aa; background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.045); border-radius: 4px; font-size: .43rem; }
+.platform-node-clients .platform-node strong { overflow-wrap: anywhere; white-space: normal; line-height: 1.05; }
 .system-telemetry-state { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: .51rem; }
 .system-metric-list { display: grid; gap: 7px; }
 .system-metric-row { display: grid; grid-template-columns: 29px minmax(0,1fr); align-items: center; gap: 8px; }
@@ -715,9 +712,7 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
 :root[data-theme="light"] .dashboard-live-event { color: #263b52; border-color: rgba(42,75,104,.09); }
 :root[data-theme="light"] .platform-node { border-color: rgba(42,75,104,.1); }
 :root[data-theme="light"] .platform-node-primary { background: linear-gradient(90deg,rgba(24,120,209,.09),rgba(255,255,255,.45)); border-color: rgba(24,120,209,.2); }
-:root[data-theme="light"] .runtime-module-list,
 :root[data-theme="light"] .network-metric { border-color: rgba(42,75,104,.1); }
-:root[data-theme="light"] .runtime-module-list code { color: #597087; background: rgba(24,120,209,.035); border-color: rgba(42,75,104,.08); }
 :root[data-theme="light"] .system-metric-row header strong,
 :root[data-theme="light"] .network-values b { color: #314960; }
 :root[data-theme="light"] .dashboard-live-event:hover { background: rgba(24,120,209,.045); }
