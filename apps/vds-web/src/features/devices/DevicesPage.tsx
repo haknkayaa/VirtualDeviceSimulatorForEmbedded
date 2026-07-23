@@ -1,4 +1,5 @@
-import { Power, RotateCcw } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Ellipsis, Pencil, Power, RadioTower, RefreshCw, RotateCcw } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 
 import {
@@ -14,10 +15,34 @@ import { AsyncState } from '../../components/AsyncState'
 import { GlassPanel } from '../../components/GlassPanel'
 import { PageHeader } from '../../components/PageHeader'
 import { StatusBadge } from '../../components/StatusBadge'
+import { VirtualEventList } from '../../components/VirtualEventList'
+import { useEventStore } from '../../stores/eventStore'
 import { formatHex, humanize } from '../../utils/format'
+import { DeviceProfileCard } from './DeviceProfileCard'
+
+const deviceTabs = [
+  { id: 'registers', label: 'Registers' },
+  { id: 'commands', label: 'Commands' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'state-machine', label: 'State Machine' },
+  { id: 'faults', label: 'Faults' },
+  { id: 'events', label: 'Events' },
+  { id: 'configuration', label: 'Configuration' },
+] as const
+
+type DeviceTab = (typeof deviceTabs)[number]['id']
+
+const unavailableTabCopy: Record<Exclude<DeviceTab, 'registers' | 'faults' | 'events'>, string> = {
+  commands: 'Command metadata is not exposed by the current Control API.',
+  memory: 'Memory inspection is not exposed by the current Control API.',
+  'state-machine': 'State-machine definitions are not exposed by the current Control API.',
+  configuration: 'Device configuration is not exposed by the current Control API.',
+}
 
 export function DevicesPage() {
   const { deviceId: routeDeviceId } = useParams()
+  const [activeTab, setActiveTab] = useState<DeviceTab>('registers')
+  const [liveRead, setLiveRead] = useState(false)
   const devices = useDevices()
   const deviceId = routeDeviceId ?? devices.data?.[0]?.id
   const device = useDevice(deviceId)
@@ -26,17 +51,164 @@ export function DevicesPage() {
   const faults = useFaults()
   const reset = useResetDevice()
   const faultToggle = useSetFault()
+  const events = useEventStore((store) => store.events)
   const deviceFaults = faults.data?.filter((fault) => fault.device_id === deviceId) ?? []
+  const refetchDevices = devices.refetch
+  const refetchDevice = device.refetch
+  const refetchState = state.refetch
+  const refetchRegisters = registers.refetch
+  const refetchFaults = faults.refetch
+  const deviceEvents = useMemo(
+    () => events.filter((event) => event.device_id === deviceId).slice(-100).reverse(),
+    [deviceId, events],
+  )
+  const isRefreshing = devices.isFetching || device.isFetching || state.isFetching || registers.isFetching || faults.isFetching
+
+  const refresh = useCallback(() => {
+    void Promise.all([
+      refetchDevices(),
+      refetchDevice(),
+      refetchState(),
+      refetchRegisters(),
+      refetchFaults(),
+    ])
+  }, [refetchDevice, refetchDevices, refetchFaults, refetchRegisters, refetchState])
+
+  useEffect(() => {
+    if (!liveRead) return
+    const interval = window.setInterval(refresh, 1_000)
+    return () => window.clearInterval(interval)
+  }, [liveRead, refresh])
+
+  const renderTabContent = () => {
+    if (activeTab === 'registers') {
+      return (
+        <GlassPanel eyebrow="Authoritative snapshot" title="Register table">
+          {registers.isPending && deviceId && <AsyncState kind="loading" title="Reading registers" />}
+          {registers.isError && <AsyncState detail={registers.error.message} kind="error" title="Registers unavailable" />}
+          {registers.data?.length === 0 && <AsyncState kind="empty" title="No registers exposed" />}
+          {registers.data && registers.data.length > 0 && (
+            <div className="table-scroll"><table>
+              <thead><tr><th>Name</th><th>Address</th><th>Width</th><th>Access</th><th>Value</th></tr></thead>
+              <tbody>{registers.data.map((register) => (
+                <tr key={register.address}><td><strong>{register.name}</strong></td><td className="mono">{formatHex(register.address)}</td><td>{register.width_bits} bit</td><td>{register.access.toUpperCase()}</td><td className="mono value-cell">{formatHex(register.value, register.width_bits)}</td></tr>
+              ))}</tbody>
+            </table></div>
+          )}
+        </GlassPanel>
+      )
+    }
+
+    if (activeTab === 'faults') {
+      return (
+        <GlassPanel eyebrow="Deterministic controls" title="Fault profiles">
+          {faults.isPending && <AsyncState kind="loading" title="Loading faults" />}
+          {faults.isError && <AsyncState detail={faults.error.message} kind="error" title="Faults unavailable" />}
+          {deviceFaults.length === 0 && !faults.isPending && <AsyncState kind="empty" title="No faults defined for this device" />}
+          <div className="fault-list">
+            {deviceFaults.map((fault) => (
+              <article className="fault-row" key={fault.id}>
+                <div className="fault-icon"><Power aria-hidden="true" size={17} /></div>
+                <div><strong>{fault.id}</strong><span>{humanize(fault.action)} · {humanize(fault.trigger)} · priority {fault.priority}</span></div>
+                <button
+                  aria-label={`${fault.enabled ? 'Disable' : 'Enable'} ${fault.id}`}
+                  aria-pressed={fault.enabled}
+                  className={`toggle ${fault.enabled ? 'active' : ''}`}
+                  disabled={faultToggle.isPending}
+                  onClick={() => faultToggle.mutate({ id: fault.id, enabled: !fault.enabled })}
+                  type="button"
+                ><span /></button>
+              </article>
+            ))}
+          </div>
+          {faultToggle.isError && <AsyncState detail={faultToggle.error.message} kind="error" title="Fault update failed" />}
+        </GlassPanel>
+      )
+    }
+
+    if (activeTab === 'events') {
+      return (
+        <GlassPanel eyebrow="Domain telemetry" title="Device events">
+          {deviceEvents.length === 0
+            ? <AsyncState kind="empty" title="No events retained for this device" />
+            : <VirtualEventList compact events={deviceEvents} />}
+        </GlassPanel>
+      )
+    }
+
+    return (
+      <GlassPanel eyebrow="Control API boundary" title={deviceTabs.find((tab) => tab.id === activeTab)?.label ?? activeTab}>
+        <AsyncState detail={unavailableTabCopy[activeTab]} kind="empty" title="Not exposed yet" />
+      </GlassPanel>
+    )
+  }
+
+  const deviceActions = (
+    <div aria-label="Device actions" className="device-page-actions" role="group">
+      <button className="button button-secondary" disabled={!deviceId || isRefreshing} onClick={refresh} type="button">
+        <RefreshCw aria-hidden="true" className={isRefreshing ? 'spin' : ''} size={15} />
+        {isRefreshing ? 'Refreshing' : 'Refresh'}
+      </button>
+      <button
+        aria-pressed={liveRead}
+        className={`button button-secondary${liveRead ? ' active' : ''}`}
+        disabled={!deviceId}
+        onClick={() => setLiveRead((enabled) => !enabled)}
+        type="button"
+      >
+        <RadioTower aria-hidden="true" size={15} /> Live Read
+      </button>
+      <button className="button button-secondary" disabled title="Device editing is not available in this phase." type="button">
+        <Pencil aria-hidden="true" size={15} /> Edit
+      </button>
+      <details className="device-more-menu">
+        <summary className="button button-secondary"><Ellipsis aria-hidden="true" size={16} /> More</summary>
+        <div className="device-more-popover">
+          <button disabled={!deviceId || reset.isPending} onClick={() => deviceId && reset.mutate(deviceId)} type="button">
+            <RotateCcw aria-hidden="true" size={15} /> {reset.isPending ? 'Resetting device' : 'Reset device'}
+          </button>
+        </div>
+      </details>
+    </div>
+  )
 
   return (
     <div className="page-stack">
-      <PageHeader eyebrow="Runtime inventory" title="Devices" description="Inspect authoritative device state and operate only through public control APIs." />
+      <PageHeader
+        description="Inspect authoritative device state and operate only through public control APIs."
+        eyebrow="Runtime inventory"
+        title="Devices"
+      />
+
+      {!deviceId && <GlassPanel><AsyncState kind="empty" title="Select a device" /></GlassPanel>}
+      {device.isPending && deviceId && <GlassPanel><AsyncState kind="loading" title="Loading device profile" /></GlassPanel>}
+      {device.isError && <GlassPanel><AsyncState detail={device.error.message} kind="error" title="Device unavailable" /></GlassPanel>}
+      {device.data && <DeviceProfileCard actions={deviceActions} currentState={state.data?.state ?? device.data.state} device={device.data} />}
+      {reset.isError && <AsyncState detail={reset.error.message} kind="error" title="Reset failed" />}
+
+      <nav aria-label="Device detail sections" className="device-detail-tabs" role="tablist">
+        {deviceTabs.map((tab) => (
+          <button
+            aria-controls="device-tab-panel"
+            aria-selected={activeTab === tab.id}
+            className={activeTab === tab.id ? 'active' : ''}
+            id={`device-tab-${tab.id}`}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            role="tab"
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
       <div className="devices-layout">
         <GlassPanel className="device-list-panel" eyebrow="Registry" title="Loaded devices">
           {devices.isPending && <AsyncState kind="loading" title="Loading registry" />}
           {devices.isError && <AsyncState detail={devices.error.message} kind="error" title="Registry unavailable" />}
           {devices.data?.length === 0 && <AsyncState kind="empty" title="No devices loaded" />}
-          <nav className="device-nav" aria-label="Device list">
+          <nav aria-label="Device list" className="device-nav">
             {devices.data?.map((item) => (
               <Link className={item.id === deviceId ? 'device-link active' : 'device-link'} key={item.id} to={`/devices/${encodeURIComponent(item.id)}`}>
                 <span className="device-bus">{item.bus.toUpperCase()}</span>
@@ -45,64 +217,9 @@ export function DevicesPage() {
             ))}
           </nav>
         </GlassPanel>
-        <div className="device-detail-stack">
-          {!deviceId && <GlassPanel><AsyncState kind="empty" title="Select a device" /></GlassPanel>}
-          {device.isError && <GlassPanel><AsyncState detail={device.error.message} kind="error" title="Device unavailable" /></GlassPanel>}
-          {device.data && (
-            <GlassPanel
-              eyebrow={`${device.data.bus.toUpperCase()} device`}
-              title={device.data.id}
-              action={
-                <button className="button button-secondary" disabled={reset.isPending} onClick={() => reset.mutate(device.data.id)} type="button">
-                  <RotateCcw size={16} /> {reset.isPending ? 'Resetting' : 'Reset'}
-                </button>
-              }
-            >
-              <div className="device-summary">
-                <div><span>Current state</span><StatusBadge status={state.data?.state ?? device.data.state} /></div>
-                <div><span>Bus</span><strong>{humanize(device.data.bus)}</strong></div>
-                <div><span>Registers</span><strong>{registers.data?.length ?? '—'}</strong></div>
-                <div><span>Fault profiles</span><strong>{deviceFaults.length}</strong></div>
-              </div>
-              {reset.isError && <AsyncState detail={reset.error.message} kind="error" title="Reset failed" />}
-            </GlassPanel>
-          )}
-          <GlassPanel eyebrow="Authoritative snapshot" title="Register table">
-            {registers.isPending && deviceId && <AsyncState kind="loading" title="Reading registers" />}
-            {registers.isError && <AsyncState detail={registers.error.message} kind="error" title="Registers unavailable" />}
-            {registers.data?.length === 0 && <AsyncState kind="empty" title="No registers exposed" />}
-            {registers.data && registers.data.length > 0 && (
-              <div className="table-scroll"><table>
-                <thead><tr><th>Name</th><th>Address</th><th>Width</th><th>Access</th><th>Value</th></tr></thead>
-                <tbody>{registers.data.map((register) => (
-                  <tr key={register.address}><td><strong>{register.name}</strong></td><td className="mono">{formatHex(register.address)}</td><td>{register.width_bits} bit</td><td>{register.access.toUpperCase()}</td><td className="mono value-cell">{formatHex(register.value, register.width_bits)}</td></tr>
-                ))}</tbody>
-              </table></div>
-            )}
-          </GlassPanel>
-          <GlassPanel eyebrow="Deterministic controls" title="Fault profiles">
-            {faults.isPending && <AsyncState kind="loading" title="Loading faults" />}
-            {faults.isError && <AsyncState detail={faults.error.message} kind="error" title="Faults unavailable" />}
-            {deviceFaults.length === 0 && !faults.isPending && <AsyncState kind="empty" title="No faults defined for this device" />}
-            <div className="fault-list">
-              {deviceFaults.map((fault) => (
-                <article className="fault-row" key={fault.id}>
-                  <div className="fault-icon"><Power size={17} /></div>
-                  <div><strong>{fault.id}</strong><span>{humanize(fault.action)} · {humanize(fault.trigger)} · priority {fault.priority}</span></div>
-                  <button
-                    aria-label={`${fault.enabled ? 'Disable' : 'Enable'} ${fault.id}`}
-                    aria-pressed={fault.enabled}
-                    className={`toggle ${fault.enabled ? 'active' : ''}`}
-                    disabled={faultToggle.isPending}
-                    onClick={() => faultToggle.mutate({ id: fault.id, enabled: !fault.enabled })}
-                    type="button"
-                  ><span /></button>
-                </article>
-              ))}
-            </div>
-            {faultToggle.isError && <AsyncState detail={faultToggle.error.message} kind="error" title="Fault update failed" />}
-          </GlassPanel>
-        </div>
+        <section aria-labelledby={`device-tab-${activeTab}`} className="device-detail-stack" id="device-tab-panel" role="tabpanel">
+          {deviceId ? renderTabContent() : <GlassPanel><AsyncState kind="empty" title="Select a device to inspect this section" /></GlassPanel>}
+        </section>
       </div>
     </div>
   )
