@@ -35,6 +35,18 @@ export function DashboardPage() {
         description="Authoritative snapshots from REST, live operational context from the domain event stream."
         action={<div className="header-status"><span>Event stream</span><StatusBadge status={connectionStatus} /></div>}
       />
+      <div className="metric-grid">
+        <MetricCard
+          accent="cyan"
+          detail={activeRun.data?.scenario_id ?? (activeRun.isError ? 'Status unavailable' : 'Orchestration')}
+          icon={PlayCircle}
+          label="Scenario run"
+          value={activeRun.data?.status ?? (activeRunId ? 'checking' : 'idle')}
+        />
+        <MetricCard accent="violet" detail="Loaded runtime models" icon={Boxes} label="Active devices" value={devices.data?.length ?? '—'} />
+        <MetricCard accent="amber" detail={`${enabledFaults} enabled`} icon={ShieldAlert} label="Fault profiles" value={faults.data?.length ?? '—'} />
+        <MetricCard detail="Current session" icon={Activity} label="Domain events" value={events.length} />
+      </div>
       <div className="dashboard-command-grid">
         <GlassPanel className="runtime-map-panel" eyebrow="Runtime snapshot" title="Device map" action={<span className="panel-count">{devices.data?.length ?? 0} loaded</span>}>
           {devices.isPending && <AsyncState kind="loading" title="Loading devices" />}
@@ -54,18 +66,6 @@ export function DashboardPage() {
           healthStatus={health.data?.status}
           systemMetrics={health.data?.system}
         />
-      </div>
-      <div className="metric-grid">
-        <MetricCard
-          accent="cyan"
-          detail={activeRun.data?.scenario_id ?? (activeRun.isError ? 'Status unavailable' : 'Orchestration')}
-          icon={PlayCircle}
-          label="Scenario run"
-          value={activeRun.data?.status ?? (activeRunId ? 'checking' : 'idle')}
-        />
-        <MetricCard accent="violet" detail="Loaded runtime models" icon={Boxes} label="Active devices" value={devices.data?.length ?? '—'} />
-        <MetricCard accent="amber" detail={`${enabledFaults} enabled`} icon={ShieldAlert} label="Fault profiles" value={faults.data?.length ?? '—'} />
-        <MetricCard detail="Current session" icon={Activity} label="Domain events" value={events.length} />
       </div>
       <div className="dashboard-grid">
         <GlassPanel className="dashboard-transactions" eyebrow="Domain telemetry" title="Live Event Stream">
