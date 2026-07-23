@@ -38,7 +38,8 @@ export function DevicePackageList({
         <select aria-label="Filter packages by bus" onChange={(event) => onBusChange(event.target.value)} value={bus}>
           <option value="all">All buses</option>
           <option value="SPI">SPI</option>
-          <option value="Generic">Generic</option>
+          <option value="I2C">I2C</option>
+          <option value="Ethernet">Ethernet</option>
         </select>
         <button className="button button-secondary" disabled title="Additional registry filters require a package service." type="button">
           <SlidersHorizontal aria-hidden="true" size={14} /> More filters
@@ -66,9 +67,12 @@ export function DevicePackageList({
             <span className="package-row-meta">
               <i>{item.bus}</i>
               <i>v{item.version}</i>
-              <b><CheckCircle2 aria-hidden="true" size={11} /> Bundled</b>
+              <b>
+                <CheckCircle2 aria-hidden="true" size={11} />
+                {item.readiness === 'runtime_ready' ? 'Installed' : 'Template'}
+              </b>
             </span>
-            <span className="package-row-kind">{libraryKindLabel(item.kind)}</span>
+            <span className="package-row-kind">{libraryKindLabel()}</span>
           </button>
         ))}
         {packages.length === 0 && (
