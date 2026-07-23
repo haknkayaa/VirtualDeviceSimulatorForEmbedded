@@ -12,6 +12,9 @@
 
 #define VDS_MAX_FRAME_SIZE (1024U * 1024U)
 #define VDS_MAX_REQUEST_SIZE 4096U
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
 
 typedef struct {
     const uint8_t *data;
@@ -21,7 +24,7 @@ typedef struct {
 
 static int write_all(int fd, const uint8_t *data, size_t length) {
     while (length > 0U) {
-        const ssize_t written = write(fd, data, length);
+        const ssize_t written = send(fd, data, length, MSG_NOSIGNAL);
         if (written < 0 && errno == EINTR) {
             continue;
         }
@@ -313,4 +316,3 @@ vds_status_t vds_spi_transfer(vds_client_t *client,
     }
     return status;
 }
-

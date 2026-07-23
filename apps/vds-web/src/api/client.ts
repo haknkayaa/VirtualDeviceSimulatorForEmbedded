@@ -1,5 +1,6 @@
 import type {
   ApiErrorBody,
+  BusTelemetryResponse,
   CreateDeviceInput,
   Device,
   DeviceRegister,
@@ -59,6 +60,7 @@ async function requestArtifact(path: string): Promise<DownloadArtifact> {
 
 export const api = {
   health: () => request<Health>('/health'),
+  busTelemetry: () => request<BusTelemetryResponse>('/telemetry/buses'),
   devices: () => request<Device[]>('/devices'),
   deviceTemplates: () => request<DeviceTemplate[]>('/device-models'),
   createDevice: (input: CreateDeviceInput) =>

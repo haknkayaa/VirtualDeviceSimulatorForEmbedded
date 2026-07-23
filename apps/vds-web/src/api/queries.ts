@@ -5,6 +5,7 @@ import type { CreateDeviceInput, RunStatus } from '../types/api'
 
 export const queryKeys = {
   health: ['health'] as const,
+  busTelemetry: ['telemetry', 'buses'] as const,
   devices: ['devices'] as const,
   deviceTemplates: ['device-models'] as const,
   device: (id: string) => ['devices', id] as const,
@@ -21,6 +22,14 @@ const terminalRunStatuses = new Set<RunStatus>(['passed', 'failed', 'cancelled',
 
 export function useHealth() {
   return useQuery({ queryKey: queryKeys.health, queryFn: api.health, refetchInterval: 5_000, retry: 1 })
+}
+
+export function useBusTelemetry() {
+  return useQuery({
+    queryKey: queryKeys.busTelemetry,
+    queryFn: api.busTelemetry,
+    refetchInterval: 2_000,
+  })
 }
 
 export function useDevices() {

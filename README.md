@@ -214,6 +214,8 @@ REST control plane under `/api/v1`. It provides health, device/register/state,
 reset, scenario/run, and fault-management endpoints. Scenario starts return
 `202 Accepted` with a run ID; status and the final JSON result are retrieved
 from `/api/v1/runs/{run_id}` and `/api/v1/runs/{run_id}/result`.
+`GET /api/v1/telemetry/buses` derives a read-only 60-second bus-health
+snapshot from typed transaction events; it does not accept transactions.
 
 `GET /api/v1/events` upgrades to a WebSocket stream of typed domain events.
 The in-memory event bus assigns monotonically increasing IDs and retains the
@@ -225,6 +227,10 @@ they can recover retained events by ID after lagging.
 The REST surface intentionally has no SPI-transfer endpoint. Hardware
 transactions continue to use the length-prefixed Protobuf protocol over the
 Unix socket, while REST and WebSocket remain control and observability paths.
+
+The optional Linux SPI ABI adapter in `adapters/spi-preload` lets dynamically
+linked applications use mapped `/dev/spidevX.Y` paths through `LD_PRELOAD`.
+See its README for the supported ioctl subset, build commands, and limitations.
 
 ## Web UI Foundation v1
 
