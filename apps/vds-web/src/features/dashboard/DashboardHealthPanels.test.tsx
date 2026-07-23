@@ -5,23 +5,29 @@ import { DashboardHealthPanels } from './DashboardHealthPanels'
 
 describe('dashboard health panels', () => {
   it('lists application nodes and linked runtime modules', () => {
-    render(<DashboardHealthPanels connectionStatus="connected" healthStatus="ok" />)
+    render(<DashboardHealthPanels healthStatus="ok" />)
 
     expect(screen.getByRole('heading', { name: 'Server Health' })).toBeInTheDocument()
     expect(screen.getByText('vds-server')).toBeInTheDocument()
     expect(screen.getByText('vds-web')).toBeInTheDocument()
     expect(screen.getByText('vds-cli')).toBeInTheDocument()
-    expect(screen.getByText('C client SDK')).toBeInTheDocument()
+    expect(screen.queryByText('C client SDK')).not.toBeInTheDocument()
+    expect(screen.queryByText('Event stream')).not.toBeInTheDocument()
     expect(screen.getByText('vds-core')).toBeInTheDocument()
     expect(screen.getByText('vds-device-model')).toBeInTheDocument()
     expect(screen.getByText('vds-events')).toBeInTheDocument()
     expect(screen.getByText('vds-protocol')).toBeInTheDocument()
     expect(screen.getByText('vds-registers')).toBeInTheDocument()
     expect(screen.getByText('vds-scenario')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'System Health' }).compareDocumentPosition(
+        screen.getByRole('heading', { name: 'Server Health' }),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('shows unavailable host telemetry honestly when the API omits metrics', () => {
-    render(<DashboardHealthPanels connectionStatus="disconnected" healthStatus="ok" />)
+    render(<DashboardHealthPanels healthStatus="ok" />)
 
     expect(screen.getByRole('heading', { name: 'System Health' })).toBeInTheDocument()
     expect(screen.getByText('CPU')).toBeInTheDocument()
@@ -34,7 +40,6 @@ describe('dashboard health panels', () => {
   it('formats typed host telemetry when supplied by the health contract', () => {
     render(
       <DashboardHealthPanels
-        connectionStatus="connected"
         healthStatus="ok"
         systemMetrics={{
           cpu_percent: 24.5,
