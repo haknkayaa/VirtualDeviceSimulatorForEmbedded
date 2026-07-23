@@ -158,6 +158,7 @@ the same workspace test run.
 | REST snapshot and WebSocket replay map to transient runtime highlights without changing history | `behavior runtime mapping` |
 | Local save and deterministic import/export preserve semantic data | `device behavior persistence` |
 | No new runtime or REST hardware transaction route is introduced | architecture review and API client review |
+| Complete public Generic SPI Flash 128 Mbit example loads, compiles, and runs all ten conformance scenarios | `generic_spi_flash_reference`, `device behavior compiler`, `device behavior persistence` |
 
 Topology Editor work has not started. Passing this gate does not authorize that phase.
 

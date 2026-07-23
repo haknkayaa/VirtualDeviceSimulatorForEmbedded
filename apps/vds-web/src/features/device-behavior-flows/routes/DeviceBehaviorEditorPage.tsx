@@ -7,7 +7,7 @@ import { serializeFlowDocument } from '../../flows/serialization/flowDocument'
 import { localFlowRepository } from '../../flows/serialization/localFlowRepository'
 import { useFlowStore } from '../../flows/store/flowStore'
 import { DeviceBehaviorEditor } from '../components/DeviceBehaviorEditor'
-import { createDeviceBehaviorFlowDocument, exampleDeviceBehaviorFlow } from '../serialization/deviceBehaviorFlowDocument'
+import { createDeviceBehaviorFlowDocument, exampleDeviceBehaviorFlow, genericSpiFlashBehaviorFlow } from '../serialization/deviceBehaviorFlowDocument'
 import '../registry/deviceBehaviorRegistry'
 
 function download(name: string, content: string) {
@@ -26,9 +26,10 @@ export function DeviceBehaviorEditorPage() {
     const key = `${flowId ?? 'new'}:${readOnly}`; if (loaded.current === key) return; loaded.current = key
     if (!flowId) { useFlowStore.getState().newDocument(createDeviceBehaviorFlowDocument()); useFlowStore.getState().setReadOnly(readOnly); return }
     const local = localFlowRepository.load(flowId)
-    const example = flowId === exampleDeviceBehaviorFlow.flow.id ? structuredClone(exampleDeviceBehaviorFlow) : null
-    const document = local ?? example
-    if (document?.flow.kind === 'device_behavior') useFlowStore.getState().loadDocument(document, { readOnly: readOnly || Boolean(example && !local) })
+    const example = [exampleDeviceBehaviorFlow, genericSpiFlashBehaviorFlow].find((candidate) => candidate.flow.id === flowId)
+    const exampleDocument = example ? structuredClone(example) : null
+    const document = local ?? exampleDocument
+    if (document?.flow.kind === 'device_behavior') useFlowStore.getState().loadDocument(document, { readOnly: readOnly || Boolean(exampleDocument && !local) })
     else useFlowStore.getState().loadDocument(createDeviceBehaviorFlowDocument({ id: flowId, name: 'Recovered Device Behavior' }), { readOnly })
   }, [flowId, readOnly])
   const save = useCallback(() => {

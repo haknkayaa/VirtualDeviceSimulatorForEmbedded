@@ -55,3 +55,62 @@ export const exampleDeviceBehaviorFlow: FlowDocument = {
     behavior: { device_id: '', description: 'Safe generic reset/ready/busy state-machine example.', revision: 1 },
   },
 }
+
+const flashStateNames = ['powered_off', 'resetting', 'ready', 'write_enabled', 'programming', 'erasing', 'deep_power_down', 'error']
+const flashStatePositions: Record<string, { x: number; y: number }> = {
+  powered_off: { x: 20, y: 40 }, resetting: { x: 300, y: 40 }, ready: { x: 600, y: 220 },
+  write_enabled: { x: 900, y: 220 }, programming: { x: 1200, y: 80 }, erasing: { x: 1200, y: 360 },
+  deep_power_down: { x: 600, y: 500 }, error: { x: 900, y: 500 },
+}
+const flashActions: Record<string, JsonValue[]> = {
+  resetting: [{ kind: 'set_register', register: 'STATUS1', value: '0x01', mask: '0x03', allow_read_only_internal: true }],
+  ready: [{ kind: 'set_register', register: 'STATUS1', value: '0x00', mask: '0x03', allow_read_only_internal: true }],
+  write_enabled: [{ kind: 'set_register', register: 'STATUS1', value: '0x02', mask: '0x03', allow_read_only_internal: true }],
+  programming: [{ kind: 'set_register', register: 'STATUS1', value: '0x01', mask: '0x03', allow_read_only_internal: true }],
+  erasing: [{ kind: 'set_register', register: 'STATUS1', value: '0x01', mask: '0x03', allow_read_only_internal: true }],
+  deep_power_down: [{ kind: 'set_register', register: 'STATUS1', value: '0x00', mask: '0x03', allow_read_only_internal: true }],
+  error: [{ kind: 'set_register', register: 'STATUS1', value: '0x01', mask: '0x01', allow_read_only_internal: true }],
+}
+const flashTransitions = [
+  ['powered_off', 'resetting', 'power_on', 'event'],
+  ['resetting', 'ready', 'reset_complete', 'event'],
+  ['ready', 'write_enabled', 'write_enable', 'command'],
+  ['write_enabled', 'ready', 'write_disable', 'command'],
+  ['write_enabled', 'programming', 'page_program', 'command'],
+  ['programming', 'ready', 'operation_completed', 'event'],
+  ['write_enabled', 'erasing', 'sector_erase', 'command'],
+  ['erasing', 'ready', 'operation_completed', 'event'],
+  ['ready', 'deep_power_down', 'deep_power_down', 'command'],
+  ['deep_power_down', 'ready', 'release_power_down', 'command'],
+  ...['resetting', 'ready', 'write_enabled', 'programming', 'erasing', 'deep_power_down', 'error'].map((source) => [source, 'resetting', 'reset', 'command']),
+] as string[][]
+
+export const genericSpiFlashBehaviorFlow: FlowDocument = {
+  schema_version: 1,
+  flow: { id: 'generic-spi-flash-128m-behavior', name: 'Generic SPI Flash 128 Mbit', kind: 'device_behavior', revision: 1, created_at: now, updated_at: now },
+  nodes: flashStateNames.map((name) => ({
+    id: `state-${name.replaceAll('_', '-')}`,
+    kind: name === 'resetting' ? BEHAVIOR_NODE_KINDS.initialState : BEHAVIOR_NODE_KINDS.state,
+    position: flashStatePositions[name],
+    data: { label: name.replaceAll('_', ' '), state_name: name, description: '', terminal: false, entry_actions: flashActions[name] ?? [], exit_actions: [] },
+    ui: {},
+  })),
+  edges: flashTransitions.map(([source, target, trigger, triggerType], index) => transition(
+    `transition-${index.toString().padStart(2, '0')}-${source}-${target}`,
+    `state-${source.replaceAll('_', '-')}`,
+    `state-${target.replaceAll('_', '-')}`,
+    trigger,
+    {
+      trigger_type: triggerType,
+      ...(source === 'resetting' && target === 'ready' ? { delay_value: 5, delay_unit: 'ms' } : {}),
+    },
+  )),
+  viewport: { x: 0, y: 0, zoom: .62 },
+  metadata: {
+    allow_cycles: true,
+    default_edge_kind: BEHAVIOR_TRANSITION_EDGE,
+    example: true,
+    source_model: 'device-models/examples/generic-spi-flash/model.yaml',
+    behavior: { device_id: 'generic-spi-flash-128m', description: 'Public-safe 128 Mbit SPI flash reference behavior.', revision: 1 },
+  },
+}

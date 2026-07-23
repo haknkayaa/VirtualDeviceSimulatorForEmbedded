@@ -3,12 +3,16 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { deserializeFlowDocument, serializeFlowDocument } from '../../flows/serialization/flowDocument'
 import { localFlowRepository } from '../../flows/serialization/localFlowRepository'
 import { useFlowStore } from '../../flows/store/flowStore'
-import { createDeviceBehaviorFlowDocument, exampleDeviceBehaviorFlow } from './deviceBehaviorFlowDocument'
+import { createDeviceBehaviorFlowDocument, exampleDeviceBehaviorFlow, genericSpiFlashBehaviorFlow } from './deviceBehaviorFlowDocument'
 
 describe('device behavior persistence', () => {
   beforeEach(() => localStorage.clear())
   it('round trips behavior semantics and viewport deterministically', () => {
     const json = serializeFlowDocument(exampleDeviceBehaviorFlow)
+    expect(serializeFlowDocument(deserializeFlowDocument(json))).toBe(json)
+  })
+  it('round trips the full public SPI flash reference', () => {
+    const json = serializeFlowDocument(genericSpiFlashBehaviorFlow)
     expect(serializeFlowDocument(deserializeFlowDocument(json))).toBe(json)
   })
   it('saves and loads locally and preserves current state on invalid import', () => {
