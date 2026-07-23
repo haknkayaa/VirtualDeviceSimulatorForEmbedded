@@ -19,6 +19,7 @@ import { useEventStore } from '../../stores/eventStore'
 import { humanize } from '../../utils/format'
 import { BitfieldInspector } from './BitfieldInspector'
 import { DeviceFooterPanels } from './DeviceFooterPanels'
+import { DeviceInstanceList } from './DeviceInstanceList'
 import { DeviceProfileCard } from './DeviceProfileCard'
 import { RegisterMap } from './RegisterMap'
 import { RegisterMapOverview } from './RegisterMapOverview'
@@ -201,61 +202,71 @@ export function DevicesPage() {
   )
 
   return (
-    <div className="page-stack">
+    <div className="page-stack devices-page">
       <PageHeader
         description="Inspect authoritative device state and operate only through public control APIs."
         eyebrow="Runtime inventory"
         title="Devices"
       />
 
-      {!deviceId && <GlassPanel><AsyncState kind="empty" title="Select a device" /></GlassPanel>}
-      {device.isPending && deviceId && <GlassPanel><AsyncState kind="loading" title="Loading device profile" /></GlassPanel>}
-      {device.isError && <GlassPanel><AsyncState detail={device.error.message} kind="error" title="Device unavailable" /></GlassPanel>}
-      {device.data && <DeviceProfileCard actions={deviceActions} currentState={state.data?.state ?? device.data.state} device={device.data} />}
-      {reset.isError && <AsyncState detail={reset.error.message} kind="error" title="Reset failed" />}
-
-      <div className="device-workspace-layout">
-        <div className="device-workspace-main">
-          <nav aria-label="Device detail sections" className="device-detail-tabs" role="tablist">
-            {deviceTabs.map((tab) => (
-              <button
-                aria-controls="device-tab-panel"
-                aria-selected={activeTab === tab.id}
-                className={activeTab === tab.id ? 'active' : ''}
-                id={`device-tab-${tab.id}`}
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                role="tab"
-                type="button"
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-          <section aria-labelledby={`device-tab-${activeTab}`} className="device-detail-stack" id="device-tab-panel" role="tabpanel">
-            {devices.isError && <GlassPanel><AsyncState detail={devices.error.message} kind="error" title="Registry unavailable" /></GlassPanel>}
-            {deviceId ? renderTabContent() : <GlassPanel><AsyncState kind="empty" title="Select a device to inspect this section" /></GlassPanel>}
-          </section>
-        </div>
-        <aside aria-label="Device detail inspector" className="device-inspector-column">
-          {renderInspectorContent()}
-        </aside>
-      </div>
-      {deviceId && (
-        <DeviceFooterPanels
-          key={selectedRegister?.address ?? 'none'}
-          currentState={state.data?.state ?? device.data?.state ?? null}
-          device={device.data}
-          events={deviceEvents}
-          isRefreshing={registers.isFetching}
-          liveRead={liveRead}
-          onLiveReadChange={setLiveRead}
-          onRefreshRegisters={() => void refetchRegisters()}
-          onSelectRegister={setSelectedRegisterAddress}
-          registers={registerList}
-          selectedRegister={selectedRegister}
+      <div className="devices-page-layout">
+        <DeviceInstanceList
+          devices={devices.data ?? []}
+          errorMessage={devices.error?.message}
+          isLoading={devices.isPending}
+          selectedId={deviceId}
         />
-      )}
+        <div className="device-detail-page">
+          {!deviceId && <GlassPanel><AsyncState kind="empty" title="Select a device" /></GlassPanel>}
+          {device.isPending && deviceId && <GlassPanel><AsyncState kind="loading" title="Loading device profile" /></GlassPanel>}
+          {device.isError && <GlassPanel><AsyncState detail={device.error.message} kind="error" title="Device unavailable" /></GlassPanel>}
+          {device.data && <DeviceProfileCard actions={deviceActions} currentState={state.data?.state ?? device.data.state} device={device.data} />}
+          {reset.isError && <AsyncState detail={reset.error.message} kind="error" title="Reset failed" />}
+
+          <div className="device-workspace-layout">
+            <div className="device-workspace-main">
+              <nav aria-label="Device detail sections" className="device-detail-tabs" role="tablist">
+                {deviceTabs.map((tab) => (
+                  <button
+                    aria-controls="device-tab-panel"
+                    aria-selected={activeTab === tab.id}
+                    className={activeTab === tab.id ? 'active' : ''}
+                    id={`device-tab-${tab.id}`}
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    role="tab"
+                    type="button"
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+              <section aria-labelledby={`device-tab-${activeTab}`} className="device-detail-stack" id="device-tab-panel" role="tabpanel">
+                {devices.isError && <GlassPanel><AsyncState detail={devices.error.message} kind="error" title="Registry unavailable" /></GlassPanel>}
+                {deviceId ? renderTabContent() : <GlassPanel><AsyncState kind="empty" title="Select a device to inspect this section" /></GlassPanel>}
+              </section>
+            </div>
+            <aside aria-label="Device detail inspector" className="device-inspector-column">
+              {renderInspectorContent()}
+            </aside>
+          </div>
+          {deviceId && (
+            <DeviceFooterPanels
+              key={selectedRegister?.address ?? 'none'}
+              currentState={state.data?.state ?? device.data?.state ?? null}
+              device={device.data}
+              events={deviceEvents}
+              isRefreshing={registers.isFetching}
+              liveRead={liveRead}
+              onLiveReadChange={setLiveRead}
+              onRefreshRegisters={() => void refetchRegisters()}
+              onSelectRegister={setSelectedRegisterAddress}
+              registers={registerList}
+              selectedRegister={selectedRegister}
+            />
+          )}
+        </div>
+      </div>
     </div>
   )
 }

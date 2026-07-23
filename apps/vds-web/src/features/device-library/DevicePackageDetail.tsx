@@ -14,17 +14,23 @@ export function DevicePackageDetail({ item }: DevicePackageDetailProps) {
       <header className="package-detail-hero">
         <span className={`package-detail-acronym package-kind-${item.kind}`}>{item.acronym}</span>
         <div>
-          <p>{libraryKindLabel(item.kind)}</p>
+          <p>{libraryKindLabel()}</p>
           <h2>{item.name}</h2>
           <span>VDS4E public-safe local catalog</span>
           <div className="package-trust-badges">
             <b><ShieldCheck aria-hidden="true" size={12} /> Public safe</b>
             <b><PackageCheck aria-hidden="true" size={12} /> Bundled</b>
-            <b><CheckCircle2 aria-hidden="true" size={12} /> Schema validated</b>
+            <b>
+              <CheckCircle2 aria-hidden="true" size={12} />
+              {item.readiness === 'runtime_ready' ? 'Runtime ready' : 'Starter template'}
+            </b>
           </div>
         </div>
         <div className="package-install-state">
-          <strong><CheckCircle2 aria-hidden="true" size={14} /> Available locally</strong>
+          <strong>
+            <CheckCircle2 aria-hidden="true" size={14} />
+            {item.readiness === 'runtime_ready' ? 'Available locally' : 'Template only'}
+          </strong>
           <span>Version {item.version}</span>
         </div>
       </header>
@@ -70,7 +76,7 @@ export function DevicePackageDetail({ item }: DevicePackageDetailProps) {
             <GitBranch aria-hidden="true" size={14} /> Open in editor
           </Link>
         ) : (
-          <button className="button button-primary" disabled type="button"><GitBranch aria-hidden="true" size={14} /> No visual flow</button>
+          <button className="button button-primary" disabled type="button"><GitBranch aria-hidden="true" size={14} /> Runtime adapter required</button>
         )}
       </footer>
     </aside>
