@@ -8,10 +8,10 @@ import { GlassPanel } from '../../components/GlassPanel'
 import { MetricCard } from '../../components/MetricCard'
 import { PageHeader } from '../../components/PageHeader'
 import { StatusBadge } from '../../components/StatusBadge'
-import { VirtualEventList } from '../../components/VirtualEventList'
 import { useEventStore } from '../../stores/eventStore'
 import { useRunStore } from '../../stores/runStore'
 import { humanize } from '../../utils/format'
+import { LiveEventStream } from './LiveEventStream'
 
 export function DashboardPage() {
   const health = useHealth()
@@ -21,8 +21,12 @@ export function DashboardPage() {
   const activeRun = useRun(activeRunId)
   const connectionStatus = useEventStore((state) => state.connectionStatus)
   const events = useEventStore((state) => state.events)
-  const recentTransactions = useMemo(
-    () => events.filter((event) => event.event_type === 'transaction_completed').slice(-8),
+  const recentEvents = useMemo(
+    () => events.slice(-12).reverse(),
+    [events],
+  )
+  const transactionCount = useMemo(
+    () => events.filter((event) => event.event_type === 'transaction_completed').length,
     [events],
   )
   const enabledFaults = faults.data?.filter((fault) => fault.enabled).length ?? 0
@@ -66,7 +70,7 @@ export function DashboardPage() {
           <GlassPanel className="stream-health-panel" eyebrow="Live telemetry" title="Event stream" action={<StatusBadge status={connectionStatus} />}>
             <div className="stream-health-stats">
               <div><span>Retained events</span><strong>{events.length.toLocaleString()}</strong></div>
-              <div><span>Transactions</span><strong>{recentTransactions.length}</strong></div>
+              <div><span>Transactions</span><strong>{transactionCount.toLocaleString()}</strong></div>
               <div><span>Enabled faults</span><strong>{enabledFaults}</strong></div>
             </div>
           </GlassPanel>
@@ -79,14 +83,14 @@ export function DashboardPage() {
         <MetricCard detail="Current session" icon={Activity} label="Domain events" value={events.length} />
       </div>
       <div className="dashboard-grid">
-        <GlassPanel className="dashboard-transactions" eyebrow="Data plane telemetry" title="Recent transactions">
-          {connectionStatus === 'disconnected' && recentTransactions.length === 0 && (
+        <GlassPanel className="dashboard-transactions" eyebrow="Domain telemetry" title="Live Event Stream">
+          {connectionStatus === 'disconnected' && recentEvents.length === 0 && (
             <AsyncState detail="The UI will resume from its last event ID." kind="disconnected" title="Event stream disconnected" />
           )}
-          {connectionStatus !== 'disconnected' && recentTransactions.length === 0 && (
-            <AsyncState kind="empty" title="Waiting for transaction events" />
+          {connectionStatus !== 'disconnected' && recentEvents.length === 0 && (
+            <AsyncState kind="empty" title="Waiting for domain events" />
           )}
-          {recentTransactions.length > 0 && <VirtualEventList compact events={recentTransactions} />}
+          {recentEvents.length > 0 && <LiveEventStream events={recentEvents} />}
         </GlassPanel>
       </div>
     </div>
