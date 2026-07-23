@@ -5,6 +5,17 @@ export interface ApiErrorBody {
 
 export interface Health {
   status: 'ok' | string
+  system?: SystemMetrics
+}
+
+export interface SystemMetrics {
+  cpu_percent?: number
+  memory_used_bytes?: number
+  memory_total_bytes?: number
+  disk_used_bytes?: number
+  disk_total_bytes?: number
+  network_rx_bytes_per_sec?: number
+  network_tx_bytes_per_sec?: number
 }
 
 export interface Device {
