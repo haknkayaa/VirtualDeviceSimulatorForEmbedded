@@ -28,7 +28,7 @@ export function DashboardPage() {
   const enabledFaults = faults.data?.filter((fault) => fault.enabled).length ?? 0
 
   return (
-    <div className="page-stack">
+    <div className="page-stack dashboard-page">
       <PageHeader
         eyebrow="Control plane / Overview"
         title="System overview"

@@ -45,6 +45,10 @@ function formatBytes(value?: number) {
   return `${value} B`
 }
 
+function formatRate(value?: number) {
+  return value === undefined ? '—' : `${formatBytes(value)}/s`
+}
+
 export function DashboardHealthPanels({
   healthStatus,
   systemMetrics,
@@ -98,8 +102,8 @@ export function DashboardHealthPanels({
             <div>
               <header><strong>Network Traffic</strong><small>{systemMetrics?.network_rx_bytes_per_sec === undefined ? 'Not exposed' : 'Live throughput'}</small></header>
               <div className="network-values">
-                <span><Gauge aria-hidden="true" size={11} /> RX <b>{formatBytes(systemMetrics?.network_rx_bytes_per_sec)}/s</b></span>
-                <span><Database aria-hidden="true" size={11} /> TX <b>{formatBytes(systemMetrics?.network_tx_bytes_per_sec)}/s</b></span>
+                <span><Gauge aria-hidden="true" size={11} /> RX <b>{formatRate(systemMetrics?.network_rx_bytes_per_sec)}</b></span>
+                <span><Database aria-hidden="true" size={11} /> TX <b>{formatRate(systemMetrics?.network_tx_bytes_per_sec)}</b></span>
               </div>
             </div>
           </div>
