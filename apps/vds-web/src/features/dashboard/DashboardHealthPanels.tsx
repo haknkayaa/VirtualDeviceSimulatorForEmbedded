@@ -49,6 +49,7 @@ export function DashboardHealthPanels({
   healthStatus,
   systemMetrics,
 }: DashboardHealthPanelsProps) {
+  const serverRunning = healthStatus === 'ok'
   const cpu = systemMetrics?.cpu_percent
   const ram = percent(systemMetrics?.memory_used_bytes, systemMetrics?.memory_total_bytes)
   const disk = percent(systemMetrics?.disk_used_bytes, systemMetrics?.disk_total_bytes)
@@ -115,7 +116,9 @@ export function DashboardHealthPanels({
           <article className="platform-node platform-node-primary">
             <span><Server aria-hidden="true" size={16} /></span>
             <div><strong>vds-server</strong><small>Control API · WebSocket · Unix socket</small></div>
-            <i className={healthStatus === 'ok' ? 'online' : ''} />
+            <span className={`platform-node-status ${serverRunning ? 'running' : 'failed'}`}>
+              <i /> {serverRunning ? 'RUNNING' : 'FAIL'}
+            </span>
           </article>
           <div aria-hidden="true" className="node-map-rail" />
           <div className="platform-node-clients">
@@ -123,7 +126,9 @@ export function DashboardHealthPanels({
               <article className="platform-node" key={module.id}>
                 <span><module.icon aria-hidden="true" size={15} /></span>
                 <div><strong title={module.id}>{module.id}</strong><small>{module.detail}</small></div>
-                <i className={module.id === 'vds-web' ? 'online' : 'available'} />
+                <span className={`platform-node-status ${module.id === 'vds-web' || serverRunning ? 'running' : 'failed'}`}>
+                  <i /> {module.id === 'vds-web' || serverRunning ? 'RUNNING' : 'FAIL'}
+                </span>
               </article>
             ))}
           </div>
