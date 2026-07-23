@@ -1,8 +1,10 @@
 import type {
   ApiErrorBody,
+  CreateDeviceInput,
   Device,
   DeviceRegister,
   DeviceState,
+  DeviceTemplate,
   DownloadArtifact,
   Fault,
   Health,
@@ -58,6 +60,13 @@ async function requestArtifact(path: string): Promise<DownloadArtifact> {
 export const api = {
   health: () => request<Health>('/health'),
   devices: () => request<Device[]>('/devices'),
+  deviceTemplates: () => request<DeviceTemplate[]>('/device-models'),
+  createDevice: (input: CreateDeviceInput) =>
+    request<Device>('/devices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
   device: (id: string) => request<Device>(`/devices/${encodeURIComponent(id)}`),
   registers: (id: string) =>
     request<DeviceRegister[]>(`/devices/${encodeURIComponent(id)}/registers`),

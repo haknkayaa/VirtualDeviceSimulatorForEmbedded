@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use crate::device::{Device, DeviceError, DeviceTransfer};
 
@@ -18,7 +21,7 @@ pub struct DeviceFaultSnapshot {
 /// Registry used by the transaction router to locate virtual devices.
 #[derive(Default)]
 pub struct DeviceRegistry {
-    devices: HashMap<String, Arc<dyn Device>>,
+    devices: RwLock<HashMap<String, Arc<dyn Device>>>,
 }
 
 impl DeviceRegistry {
@@ -32,14 +35,18 @@ impl DeviceRegistry {
     /// # Errors
     ///
     /// Returns an error when another device already uses the same identifier.
-    pub fn register(&mut self, device: Arc<dyn Device>) -> Result<(), DeviceError> {
+    pub fn register(&self, device: Arc<dyn Device>) -> Result<(), DeviceError> {
         let id = device.id().to_owned();
-        if self.devices.contains_key(&id) {
+        let mut devices = self
+            .devices
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if devices.contains_key(&id) {
             return Err(DeviceError::InvalidRequest(format!(
                 "duplicate device id '{id}'"
             )));
         }
-        self.devices.insert(id, device);
+        devices.insert(id, device);
         Ok(())
     }
 
@@ -83,7 +90,7 @@ impl DeviceRegistry {
     /// Returns an error when a device fault runtime cannot be updated.
     pub fn set_fault_enabled(&self, fault_id: &str, enabled: bool) -> Result<usize, DeviceError> {
         let mut matched = 0;
-        for device in self.devices.values() {
+        for device in self.device_values() {
             matched += usize::from(device.set_fault_enabled(fault_id, enabled)?);
         }
         Ok(matched)
@@ -94,7 +101,13 @@ impl DeviceRegistry {
     /// # Errors
     /// Returns an error when a device cannot apply a due event.
     pub fn run_due_events(&self) -> Result<Vec<(String, crate::event::DeviceEvent)>, DeviceError> {
-        let mut ids = self.devices.keys().cloned().collect::<Vec<_>>();
+        let mut ids = self
+            .devices
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
         ids.sort();
         let mut events = Vec::new();
         for id in ids {
@@ -110,7 +123,7 @@ impl DeviceRegistry {
     /// # Errors
     /// Returns an error when scheduler state cannot be inspected.
     pub fn next_event_deadline_ns(&self) -> Result<Option<u64>, DeviceError> {
-        self.devices.values().try_fold(None, |next, device| {
+        self.device_values().iter().try_fold(None, |next, device| {
             let deadline = device.next_event_deadline_ns()?;
             Ok(match (next, deadline) {
                 (Some(left), Some(right)) => Some(left.min(right)),
@@ -125,8 +138,8 @@ impl DeviceRegistry {
     /// Returns an error when device state cannot be inspected.
     pub fn snapshots(&self) -> Result<Vec<DeviceSnapshot>, DeviceError> {
         let mut devices = self
-            .devices
-            .values()
+            .device_values()
+            .iter()
             .map(|device| {
                 Ok(DeviceSnapshot {
                     id: device.id().to_owned(),
@@ -145,7 +158,7 @@ impl DeviceRegistry {
     /// Returns an error when fault state cannot be inspected.
     pub fn fault_snapshots(&self) -> Result<Vec<DeviceFaultSnapshot>, DeviceError> {
         let mut faults = Vec::new();
-        for device in self.devices.values() {
+        for device in self.device_values() {
             faults.extend(
                 device
                     .faults()?
@@ -181,20 +194,38 @@ impl DeviceRegistry {
         Ok(self.device(device_id)?.virtual_time_ns())
     }
 
-    fn device(&self, device_id: &str) -> Result<&Arc<dyn Device>, DeviceError> {
+    fn device(&self, device_id: &str) -> Result<Arc<dyn Device>, DeviceError> {
         self.devices
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .get(device_id)
+            .cloned()
             .ok_or_else(|| DeviceError::NotFound(device_id.to_owned()))
+    }
+
+    fn device_values(&self) -> Vec<Arc<dyn Device>> {
+        self.devices
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .values()
+            .cloned()
+            .collect()
     }
 
     #[must_use]
     pub fn len(&self) -> usize {
-        self.devices.len()
+        self.devices
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .len()
     }
 
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.devices.is_empty()
+        self.devices
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .is_empty()
     }
 }
 
@@ -224,7 +255,7 @@ mod tests {
 
     #[test]
     fn routes_to_a_registered_device() {
-        let mut registry = DeviceRegistry::new();
+        let registry = DeviceRegistry::new();
         registry
             .register(Arc::new(EchoDevice))
             .expect("device should register");

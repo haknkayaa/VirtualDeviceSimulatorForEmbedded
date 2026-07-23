@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Ellipsis, Pencil, Power, RadioTower, RefreshCw, RotateCcw } from 'lucide-react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import {
+  useCreateDevice,
   useDevice,
+  useDeviceTemplates,
   useDevices,
   useDeviceState,
   useFaults,
@@ -17,6 +19,7 @@ import { PageHeader } from '../../components/PageHeader'
 import { VirtualEventList } from '../../components/VirtualEventList'
 import { useEventStore } from '../../stores/eventStore'
 import { humanize } from '../../utils/format'
+import { AddDeviceDialog } from './AddDeviceDialog'
 import { BitfieldInspector } from './BitfieldInspector'
 import { DeviceFooterPanels } from './DeviceFooterPanels'
 import { DeviceInstanceList } from './DeviceInstanceList'
@@ -43,12 +46,25 @@ const unavailableTabCopy: Record<Exclude<DeviceTab, 'registers' | 'faults' | 'ev
   configuration: 'Device configuration is not exposed by the current Control API.',
 }
 
+function nextDeviceId(ids: string[], selectedId?: string) {
+  const source = selectedId ?? ids[0] ?? 'device-0'
+  const match = /^(.*?)(\d+)$/.exec(source)
+  const prefix = match?.[1] ?? `${source}-`
+  let sequence = match ? Number(match[2]) + 1 : 1
+  while (ids.includes(`${prefix}${sequence}`)) sequence += 1
+  return `${prefix}${sequence}`
+}
+
 export function DevicesPage() {
   const { deviceId: routeDeviceId } = useParams()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<DeviceTab>('registers')
   const [liveRead, setLiveRead] = useState(false)
+  const [showAddDevice, setShowAddDevice] = useState(false)
   const [selectedRegisterAddress, setSelectedRegisterAddress] = useState<number | null>(null)
   const devices = useDevices()
+  const deviceTemplates = useDeviceTemplates(showAddDevice)
+  const createDevice = useCreateDevice()
   const deviceId = routeDeviceId ?? devices.data?.[0]?.id
   const device = useDevice(deviceId)
   const state = useDeviceState(deviceId)
@@ -214,6 +230,10 @@ export function DevicesPage() {
           devices={devices.data ?? []}
           errorMessage={devices.error?.message}
           isLoading={devices.isPending}
+          onAdd={() => {
+            createDevice.reset()
+            setShowAddDevice(true)
+          }}
           selectedId={deviceId}
         />
         <div className="device-detail-page">
@@ -267,6 +287,22 @@ export function DevicesPage() {
           )}
         </div>
       </div>
+      {showAddDevice && (
+        <AddDeviceDialog
+          defaultDeviceId={nextDeviceId((devices.data ?? []).map((item) => item.id), deviceId)}
+          errorMessage={createDevice.error?.message}
+          isCreating={createDevice.isPending}
+          isLoadingTemplates={deviceTemplates.isPending}
+          onClose={() => setShowAddDevice(false)}
+          onSubmit={(input) => createDevice.mutate(input, {
+            onSuccess: (created) => {
+              setShowAddDevice(false)
+              void navigate(`/devices/${encodeURIComponent(created.id)}`)
+            },
+          })}
+          templates={deviceTemplates.data ?? []}
+        />
+      )}
     </div>
   )
 }

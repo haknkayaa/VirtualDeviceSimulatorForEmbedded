@@ -14,9 +14,12 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use vds_core::{
+    clock::SimulatorClock,
     config::ServerConfig,
+    device::Device,
     registry::{DeviceRegistry, DeviceSnapshot},
 };
+use vds_device_model::DeviceModel;
 use vds_events::{EventBus, EventDraft, EventPayload};
 use vds_scenario::{JUnitReportMetadata, ScenarioDocument, ScenarioResult, to_junit_xml};
 
@@ -29,6 +32,8 @@ pub struct ApiState {
     pub scenarios: Arc<HashMap<String, ScenarioDocument>>,
     pub runs: Arc<RunManager>,
     pub config: ServerConfig,
+    device_templates: Arc<HashMap<String, DeviceModel>>,
+    clock: Arc<dyn SimulatorClock>,
 }
 
 impl ApiState {
@@ -40,6 +45,7 @@ impl ApiState {
         config: ServerConfig,
         registry: Arc<DeviceRegistry>,
         events: Arc<EventBus>,
+        clock: Arc<dyn SimulatorClock>,
     ) -> Result<Self, String> {
         let mut scenarios = HashMap::new();
         for path in &config.scenarios {
@@ -53,12 +59,26 @@ impl ApiState {
                 return Err(format!("duplicate scenario id '{id}'"));
             }
         }
+        let mut device_templates = HashMap::new();
+        for path in &config.device_models {
+            let model = DeviceModel::load(path)
+                .map_err(|error| format!("invalid device model '{}': {error}", path.display()))?;
+            let template_id = model.device.id.clone();
+            if device_templates
+                .insert(template_id.clone(), model)
+                .is_some()
+            {
+                return Err(format!("duplicate device template id '{template_id}'"));
+            }
+        }
         Ok(Self {
             registry,
             events,
             scenarios: Arc::new(scenarios),
             runs: Arc::new(RunManager::default()),
             config,
+            device_templates: Arc::new(device_templates),
+            clock,
         })
     }
 }
@@ -66,7 +86,8 @@ impl ApiState {
 pub fn router(state: ApiState) -> Router {
     Router::new()
         .route("/api/v1/health", get(health))
-        .route("/api/v1/devices", get(devices))
+        .route("/api/v1/devices", get(devices).post(create_device))
+        .route("/api/v1/device-models", get(device_templates))
         .route("/api/v1/devices/{id}", get(device))
         .route("/api/v1/devices/{id}/registers", get(registers))
         .route("/api/v1/devices/{id}/state", get(device_state))
@@ -98,6 +119,105 @@ struct DeviceDto {
     bus: String,
     state: Option<String>,
 }
+
+#[derive(Serialize)]
+struct DeviceTemplateDto {
+    id: String,
+    name: String,
+    bus: String,
+    model: String,
+}
+
+async fn device_templates(State(state): State<ApiState>) -> Json<Vec<DeviceTemplateDto>> {
+    let mut templates = state
+        .device_templates
+        .iter()
+        .map(|(id, template)| DeviceTemplateDto {
+            id: id.clone(),
+            name: template.device.name.clone(),
+            bus: template.device.bus.clone(),
+            model: template.device.model.clone(),
+        })
+        .collect::<Vec<_>>();
+    templates.sort_by(|left, right| left.id.cmp(&right.id));
+    Json(templates)
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CreateDeviceRequest {
+    template_id: String,
+    device_id: String,
+}
+
+async fn create_device(
+    State(state): State<ApiState>,
+    Json(request): Json<CreateDeviceRequest>,
+) -> ApiResult<(StatusCode, Json<DeviceDto>)> {
+    if !valid_device_id(&request.device_id) {
+        return Err(ApiError::bad_request(
+            "invalid_device_id",
+            "device_id must be 1-64 ASCII letters, numbers, '.', '_' or '-', and start with a letter or number".to_owned(),
+        ));
+    }
+    if state
+        .registry
+        .snapshots()
+        .map_err(ApiError::device)?
+        .iter()
+        .any(|device| device.id == request.device_id)
+    {
+        return Err(ApiError::conflict(
+            "device_id_conflict",
+            format!("device '{}' already exists", request.device_id),
+        ));
+    }
+    let mut model = state
+        .device_templates
+        .get(&request.template_id)
+        .cloned()
+        .ok_or_else(|| {
+            ApiError::not_found(
+                "device_template_not_found",
+                format!("device template '{}' was not found", request.template_id),
+            )
+        })?;
+    model.device.id.clone_from(&request.device_id);
+    let device = model
+        .into_spi_device_with_clock(Arc::clone(&state.clock))
+        .map_err(|error| {
+            ApiError::bad_request(
+                "device_instance_create_failed",
+                format!("device instance could not be created: {error}"),
+            )
+        })?;
+    let snapshot = DeviceDto {
+        id: device.id().to_owned(),
+        bus: device.bus_type().to_string(),
+        state: device.current_state().map_err(ApiError::device)?,
+    };
+    state.registry.register(Arc::new(device)).map_err(|error| {
+        if error.to_string().contains("duplicate device id") {
+            ApiError::conflict("device_id_conflict", error.to_string())
+        } else {
+            ApiError::device(error)
+        }
+    })?;
+    Ok((StatusCode::CREATED, Json(snapshot)))
+}
+
+fn valid_device_id(value: &str) -> bool {
+    let mut characters = value.chars();
+    let Some(first) = characters.next() else {
+        return false;
+    };
+    value.len() <= 64
+        && first.is_ascii_alphanumeric()
+        && characters.all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
+        })
+}
+
 impl From<DeviceSnapshot> for DeviceDto {
     fn from(value: DeviceSnapshot) -> Self {
         Self {

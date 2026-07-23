@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -7,10 +7,25 @@ import { useEventStore } from '../../stores/eventStore'
 import { jsonResponse, renderRoute } from '../../test/render'
 
 function installDeviceApi() {
+  let created = false
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
-    if (url === '/api/v1/devices') return jsonResponse([{ id: 'spi-flash-0', bus: 'spi', state: 'ready' }])
+    if (url === '/api/v1/devices' && init?.method === 'POST') {
+      const body = JSON.parse(String(init.body)) as { device_id: string }
+      created = true
+      return jsonResponse({ id: body.device_id, bus: 'spi', state: 'resetting' }, { status: 201 })
+    }
+    if (url === '/api/v1/devices') {
+      return jsonResponse([
+        { id: 'spi-flash-0', bus: 'spi', state: 'ready' },
+        ...(created ? [{ id: 'spi-flash-1', bus: 'spi', state: 'resetting' }] : []),
+      ])
+    }
+    if (url === '/api/v1/device-models') {
+      return jsonResponse([{ id: 'spi-flash-0', name: 'Reference Flash', bus: 'spi', model: 'generic-spi-command' }])
+    }
     if (url === '/api/v1/devices/spi-flash-0') return jsonResponse({ id: 'spi-flash-0', name: 'Reference Flash', bus: 'spi', type: 'Flash memory', model: 'generic-spi-command', version: '1.0', state: 'ready' })
+    if (url === '/api/v1/devices/spi-flash-1') return jsonResponse({ id: 'spi-flash-1', name: 'Reference Flash', bus: 'spi', type: 'Flash memory', model: 'generic-spi-command', version: '1.0', state: 'resetting' })
     if (url.endsWith('/registers')) return jsonResponse([
       { name: 'CONTROL', address: 1, width_bits: 8, access: 'rw', reset_value: 0, value: 18, description: 'Device control register' },
       { name: 'STATUS', address: 2, width_bits: 8, access: 'ro', reset_value: 1, value: 1, description: 'Current device status' },
@@ -60,13 +75,38 @@ describe('devices page', () => {
     expect(screen.getByRole('button', { name: 'Write' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Write & Verify' })).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'Add Device' }))
-    expect(screen.getByText('Choose an installed model')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Open Device Library' })).toHaveAttribute('href', '/device-library')
+    expect(await screen.findByRole('dialog', { name: 'Add Device' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Device model' })).toHaveValue('spi-flash-0')
+    expect(screen.getByLabelText('Device instance ID')).toHaveValue('spi-flash-1')
+    expect(screen.queryByRole('link', { name: 'Open Device Library' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await userEvent.click(screen.getByRole('tab', { name: 'Faults' }))
     await userEvent.click(screen.getByRole('button', { name: 'Enable read_id_timeout' }))
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/faults/read_id_timeout/enable',
       expect.objectContaining({ method: 'POST' }),
+    )
+  })
+
+  it('creates another runtime instance from a configured model', async () => {
+    const fetchMock = installDeviceApi()
+    renderRoute(<DevicesPage />, '/devices/spi-flash-0', '/devices/:deviceId')
+
+    await screen.findAllByText('CONTROL')
+    await userEvent.click(screen.getByRole('button', { name: 'Add Device' }))
+    await screen.findByRole('combobox', { name: 'Device model' })
+    await userEvent.click(screen.getByRole('button', { name: 'Create Instance' }))
+
+    await screen.findByRole('link', { name: /spi-flash-1/i })
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: /spi-flash-1/i })).toHaveAttribute('aria-current', 'page')
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/devices',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ template_id: 'spi-flash-0', device_id: 'spi-flash-1' }),
+      }),
     )
   })
 

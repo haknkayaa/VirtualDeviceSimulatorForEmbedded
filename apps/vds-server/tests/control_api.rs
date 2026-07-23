@@ -43,8 +43,14 @@ scenarios: ['{}']
 fn state() -> ApiState {
     let config = config();
     let clock = Arc::new(ManualClock::default());
-    let registry = load_registry_with_clock(&config, clock).unwrap();
-    ApiState::new(config, Arc::new(registry), Arc::new(EventBus::default())).unwrap()
+    let registry = load_registry_with_clock(&config, clock.clone()).unwrap();
+    ApiState::new(
+        config,
+        Arc::new(registry),
+        Arc::new(EventBus::default()),
+        clock,
+    )
+    .unwrap()
 }
 
 async fn json_request(
@@ -128,6 +134,59 @@ async fn health_device_register_state_reset_and_fault_endpoints_work() {
     assert_eq!(faults[0]["enabled"], true);
     let (status, _) = json_request(app, "POST", "/api/v1/faults/read_id_timeout/disable").await;
     assert_eq!(status, StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
+async fn configured_model_creates_independent_runtime_device_instances() {
+    let app = router(state());
+    let (status, templates) = json_request(app.clone(), "GET", "/api/v1/device-models").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(templates.as_array().unwrap().len(), 1);
+    assert_eq!(templates[0]["id"], "spi-flash-0");
+    assert_eq!(templates[0]["bus"], "spi");
+
+    let request = serde_json::json!({
+        "template_id": "spi-flash-0",
+        "device_id": "spi-flash-1"
+    });
+    let (status, created) =
+        json_request_with_body(app.clone(), "POST", "/api/v1/devices", request.clone()).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(created["id"], "spi-flash-1");
+    assert_eq!(created["bus"], "spi");
+
+    let (_, devices) = json_request(app.clone(), "GET", "/api/v1/devices").await;
+    assert_eq!(devices.as_array().unwrap().len(), 2);
+    assert_eq!(devices[0]["id"], "spi-flash-0");
+    assert_eq!(devices[1]["id"], "spi-flash-1");
+    let (_, registers) =
+        json_request(app.clone(), "GET", "/api/v1/devices/spi-flash-1/registers").await;
+    assert!(!registers.as_array().unwrap().is_empty());
+
+    let (status, duplicate) =
+        json_request_with_body(app.clone(), "POST", "/api/v1/devices", request).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(duplicate["code"], "device_id_conflict");
+
+    let (status, missing) = json_request_with_body(
+        app.clone(),
+        "POST",
+        "/api/v1/devices",
+        serde_json::json!({ "template_id": "missing", "device_id": "other-device" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(missing["code"], "device_template_not_found");
+
+    let (status, invalid) = json_request_with_body(
+        app,
+        "POST",
+        "/api/v1/devices",
+        serde_json::json!({ "template_id": "spi-flash-0", "device_id": "invalid id" }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(invalid["code"], "invalid_device_id");
 }
 
 #[tokio::test]
