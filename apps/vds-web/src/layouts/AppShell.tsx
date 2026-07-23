@@ -1,4 +1,4 @@
-import { Activity, Bell, Boxes, CircleHelp, Gauge, GitBranch, Moon, PlaySquare, Radio, Settings, Sun } from 'lucide-react'
+import { Activity, Bell, Boxes, CircleHelp, Gauge, GitBranch, LibraryBig, Moon, PlaySquare, Radio, Settings, Sun } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { BrandLogo } from '../components/BrandLogo'
@@ -13,6 +13,7 @@ const navigation = [
   { to: '/devices', label: 'Devices', icon: Boxes, end: false },
   { to: '/transactions', label: 'Transactions', icon: Activity, end: false },
   { to: '/scenarios', label: 'Scenarios', icon: PlaySquare, end: false },
+  { to: '/device-library', label: 'Device Library', icon: LibraryBig, end: false },
   { to: '/flows', label: 'Flows', icon: GitBranch, end: false },
 ] as const
 
@@ -21,6 +22,7 @@ const workspaceNavigation = [
   { to: '/devices', label: 'Devices', end: false },
   { to: '/transactions', label: 'Transactions', end: false },
   { to: '/scenarios', label: 'Scenarios', end: false },
+  { to: '/device-library', label: 'Device Library', end: false },
   { to: '/flows', label: 'Flow editor', end: false },
 ] as const
 
