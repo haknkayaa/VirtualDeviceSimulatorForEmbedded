@@ -28,6 +28,8 @@ export interface DeviceRegister {
   width_bits: number
   access: string
   value: number
+  reset_value?: number
+  description?: string
 }
 
 export interface Fault {

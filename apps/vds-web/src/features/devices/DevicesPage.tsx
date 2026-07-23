@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Ellipsis, Pencil, Power, RadioTower, RefreshCw, RotateCcw } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 
 import {
   useDevice,
@@ -14,11 +14,13 @@ import {
 import { AsyncState } from '../../components/AsyncState'
 import { GlassPanel } from '../../components/GlassPanel'
 import { PageHeader } from '../../components/PageHeader'
-import { StatusBadge } from '../../components/StatusBadge'
 import { VirtualEventList } from '../../components/VirtualEventList'
 import { useEventStore } from '../../stores/eventStore'
-import { formatHex, humanize } from '../../utils/format'
+import { humanize } from '../../utils/format'
+import { BitfieldInspector } from './BitfieldInspector'
 import { DeviceProfileCard } from './DeviceProfileCard'
+import { RegisterMap } from './RegisterMap'
+import { RegisterMapOverview } from './RegisterMapOverview'
 
 const deviceTabs = [
   { id: 'registers', label: 'Registers' },
@@ -43,6 +45,7 @@ export function DevicesPage() {
   const { deviceId: routeDeviceId } = useParams()
   const [activeTab, setActiveTab] = useState<DeviceTab>('registers')
   const [liveRead, setLiveRead] = useState(false)
+  const [selectedRegisterAddress, setSelectedRegisterAddress] = useState<number | null>(null)
   const devices = useDevices()
   const deviceId = routeDeviceId ?? devices.data?.[0]?.id
   const device = useDevice(deviceId)
@@ -62,6 +65,9 @@ export function DevicesPage() {
     () => events.filter((event) => event.device_id === deviceId).slice(-100).reverse(),
     [deviceId, events],
   )
+  const registerList = registers.data ?? []
+  const selectedRegister = registerList.find((register) => register.address === selectedRegisterAddress) ?? registerList[0]
+  const effectiveSelectedAddress = selectedRegister?.address ?? null
   const isRefreshing = devices.isFetching || device.isFetching || state.isFetching || registers.isFetching || faults.isFetching
 
   const refresh = useCallback(() => {
@@ -83,19 +89,18 @@ export function DevicesPage() {
   const renderTabContent = () => {
     if (activeTab === 'registers') {
       return (
-        <GlassPanel eyebrow="Authoritative snapshot" title="Register table">
+        <>
           {registers.isPending && deviceId && <AsyncState kind="loading" title="Reading registers" />}
           {registers.isError && <AsyncState detail={registers.error.message} kind="error" title="Registers unavailable" />}
           {registers.data?.length === 0 && <AsyncState kind="empty" title="No registers exposed" />}
           {registers.data && registers.data.length > 0 && (
-            <div className="table-scroll"><table>
-              <thead><tr><th>Name</th><th>Address</th><th>Width</th><th>Access</th><th>Value</th></tr></thead>
-              <tbody>{registers.data.map((register) => (
-                <tr key={register.address}><td><strong>{register.name}</strong></td><td className="mono">{formatHex(register.address)}</td><td>{register.width_bits} bit</td><td>{register.access.toUpperCase()}</td><td className="mono value-cell">{formatHex(register.value, register.width_bits)}</td></tr>
-              ))}</tbody>
-            </table></div>
+            <RegisterMap
+              onSelect={setSelectedRegisterAddress}
+              registers={registers.data}
+              selectedAddress={effectiveSelectedAddress}
+            />
           )}
-        </GlassPanel>
+        </>
       )
     }
 
@@ -143,6 +148,28 @@ export function DevicesPage() {
     )
   }
 
+  const renderInspectorContent = () => {
+    if (activeTab === 'registers') {
+      return (
+        <>
+          <BitfieldInspector key={selectedRegister?.address ?? 'none'} register={selectedRegister} />
+          <RegisterMapOverview
+            onSelect={setSelectedRegisterAddress}
+            registers={registerList}
+            selectedAddress={effectiveSelectedAddress}
+          />
+        </>
+      )
+    }
+
+    const label = deviceTabs.find((tab) => tab.id === activeTab)?.label ?? activeTab
+    return (
+      <GlassPanel className="device-context-inspector" title={`${label} Inspector`}>
+        <AsyncState detail={`Select items in ${label} to inspect their details here.`} kind="empty" title="No item selected" />
+      </GlassPanel>
+    )
+  }
+
   const deviceActions = (
     <div aria-label="Device actions" className="device-page-actions" role="group">
       <button className="button button-secondary" disabled={!deviceId || isRefreshing} onClick={refresh} type="button">
@@ -186,40 +213,32 @@ export function DevicesPage() {
       {device.data && <DeviceProfileCard actions={deviceActions} currentState={state.data?.state ?? device.data.state} device={device.data} />}
       {reset.isError && <AsyncState detail={reset.error.message} kind="error" title="Reset failed" />}
 
-      <nav aria-label="Device detail sections" className="device-detail-tabs" role="tablist">
-        {deviceTabs.map((tab) => (
-          <button
-            aria-controls="device-tab-panel"
-            aria-selected={activeTab === tab.id}
-            className={activeTab === tab.id ? 'active' : ''}
-            id={`device-tab-${tab.id}`}
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            role="tab"
-            type="button"
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
-
-      <div className="devices-layout">
-        <GlassPanel className="device-list-panel" eyebrow="Registry" title="Loaded devices">
-          {devices.isPending && <AsyncState kind="loading" title="Loading registry" />}
-          {devices.isError && <AsyncState detail={devices.error.message} kind="error" title="Registry unavailable" />}
-          {devices.data?.length === 0 && <AsyncState kind="empty" title="No devices loaded" />}
-          <nav aria-label="Device list" className="device-nav">
-            {devices.data?.map((item) => (
-              <Link className={item.id === deviceId ? 'device-link active' : 'device-link'} key={item.id} to={`/devices/${encodeURIComponent(item.id)}`}>
-                <span className="device-bus">{item.bus.toUpperCase()}</span>
-                <div><strong>{item.id}</strong><StatusBadge status={item.state} /></div>
-              </Link>
+      <div className="device-workspace-layout">
+        <div className="device-workspace-main">
+          <nav aria-label="Device detail sections" className="device-detail-tabs" role="tablist">
+            {deviceTabs.map((tab) => (
+              <button
+                aria-controls="device-tab-panel"
+                aria-selected={activeTab === tab.id}
+                className={activeTab === tab.id ? 'active' : ''}
+                id={`device-tab-${tab.id}`}
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                role="tab"
+                type="button"
+              >
+                {tab.label}
+              </button>
             ))}
           </nav>
-        </GlassPanel>
-        <section aria-labelledby={`device-tab-${activeTab}`} className="device-detail-stack" id="device-tab-panel" role="tabpanel">
-          {deviceId ? renderTabContent() : <GlassPanel><AsyncState kind="empty" title="Select a device to inspect this section" /></GlassPanel>}
-        </section>
+          <section aria-labelledby={`device-tab-${activeTab}`} className="device-detail-stack" id="device-tab-panel" role="tabpanel">
+            {devices.isError && <GlassPanel><AsyncState detail={devices.error.message} kind="error" title="Registry unavailable" /></GlassPanel>}
+            {deviceId ? renderTabContent() : <GlassPanel><AsyncState kind="empty" title="Select a device to inspect this section" /></GlassPanel>}
+          </section>
+        </div>
+        <aside aria-label="Device detail inspector" className="device-inspector-column">
+          {renderInspectorContent()}
+        </aside>
       </div>
     </div>
   )

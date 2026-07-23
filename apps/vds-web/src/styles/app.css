@@ -46,6 +46,7 @@ h1, h2, p { margin-top: 0; }
 h1 { margin-bottom: 4px; font-size: clamp(1.2rem, 2vw, 1.55rem); line-height: 1.1; letter-spacing: -.025em; }
 h2 { margin-bottom: 0; font-size: .85rem; letter-spacing: -.01em; }
 .mono, pre, code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; }
+.sr-only { position: absolute; overflow: hidden; width: 1px; height: 1px; padding: 0; margin: -1px; border: 0; clip: rect(0,0,0,0); white-space: nowrap; }
 
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 236px minmax(0, 1fr); }
 .sidebar {
@@ -193,6 +194,65 @@ h2 { margin-bottom: 0; font-size: .85rem; letter-spacing: -.01em; }
 .device-detail-tabs button:hover { color: var(--text-strong); background: rgba(75,163,255,.045); }
 .device-detail-tabs button.active { color: var(--text-strong); background: rgba(75,163,255,.08); }
 .device-detail-tabs button.active::after { content: ''; position: absolute; right: 12px; bottom: 1px; left: 12px; height: 2px; background: var(--cyan); border-radius: 2px; box-shadow: 0 0 9px rgba(75,163,255,.5); }
+.device-workspace-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(310px, 36%); gap: 12px; align-items: start; }
+.device-workspace-main,.device-inspector-column { display: grid; gap: 12px; min-width: 0; }
+.device-workspace-main .device-detail-tabs { min-height: 42px; }
+.device-workspace-main .device-detail-tabs button { flex: 1 1 0; min-width: 74px; padding-inline: 6px; font-size: .62rem; }
+.device-inspector-column { position: sticky; top: 82px; }
+.register-map-panel { padding: 12px; }
+.register-map-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 11px; }
+.register-map-title { display: flex; align-items: center; gap: 8px; margin-right: auto; white-space: nowrap; }
+.register-map-title span { padding: 4px 7px; color: #8fa0b3; background: rgba(255,255,255,.045); border: 1px solid var(--border); border-radius: 999px; font-size: .58rem; }
+.register-search { position: relative; flex: 1 1 180px; min-width: 150px; }
+.register-search svg { position: absolute; left: 10px; top: 50%; color: var(--muted); pointer-events: none; transform: translateY(-50%); }
+.register-search input { width: 100%; min-height: 34px; padding: 0 10px 0 31px; color: var(--text); background: var(--surface-input); border: 1px solid var(--border); border-radius: 7px; font-size: .68rem; }
+.register-map-toolbar select { flex: 0 0 112px; width: 112px; min-height: 34px; padding-left: 8px; font-size: .65rem; }
+.modified-filter { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; color: #9aa9ba; font-size: .62rem; white-space: nowrap; }
+.modified-filter input { width: 15px; height: 15px; accent-color: var(--cyan); }
+.register-map-scroll { max-height: 545px; }
+.register-map-table { min-width: 760px; }
+.register-map-table tbody tr { cursor: pointer; transition: background .12s ease; }
+.register-map-table tbody tr:hover { background: rgba(75,163,255,.035); }
+.register-map-table tbody tr.selected { background: rgba(75,163,255,.075); box-shadow: inset 2px 0 var(--cyan); }
+.register-address { color: var(--cyan); }
+.register-access { font-size: .64rem; font-weight: 750; }
+.register-access.access-rw { color: var(--green); }
+.register-access.access-ro { color: #6ca9ff; }
+.register-access.access-wo { color: var(--amber); }
+.register-current-value { display: inline-block; padding: 3px 6px; color: #dceaff; background: rgba(75,163,255,.07); border: 1px solid rgba(75,163,255,.17); border-radius: 5px; }
+.register-description { overflow: hidden; max-width: 240px; color: #8293a6; text-overflow: ellipsis; white-space: nowrap; }
+.bitfield-inspector,.register-map-overview { padding: 12px; }
+.bitfield-inspector .panel-header,.register-map-overview .panel-header { margin-bottom: 9px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.055); }
+.inspector-draft-badge { color: var(--cyan); font-family: 'SFMono-Regular', Consolas, monospace; font-size: .61rem; }
+.inspector-register-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-bottom: 10px; }
+.inspector-register-summary span,.inspector-register-summary strong { display: block; }
+.inspector-register-summary span { margin-bottom: 4px; color: var(--muted); font-size: .55rem; text-transform: uppercase; letter-spacing: .06em; }
+.inspector-register-summary strong { overflow: hidden; color: var(--text-strong); font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
+.inspector-register-summary b { margin-right: 5px; color: var(--cyan); }
+.inspector-note,.inspector-empty { color: var(--muted); font-size: .62rem; }
+.bitfield-table-scroll { overflow: auto; max-height: 380px; border: 1px solid rgba(255,255,255,.055); border-radius: 7px; }
+.bitfield-table { min-width: 430px; font-size: .65rem; }
+.bitfield-table th,.bitfield-table td { padding: 5px 7px; }
+.bitfield-table select { min-height: 25px; padding-left: 7px; font-size: .62rem; }
+.inspector-write-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.inspector-write-footer span { color: var(--muted); font-size: .57rem; line-height: 1.35; }
+.inspector-write-footer .button { flex: 0 0 auto; min-height: 31px; padding-inline: 10px; font-size: .62rem; }
+.register-sector-grid { display: grid; overflow-x: auto; gap: 3px; padding: 2px; }
+.register-sector-row { display: grid; grid-template-columns: 43px auto; align-items: center; gap: 7px; }
+.register-sector-row > span { color: var(--muted); font-family: 'SFMono-Regular', Consolas, monospace; font-size: .52rem; }
+.register-sector-cells { display: grid; grid-template-columns: repeat(16, 18px); gap: 3px; }
+.register-sector { width: 18px; height: 18px; padding: 0; background: #2b3c4d; border: 1px solid rgba(255,255,255,.06); border-radius: 2px; cursor: pointer; }
+.register-sector.empty { display: block; cursor: default; opacity: .62; }
+.register-sector.access-rw { background: rgba(80,216,149,.42); }
+.register-sector.access-ro { background: rgba(75,139,255,.52); }
+.register-sector.access-wo { background: rgba(242,169,59,.58); }
+.register-sector.selected { outline: 2px solid var(--cyan); outline-offset: 1px; box-shadow: 0 0 8px rgba(75,163,255,.55); }
+.register-overview-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; color: var(--muted); font-size: .57rem; }
+.register-overview-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.register-overview-legend i { width: 9px; height: 9px; border-radius: 2px; }
+.register-overview-legend i.access-rw { background: rgba(80,216,149,.65); }
+.register-overview-legend i.access-ro { background: rgba(75,139,255,.7); }
+.register-overview-legend i.access-wo { background: rgba(242,169,59,.75); }
 .table-scroll { overflow: auto; max-height: 410px; border: 1px solid rgba(255,255,255,.055); border-radius: 9px; }
 table { width: 100%; border-collapse: collapse; background: var(--panel-solid); font-size: .76rem; }
 th { position: sticky; top: 0; z-index: 1; padding: 10px 12px; color: #70798a; background: #141721; border-bottom: 1px solid var(--border); text-align: left; font-size: .63rem; text-transform: uppercase; letter-spacing: .07em; }
@@ -286,6 +346,7 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
   .device-summary { grid-template-columns: 1fr 1fr; }
   .device-profile-card { grid-template-columns: 68px minmax(0, 1fr); gap: 12px; }
   .device-profile-image { width: 60px; height: 60px; }
+  .device-workspace-layout { grid-template-columns: minmax(0, 1fr) 300px; }
   .filter-bar { grid-template-columns: 1fr 1fr; }
   .replay-indicator { grid-column: 1 / -1; justify-self: start; }
 }
@@ -305,6 +366,8 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
   .device-page-actions { justify-content: flex-start; width: 100%; overflow-x: auto; }
   .device-profile-card { grid-template-columns: 72px minmax(0, 1fr); }
   .device-profile-metadata { grid-column: 1 / -1; }
+  .device-workspace-layout { grid-template-columns: 1fr; }
+  .device-inspector-column { position: static; }
   .dashboard-grid, .dashboard-side-stack, .devices-layout, .scenarios-layout { grid-template-columns: 1fr; }
   .runtime-device-grid { grid-template-columns: 1fr 1fr; padding-inline: 0; }
   .dashboard-transactions { grid-column: auto; }
@@ -554,6 +617,14 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
 :root[data-theme="light"] .event-row { color: #263b52; }
 :root[data-theme="light"] .device-detail-tabs { background: rgba(255,255,255,.72); }
 :root[data-theme="light"] .device-profile-image { background: radial-gradient(circle at 40% 35%, rgba(24,120,209,.16), rgba(244,248,251,.92)); }
+:root[data-theme="light"] .register-map-title span,
+:root[data-theme="light"] .register-current-value { background: rgba(24,120,209,.06); }
+:root[data-theme="light"] .register-current-value { color: #155684; border-color: rgba(24,120,209,.2); }
+:root[data-theme="light"] .register-map-table tbody tr:hover { background: rgba(24,120,209,.035); }
+:root[data-theme="light"] .register-map-table tbody tr.selected { background: rgba(24,120,209,.07); }
+:root[data-theme="light"] .bitfield-inspector .panel-header,
+:root[data-theme="light"] .register-map-overview .panel-header,
+:root[data-theme="light"] .bitfield-table-scroll { border-color: rgba(42,75,104,.1); }
 :root[data-theme="light"] .dashboard-live-event { color: #263b52; border-color: rgba(42,75,104,.09); }
 :root[data-theme="light"] .dashboard-live-event:hover { background: rgba(24,120,209,.045); }
 :root[data-theme="light"] .live-event-source { color: #20364d; }
