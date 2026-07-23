@@ -1,9 +1,8 @@
 import { useMemo } from 'react'
-import { Activity, Boxes, Cpu, Radio, ShieldAlert } from 'lucide-react'
+import { Activity, Boxes, Cpu, PlayCircle, ShieldAlert } from 'lucide-react'
 
 import { useDevices, useFaults, useHealth, useRun } from '../../api/queries'
 import { AsyncState } from '../../components/AsyncState'
-import { BrandLogo } from '../../components/BrandLogo'
 import { GlassPanel } from '../../components/GlassPanel'
 import { MetricCard } from '../../components/MetricCard'
 import { PageHeader } from '../../components/PageHeader'
@@ -11,6 +10,7 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { useEventStore } from '../../stores/eventStore'
 import { useRunStore } from '../../stores/runStore'
 import { humanize } from '../../utils/format'
+import { DashboardHealthPanels } from './DashboardHealthPanels'
 import { LiveEventStream } from './LiveEventStream'
 
 export function DashboardPage() {
@@ -23,10 +23,6 @@ export function DashboardPage() {
   const events = useEventStore((state) => state.events)
   const recentEvents = useMemo(
     () => events.slice(-12).reverse(),
-    [events],
-  )
-  const transactionCount = useMemo(
-    () => events.filter((event) => event.event_type === 'transaction_completed').length,
     [events],
   )
   const enabledFaults = faults.data?.filter((fault) => fault.enabled).length ?? 0
@@ -54,30 +50,20 @@ export function DashboardPage() {
             ))}
           </div>
         </GlassPanel>
-        <div className="dashboard-side-stack">
-          <GlassPanel className="dashboard-run-panel" eyebrow="Orchestration" title="Running scenario">
-            <BrandLogo className="panel-brand-watermark" decorative />
-            {!activeRunId && <AsyncState detail="Start a scenario to track it here." kind="empty" title="No active run" />}
-            {activeRun.isError && <AsyncState detail={activeRun.error.message} kind="error" title="Run status unavailable" />}
-            {activeRun.data && (
-              <div className="run-overview">
-                <div><span>Run ID</span><strong>{activeRun.data.run_id}</strong></div>
-                <div><span>Scenario</span><strong>{activeRun.data.scenario_id}</strong></div>
-                <div><span>Status</span><StatusBadge status={activeRun.data.status} /></div>
-              </div>
-            )}
-          </GlassPanel>
-          <GlassPanel className="stream-health-panel" eyebrow="Live telemetry" title="Event stream" action={<StatusBadge status={connectionStatus} />}>
-            <div className="stream-health-stats">
-              <div><span>Retained events</span><strong>{events.length.toLocaleString()}</strong></div>
-              <div><span>Transactions</span><strong>{transactionCount.toLocaleString()}</strong></div>
-              <div><span>Enabled faults</span><strong>{enabledFaults}</strong></div>
-            </div>
-          </GlassPanel>
-        </div>
+        <DashboardHealthPanels
+          connectionStatus={connectionStatus}
+          healthStatus={health.data?.status}
+          systemMetrics={health.data?.system}
+        />
       </div>
       <div className="metric-grid">
-        <MetricCard accent="cyan" detail={health.isError ? 'API unavailable' : 'Control API'} icon={Radio} label="Server health" value={health.data?.status ?? 'checking'} />
+        <MetricCard
+          accent="cyan"
+          detail={activeRun.data?.scenario_id ?? (activeRun.isError ? 'Status unavailable' : 'Orchestration')}
+          icon={PlayCircle}
+          label="Scenario run"
+          value={activeRun.data?.status ?? (activeRunId ? 'checking' : 'idle')}
+        />
         <MetricCard accent="violet" detail="Loaded runtime models" icon={Boxes} label="Active devices" value={devices.data?.length ?? '—'} />
         <MetricCard accent="amber" detail={`${enabledFaults} enabled`} icon={ShieldAlert} label="Fault profiles" value={faults.data?.length ?? '—'} />
         <MetricCard detail="Current session" icon={Activity} label="Domain events" value={events.length} />
