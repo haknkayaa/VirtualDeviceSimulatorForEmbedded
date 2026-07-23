@@ -190,6 +190,55 @@ async fn configured_model_creates_independent_runtime_device_instances() {
 }
 
 #[tokio::test]
+async fn bus_telemetry_is_derived_from_typed_transaction_events() {
+    let state = state();
+    let events = Arc::clone(&state.events);
+    let _ = events.publish(EventDraft {
+        virtual_time_ns: 1_000,
+        device_id: Some("spi-flash-0".to_owned()),
+        scenario_run_id: None,
+        payload: EventPayload::TransactionStarted {
+            transaction_id: Some(42),
+            request: vec![0x9f, 0, 0, 0],
+        },
+    });
+    let _ = events.publish(EventDraft {
+        virtual_time_ns: 3_500,
+        device_id: Some("spi-flash-0".to_owned()),
+        scenario_run_id: None,
+        payload: EventPayload::TransactionCompleted {
+            transaction_id: Some(42),
+            response: vec![0xef, 0x40, 0x18],
+            result: "success".to_owned(),
+            error_code: None,
+        },
+    });
+    let _ = events.publish(EventDraft {
+        virtual_time_ns: 4_000,
+        device_id: Some("spi-flash-0".to_owned()),
+        scenario_run_id: None,
+        payload: EventPayload::TransactionStarted {
+            transaction_id: Some(43),
+            request: vec![0x05, 0],
+        },
+    });
+
+    let app = router(state);
+    let (status, telemetry) = json_request(app, "GET", "/api/v1/telemetry/buses").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(telemetry["window_seconds"], 60);
+    let bus = &telemetry["buses"][0];
+    assert_eq!(bus["device_id"], "spi-flash-0");
+    assert_eq!(bus["bus_type"], "spi");
+    assert_eq!(bus["health"], "healthy");
+    assert_eq!(bus["transactions_total"], 1);
+    assert_eq!(bus["in_flight"], 1);
+    assert_eq!(bus["latency"]["virtual_avg_ns"], 2500.0);
+    assert_eq!(bus["retries"]["count"], 0);
+    assert!(bus["throughput"]["tx_bytes_per_second"].as_f64().unwrap() > 0.0);
+}
+
+#[tokio::test]
 async fn scenario_run_is_asynchronous_and_result_is_retrievable() {
     let state = state();
     let events = Arc::clone(&state.events);

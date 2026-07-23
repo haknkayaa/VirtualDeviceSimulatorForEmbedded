@@ -55,6 +55,42 @@ export interface DeviceRegister {
   description?: string
 }
 
+export type BusHealth = 'idle' | 'healthy' | 'degraded' | 'unhealthy'
+
+export interface BusTelemetry {
+  device_id: string
+  bus_type: string
+  health: BusHealth
+  transactions_total: number
+  in_flight: number
+  throughput: {
+    tx_bytes_per_second: number
+    rx_bytes_per_second: number
+  }
+  latency: {
+    wall_avg_us: number
+    wall_p95_us: number
+    wall_max_us: number
+    virtual_avg_ns: number
+    virtual_p95_ns: number
+    virtual_max_ns: number
+  }
+  errors: {
+    count: number
+    rate: number
+    last_code?: string
+  }
+  retries: {
+    count: number
+  }
+}
+
+export interface BusTelemetryResponse {
+  generated_at_wall_ns: number
+  window_seconds: number
+  buses: BusTelemetry[]
+}
+
 export interface Fault {
   id: string
   device_id: string

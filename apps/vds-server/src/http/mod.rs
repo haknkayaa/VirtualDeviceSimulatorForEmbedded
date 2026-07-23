@@ -1,4 +1,5 @@
 mod runs;
+mod telemetry;
 
 use std::{collections::HashMap, fs, sync::Arc};
 
@@ -101,6 +102,7 @@ pub fn router(state: ApiState) -> Router {
         .route("/api/v1/faults", get(faults))
         .route("/api/v1/faults/{id}/enable", post(enable_fault))
         .route("/api/v1/faults/{id}/disable", post(disable_fault))
+        .route("/api/v1/telemetry/buses", get(telemetry::bus_telemetry))
         .route("/api/v1/events", get(events))
         .with_state(state)
 }

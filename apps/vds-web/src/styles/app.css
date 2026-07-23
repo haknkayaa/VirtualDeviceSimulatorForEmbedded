@@ -415,6 +415,96 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
 .event-primary strong, .event-primary small { display: block; }
 .event-primary strong { font-size: .75rem; text-transform: capitalize; }
 .event-primary small { margin-top: 3px; color: #737c8d; font-size: .67rem; }
+
+/* Live transaction analysis */
+.transactions-page { min-width: 0; }
+.transaction-status-badge { display: inline-flex; align-items: center; gap: 4px; max-width: 130px; padding: 4px 7px; overflow: hidden; color: var(--muted); background: rgba(255,255,255,.025); border: 1px solid var(--border); border-radius: 999px; font-size: .55rem; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.transaction-status-badge.status-success { color: var(--green); }.transaction-status-badge.status-error { color: var(--red); }.transaction-status-badge.status-running { color: var(--cyan); }
+.transaction-detail-stack { display: grid; gap: 9px; margin-top: 9px; }
+.bus-signal-scope,.transaction-hex-block { min-width: 0; background: rgba(4,14,22,.38); border: 1px solid var(--border); border-radius: 8px; }
+.bus-signal-scope { padding: 9px; }
+.bus-signal-scope > header,.transaction-hex-block > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bus-signal-scope > header { margin-bottom: 8px; }
+.bus-signal-scope > header span,.bus-signal-scope > header strong { display: block; }
+.bus-signal-scope > header span { color: var(--muted); font-size: .55rem; text-transform: uppercase; letter-spacing: .06em; }
+.bus-signal-scope > header strong { margin-top: 2px; color: var(--text-strong); font-size: .7rem; }
+.bus-signal-scope > header small { color: var(--muted); font-size: .55rem; }
+.signal-lanes { display: grid; gap: 5px; padding: 7px; overflow-x: auto; background: #071019; border-radius: 6px; }
+.signal-lane { display: grid; grid-template-columns: 42px minmax(520px,1fr); align-items: center; gap: 6px; min-height: 22px; }
+.signal-lane > strong { color: var(--cyan); font-family: 'SFMono-Regular',Consolas,monospace; font-size: .58rem; }
+.signal-cells { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(7px,1fr); align-items: center; height: 18px; }
+.signal-cells i { position: relative; display: block; height: 1px; background: rgba(88,217,231,.62); }
+.signal-cells i::before { content: ''; position: absolute; left: 0; width: 1px; height: 8px; background: inherit; }
+.signal-cells i.high { transform: translateY(-5px); }.signal-cells i.low { transform: translateY(5px); }
+.signal-byte-cells { display: flex; gap: 3px; }
+.signal-byte-cells i { min-width: 29px; padding: 4px; color: var(--green); background: rgba(105,223,165,.05); border: 1px solid rgba(105,223,165,.12); border-radius: 4px; font-family: 'SFMono-Regular',Consolas,monospace; font-size: .57rem; font-style: normal; text-align: center; }
+.transaction-hex-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.transaction-hex-block { overflow: hidden; }
+.transaction-hex-block > header { min-height: 34px; padding: 6px 9px; border-bottom: 1px solid var(--border); }
+.transaction-hex-block > header strong { color: var(--text-strong); font-size: .65rem; }.transaction-hex-block > header span { color: var(--muted); font-size: .56rem; }
+.hex-viewer { overflow: auto; max-height: 122px; padding: 6px; }
+.hex-viewer > div { display: grid; grid-template-columns: 38px minmax(280px,1fr) 116px; gap: 8px; min-height: 23px; align-items: center; }
+.hex-viewer code { color: #9eb1c3; font-size: .57rem; white-space: pre; }
+.hex-viewer code:first-child { color: var(--blue); }.hex-viewer code:last-child { color: var(--green); }
+.bus-telemetry-sidebar { display: grid; align-content: start; gap: 9px; min-width: 0; padding: 10px; background: rgba(4,14,22,.22); }
+.bus-metric-card { padding: 10px; background: rgba(255,255,255,.018); border: 1px solid var(--border); border-radius: 8px; }
+.bus-metric-card > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; color: var(--muted); }
+.bus-metric-card > header span { display: inline-flex; align-items: center; gap: 6px; color: var(--text-strong); font-size: .64rem; font-weight: 700; }
+.bus-metric-card > header small { font-size: .54rem; }
+.bus-health-summary > strong,.bus-health-summary > small { display: block; }
+.bus-health-summary > strong { color: var(--text-strong); font-size: .76rem; }.bus-health-summary > small { margin-top: 4px; color: var(--muted); font-size: .56rem; }
+.bus-health-summary header i { padding: 3px 6px; border: 1px solid currentColor; border-radius: 999px; font-size: .53rem; font-style: normal; text-transform: uppercase; }
+.health-healthy { color: var(--green); }.health-idle { color: var(--muted); }.health-degraded { color: var(--amber); }.health-unhealthy { color: var(--red); }
+.bus-metric-card dl { display: grid; gap: 5px; margin: 0; }
+.bus-metric-card dl > div { display: flex; align-items: center; justify-content: space-between; gap: 9px; min-height: 24px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,.04); }
+.bus-metric-card dl > div:last-child { padding-bottom: 0; border-bottom: 0; }
+.bus-metric-card dt { color: var(--muted); font-size: .58rem; }.bus-metric-card dd { overflow: hidden; margin: 0; color: var(--text-strong); font-family: 'SFMono-Regular',Consolas,monospace; font-size: .59rem; text-overflow: ellipsis; white-space: nowrap; }
+.telemetry-empty { padding: 18px; color: var(--muted); border: 1px dashed var(--border); border-radius: 8px; font-size: .63rem; text-align: center; }.telemetry-empty.error { color: var(--red); }
+.bus-analyzer-page { gap: 9px; }
+.bus-analyzer-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; padding: 9px 12px; }
+.bus-analyzer-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.bus-analyzer-title > span { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 auto; color: var(--cyan); background: rgba(88,217,231,.06); border: 1px solid rgba(88,217,231,.15); border-radius: 8px; }
+.bus-analyzer-title small { color: var(--muted); font-size: .54rem; letter-spacing: .06em; text-transform: uppercase; }
+.bus-analyzer-title h1 { margin: 1px 0 0; color: var(--text-strong); font-size: 1rem; }
+.bus-analyzer-types { display: flex; align-items: center; gap: 5px; margin-left: 8px; }
+.transaction-bus-badge { display: inline-flex; align-items: center; width: fit-content; padding: 3px 6px; color: #90a4b8; background: rgba(144,164,184,.06); border: 1px solid rgba(144,164,184,.18); border-radius: 999px; font-size: .52rem; font-style: normal; line-height: 1; text-transform: uppercase; white-space: nowrap; }
+.transaction-bus-badge.bus-spi { color: var(--amber); background: rgba(242,169,59,.07); border-color: rgba(242,169,59,.22); }
+.transaction-bus-badge.bus-i2c { color: var(--cyan); background: rgba(88,217,231,.07); border-color: rgba(88,217,231,.22); }
+.transaction-bus-badge.bus-ethernet { color: var(--violet); background: rgba(169,139,255,.07); border-color: rgba(169,139,255,.22); }
+.bus-analyzer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.bus-analyzer-actions > button { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 0 9px; color: #94a4b5; background: rgba(255,255,255,.02); border: 1px solid var(--border); border-radius: 7px; cursor: pointer; font-size: .61rem; white-space: nowrap; }
+.bus-analyzer-actions > button:hover:not(:disabled),.bus-analyzer-actions > button.active { color: var(--cyan); background: rgba(88,217,231,.055); border-color: rgba(88,217,231,.2); }
+.bus-analyzer-actions > button:disabled { cursor: not-allowed; opacity: .42; }
+.bus-analyzer-actions > button:first-of-type.active svg { color: var(--red); }
+.bus-analyzer-columns { display: grid; grid-template-columns: minmax(320px,.98fr) minmax(340px,1.08fr) minmax(220px,.72fr); gap: 9px; height: calc(100vh - 190px); min-height: 440px; }
+.bus-analyzer-live,.bus-analyzer-detail { display: flex; min-height: 0; flex-direction: column; padding: 0; overflow: hidden; }
+.analyzer-column-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 49px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.analyzer-column-heading strong,.analyzer-column-heading small { display: block; }
+.analyzer-column-heading strong { color: var(--text-strong); font-size: .7rem; }
+.analyzer-column-heading small { margin-top: 2px; color: var(--muted); font-size: .55rem; }
+.analyzer-column-heading > span { min-width: 25px; padding: 3px 5px; color: var(--cyan); background: rgba(88,217,231,.06); border: 1px solid rgba(88,217,231,.14); border-radius: 999px; font-family: 'SFMono-Regular',Consolas,monospace; font-size: .54rem; text-align: center; }
+.transaction-filter-row { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; padding: 7px; border-bottom: 1px solid var(--border); }
+.transaction-filter-row label > span { display: block; margin: 0 0 3px 2px; color: var(--muted); font-size: .5rem; text-transform: uppercase; }
+.transaction-filter-row select { min-height: 30px; padding-right: 20px; font-size: .57rem; }
+.live-transaction-table { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow-x: auto; }
+.live-transaction-table-head,.live-transaction-table-body > button { display: grid; grid-template-columns: 60px 36px minmax(70px,1fr) 65px 58px; align-items: center; gap: 3px; min-width: 315px; }
+.live-transaction-table-head { min-height: 31px; padding: 0 8px; color: var(--muted); background: rgba(255,255,255,.018); border-bottom: 1px solid var(--border); font-size: .51rem; text-transform: uppercase; }
+.live-transaction-table-body { min-height: 0; flex: 1; overflow-y: auto; }
+.live-transaction-table-body > button { width: 100%; min-height: 39px; padding: 4px 8px; color: var(--muted); background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; text-align: left; }
+.live-transaction-table-body > button:hover,.live-transaction-table-body > button.active { background: rgba(70,154,255,.05); }
+.live-transaction-table-body > button.active { box-shadow: inset 2px 0 var(--blue); }
+.live-transaction-table time { color: #708398; font-family: 'SFMono-Regular',Consolas,monospace; font-size: .53rem; }
+.live-transaction-table strong { overflow: hidden; color: var(--text-strong); font-size: .56rem; text-overflow: ellipsis; white-space: nowrap; }
+.transaction-table-summary { display: inline-flex; align-items: center; gap: 3px; color: #8093a7; font-family: 'SFMono-Regular',Consolas,monospace; font-size: .52rem; white-space: nowrap; }
+.live-transaction-table .transaction-status-badge { max-width: 75px; padding: 3px 5px; font-size: .48rem; font-style: normal; }
+.bus-analyzer-detail > .transaction-detail-stack { min-height: 0; margin: 0; padding: 8px; overflow: auto; }
+.bus-analyzer-detail .transaction-hex-grid { grid-template-columns: 1fr; }
+.bus-analyzer-detail .signal-lane { grid-template-columns: 39px minmax(250px,1fr); }
+.bus-analyzer-detail .hex-viewer > div { grid-template-columns: 34px minmax(170px,1fr) 76px; }
+.signal-pin-rail { display: flex; align-items: center; gap: 4px; margin-bottom: 7px; }
+.signal-pin-rail > span { margin-right: 3px; color: var(--muted); font-size: .51rem; text-transform: uppercase; }
+.signal-pin-rail > i { padding: 3px 5px; color: var(--cyan); background: rgba(88,217,231,.05); border: 1px solid rgba(88,217,231,.14); border-radius: 4px; font-family: 'SFMono-Regular',Consolas,monospace; font-size: .5rem; font-style: normal; }
+.bus-analyzer-columns > .bus-telemetry-sidebar { min-height: 0; overflow-y: auto; padding: 0; background: transparent; }
 .dashboard-live-events { overflow: auto; max-height: 360px; background: rgba(4,14,22,.56); border: 1px solid rgba(255,255,255,.055); border-radius: 8px; }
 .dashboard-live-event { display: grid; grid-template-columns: 92px 72px minmax(110px, .8fr) minmax(150px, 1fr) minmax(220px, 2fr) 48px; align-items: center; gap: 12px; width: 100%; min-height: 46px; padding: 7px 11px; color: #c5cbd6; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.045); cursor: pointer; text-align: left; }
 .dashboard-live-event:last-child { border-bottom: 0; }
@@ -492,6 +582,10 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
   .device-footer-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .filter-bar { grid-template-columns: 1fr 1fr; }
   .replay-indicator { grid-column: 1 / -1; justify-self: start; }
+  .bus-analyzer-header { align-items: flex-start; flex-direction: column; }
+  .bus-analyzer-actions { width: 100%; justify-content: flex-start; overflow-x: auto; }
+  .bus-analyzer-columns { grid-template-columns: minmax(310px,.95fr) minmax(350px,1.05fr); height: auto; }
+  .bus-analyzer-columns > .bus-telemetry-sidebar { grid-column: 1 / -1; grid-template-columns: repeat(4,minmax(0,1fr)); }
 }
 @media (max-width: 780px) {
   .app-shell { grid-template-columns: 1fr; }
@@ -521,6 +615,11 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
   .device-list-panel, .scenario-list-panel { position: static; }
   .device-nav, .scenario-list { grid-template-columns: repeat(2, 1fr); }
   .run-overview { grid-template-columns: 1fr; }
+  .bus-telemetry-sidebar { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .bus-analyzer-title { align-items: flex-start; flex-wrap: wrap; }
+  .bus-analyzer-types { width: 100%; margin-left: 43px; }
+  .bus-analyzer-columns { grid-template-columns: 1fr; }
+  .bus-analyzer-columns > .bus-telemetry-sidebar { grid-column: auto; grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 @media (max-width: 520px) {
   .metric-grid, .runtime-device-grid, .stream-health-stats, .device-summary, .filter-bar, .detail-grid { grid-template-columns: 1fr; }
@@ -531,6 +630,10 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
   .event-row { grid-template-columns: 45px 8px 1fr; }
   .event-time { display: none; }
   .panel-header { align-items: flex-start; }
+  .transaction-hex-grid,.bus-telemetry-sidebar { grid-template-columns: 1fr; }
+  .bus-signal-scope > header { align-items: flex-start; flex-direction: column; }
+  .bus-analyzer-actions .status-badge { display: none; }
+  .bus-analyzer-columns > .bus-telemetry-sidebar { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
@@ -898,6 +1001,17 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
 :root[data-theme="light"] .dashboard-live-events,
 :root[data-theme="light"] .json-block,
 :root[data-theme="light"] .json-block pre { background: #f8fbfd; }
+:root[data-theme="light"] .bus-telemetry-sidebar { background: rgba(232,240,246,.55); }
+:root[data-theme="light"] .bus-metric-card,
+:root[data-theme="light"] .bus-signal-scope,
+:root[data-theme="light"] .transaction-hex-block { background: rgba(255,255,255,.72); }
+:root[data-theme="light"] .signal-lanes { background: #edf4f8; }
+:root[data-theme="light"] .hex-viewer code { color: #536b82; }
+:root[data-theme="light"] .bus-analyzer-actions > button,
+:root[data-theme="light"] .live-transaction-table-head { background: rgba(255,255,255,.68); }
+:root[data-theme="light"] .live-transaction-table-body > button { border-color: rgba(42,75,104,.09); }
+:root[data-theme="light"] .live-transaction-table time,
+:root[data-theme="light"] .transaction-table-summary { color: #536b82; }
 :root[data-theme="light"] .event-row { color: #263b52; }
 :root[data-theme="light"] .device-detail-tabs { background: rgba(255,255,255,.72); }
 :root[data-theme="light"] .device-profile-image { background: radial-gradient(circle at 40% 35%, rgba(24,120,209,.16), rgba(244,248,251,.92)); }
