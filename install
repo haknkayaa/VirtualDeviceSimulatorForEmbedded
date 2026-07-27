@@ -24,12 +24,12 @@ required_outputs=(
   "$ROOT_DIR/target/release/vds-server"
   "$ROOT_DIR/target/release/vds-cli"
   "$ROOT_DIR/apps/vds-web/dist/index.html"
-  "$ROOT_DIR/client/c/build/libvds4e.a"
   "$STATE_DIR/spi-preload/libvds4e-spi-preload.so"
   "$STATE_DIR/spi-cuse/vds4e-spi-cuse"
   "$STATE_DIR/i2c-cuse/vds4e-i2c-cuse"
   "$STATE_DIR/gpio-sim/vds4e-gpio-sim"
   "$STATE_DIR/bin/mt25ql256_tool"
+  "$STATE_DIR/bin/at24c256_tool"
 )
 
 for output in "${required_outputs[@]}"; do
@@ -68,14 +68,11 @@ install_file 0755 "$STATE_DIR/gpio-sim/vds4e-gpio-sim" \
   "$INSTALL_ROOT/bin/vds4e-gpio-sim"
 install_file 0755 "$STATE_DIR/bin/mt25ql256_tool" \
   "$INSTALL_ROOT/bin/mt25ql256_tool"
+install_file 0755 "$STATE_DIR/bin/at24c256_tool" \
+  "$INSTALL_ROOT/bin/at24c256_tool"
 
 install_file 0644 "$STATE_DIR/spi-preload/libvds4e-spi-preload.so" \
   "$INSTALL_ROOT/lib/libvds4e-spi-preload.so"
-install_file 0644 "$ROOT_DIR/client/c/build/libvds4e.a" \
-  "$INSTALL_ROOT/lib/libvds4e.a"
-install_file 0644 "$ROOT_DIR/client/c/include/vds4e/client.h" \
-  "$INSTALL_ROOT/include/vds4e/client.h"
-
 install_tree "$ROOT_DIR/apps/vds-web/dist" \
   "$INSTALL_ROOT/share/vds4e/web"
 install_tree "$ROOT_DIR/device-models/examples" \

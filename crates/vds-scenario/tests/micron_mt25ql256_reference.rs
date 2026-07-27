@@ -5,7 +5,7 @@ use vds_device_model::DeviceModel;
 use vds_scenario::{RegistryRuntime, ResultStatus, ScenarioDocument, ScenarioExecutor};
 
 const MODEL: &str =
-    include_str!("../../../device-models/examples/generic-spi-flash/model/device.yaml");
+    include_str!("../../../device-models/examples/micron-mt25ql256aba8esf-0sit/model/device.yaml");
 
 fn executor() -> ScenarioExecutor<RegistryRuntime> {
     let clock = Arc::new(ManualClock::default());
@@ -19,15 +19,15 @@ fn executor() -> ScenarioExecutor<RegistryRuntime> {
 }
 
 #[test]
-fn public_reference_model_runs_every_conformance_scenario() {
+fn micron_model_runs_every_package_scenario() {
     let directory = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../device-models/examples/generic-spi-flash/scenarios");
+        .join("../../device-models/examples/micron-mt25ql256aba8esf-0sit/scenarios");
     let mut paths = fs::read_dir(directory)
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .collect::<Vec<_>>();
     paths.sort();
-    assert_eq!(paths.len(), 10);
+    assert_eq!(paths.len(), 4);
     for path in paths {
         let yaml = fs::read_to_string(&path).unwrap();
         let document = ScenarioDocument::from_yaml(&yaml)

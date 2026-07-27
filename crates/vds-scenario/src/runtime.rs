@@ -97,7 +97,8 @@ impl ScenarioRuntime for RegistryRuntime {
     }
 
     fn send_spi(&self, device: &str, tx: &[u8]) -> Result<DeviceTransfer, DeviceError> {
-        self.registry.transfer(device, tx)
+        self.registry
+            .transfer_spi(device, tx, 0, vds_core::device::SpiWireConfig::default())
     }
 
     fn set_fault_enabled(&self, fault: &str, enabled: bool) -> Result<(), String> {

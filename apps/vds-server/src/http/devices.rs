@@ -1,7 +1,6 @@
 use super::{
     ApiError, ApiResult, ApiState, Arc, Deserialize, Device, DeviceModel, DeviceSnapshot,
-    EventDraft, EventPayload, Json, Path, Serialize, SpiLaneWidth, SpiTransferRate, SpiWireConfig,
-    State, StatusCode,
+    EventDraft, EventPayload, Json, Path, Serialize, State, StatusCode,
 };
 
 #[derive(Serialize)]
@@ -222,119 +221,6 @@ pub(super) async fn device_commands(
     Path(id): Path<String>,
 ) -> ApiResult<Json<Vec<vds_device_model::SpiCommandDefinition>>> {
     Ok(Json(device_template(&state, &id)?.device.commands.clone()))
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct ExecuteCommandRequest {
-    tx: Vec<u8>,
-    #[serde(default)]
-    rx_length: usize,
-    #[serde(default)]
-    wire: CommandWireRequest,
-}
-
-#[derive(Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub(super) struct CommandWireRequest {
-    mode: u8,
-    bits_per_word: u8,
-    max_speed_hz: u64,
-    command_width: String,
-    address_width: String,
-    data_width: String,
-    rate: String,
-    dummy_cycles: u16,
-    lsb_first: bool,
-}
-
-impl Default for CommandWireRequest {
-    fn default() -> Self {
-        Self {
-            mode: 0,
-            bits_per_word: 8,
-            max_speed_hz: 0,
-            command_width: "single".to_owned(),
-            address_width: "single".to_owned(),
-            data_width: "single".to_owned(),
-            rate: "str".to_owned(),
-            dummy_cycles: 0,
-            lsb_first: false,
-        }
-    }
-}
-
-#[derive(Serialize)]
-pub(super) struct ExecuteCommandResponse {
-    rx: Vec<u8>,
-    state: Option<String>,
-    registers: Vec<RegisterDto>,
-}
-
-pub(super) async fn execute_device_command(
-    State(state): State<ApiState>,
-    Path(id): Path<String>,
-    Json(request): Json<ExecuteCommandRequest>,
-) -> ApiResult<Json<ExecuteCommandResponse>> {
-    if request.tx.is_empty() {
-        return Err(ApiError::bad_request(
-            "command_tx_empty",
-            "command TX must include at least an opcode".to_owned(),
-        ));
-    }
-    let lane = |value: &str| match value {
-        "single" => Ok(SpiLaneWidth::Single),
-        "dual" => Ok(SpiLaneWidth::Dual),
-        "quad" => Ok(SpiLaneWidth::Quad),
-        _ => Err(ApiError::bad_request(
-            "spi_lane_invalid",
-            format!("invalid SPI lane width '{value}'"),
-        )),
-    };
-    let rate = match request.wire.rate.as_str() {
-        "str" => SpiTransferRate::Str,
-        "dtr" => SpiTransferRate::Dtr,
-        value => {
-            return Err(ApiError::bad_request(
-                "spi_rate_invalid",
-                format!("invalid SPI transfer rate '{value}'"),
-            ));
-        }
-    };
-    let transfer = state
-        .registry
-        .transfer_spi(
-            &id,
-            &request.tx,
-            request.rx_length,
-            SpiWireConfig {
-                mode: request.wire.mode,
-                bits_per_word: request.wire.bits_per_word,
-                max_speed_hz: request.wire.max_speed_hz,
-                command_width: lane(&request.wire.command_width)?,
-                address_width: lane(&request.wire.address_width)?,
-                data_width: lane(&request.wire.data_width)?,
-                rate,
-                dummy_cycles: request.wire.dummy_cycles,
-                lsb_first: request.wire.lsb_first,
-            },
-        )
-        .map_err(ApiError::device)?;
-    let registers = state
-        .registry
-        .registers(&id)
-        .map_err(ApiError::device)?
-        .into_iter()
-        .map(register_dto)
-        .collect();
-    Ok(Json(ExecuteCommandResponse {
-        rx: transfer.response,
-        state: state
-            .registry
-            .current_state(&id)
-            .map_err(ApiError::device)?,
-        registers,
-    }))
 }
 
 #[derive(Serialize)]

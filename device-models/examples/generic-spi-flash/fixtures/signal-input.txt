@@ -1,1 +1,0 @@
-VDS4E generic SPI signal graph fixture.

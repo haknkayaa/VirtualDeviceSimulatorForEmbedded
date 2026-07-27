@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package vds.v1;
 
-// A request sent by a local SDK client to the VDS4E data plane.
+// A request sent by an internal host adapter or native tool to the data plane.
 message ClientRequest {
   uint64 request_id = 1;
 
@@ -38,8 +38,8 @@ message SpiTransferRequest {
   uint32 rx_length = 4;
 }
 
-// Physical SPI transaction attributes. Omitted fields preserve the v1
-// single-lane, 8-bit, STR behavior.
+// Physical SPI transaction attributes. Data-plane clients must provide this
+// message and explicitly select lane widths and transfer rate.
 message SpiWireConfig {
   uint32 mode = 1;
   uint32 bits_per_word = 2;

@@ -50,16 +50,6 @@ impl DeviceRegistry {
         Ok(())
     }
 
-    /// Routes a transfer to a registered device.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the device does not exist or rejects the transfer.
-    pub fn transfer(&self, device_id: &str, request: &[u8]) -> Result<DeviceTransfer, DeviceError> {
-        let device = self.device(device_id)?;
-        device.transfer(request)
-    }
-
     /// Routes a configured SPI transaction to a registered device.
     ///
     /// # Errors
@@ -315,6 +305,15 @@ mod tests {
         fn transfer(&self, request: &[u8]) -> Result<DeviceTransfer, DeviceError> {
             Ok(DeviceTransfer::response(request.to_vec()))
         }
+
+        fn transfer_spi(
+            &self,
+            request: &[u8],
+            _rx_length: usize,
+            _wire: crate::device::SpiWireConfig,
+        ) -> Result<DeviceTransfer, DeviceError> {
+            self.transfer(request)
+        }
     }
 
     #[test]
@@ -325,7 +324,7 @@ mod tests {
             .expect("device should register");
 
         let response = registry
-            .transfer("echo", &[0x9f])
+            .transfer_spi("echo", &[0x9f], 0, crate::device::SpiWireConfig::default())
             .expect("transfer should succeed");
 
         assert_eq!(response.response, vec![0x9f]);
@@ -336,7 +335,12 @@ mod tests {
         let registry = DeviceRegistry::new();
 
         assert_eq!(
-            registry.transfer("missing", &[0x9f]),
+            registry.transfer_spi(
+                "missing",
+                &[0x9f],
+                0,
+                crate::device::SpiWireConfig::default()
+            ),
             Err(DeviceError::NotFound("missing".to_owned()))
         );
     }

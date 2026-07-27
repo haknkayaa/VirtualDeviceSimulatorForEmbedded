@@ -120,6 +120,17 @@ impl Device for At24cEepromDevice {
         Ok(DeviceTransfer::response(Vec::new()))
     }
 
+    fn transfer_spi(
+        &self,
+        _request: &[u8],
+        _rx_length: usize,
+        _wire: vds_core::device::SpiWireConfig,
+    ) -> Result<DeviceTransfer, DeviceError> {
+        Err(DeviceError::InvalidRequest(
+            "AT24C devices do not support SPI transfers".to_owned(),
+        ))
+    }
+
     fn transfer_i2c(&self, messages: &[I2cMessage]) -> Result<Vec<Vec<u8>>, DeviceError> {
         if messages.is_empty() {
             return Err(DeviceError::InvalidRequest(

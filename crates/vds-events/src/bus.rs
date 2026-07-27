@@ -339,7 +339,7 @@ impl EventBus {
     /// Opens a SQLite-backed event bus and restores the newest retained events.
     ///
     /// # Errors
-    /// Returns an error when the database cannot be opened, migrated, or read.
+    /// Returns an error when the database cannot be opened, initialized, or read.
     ///
     /// # Panics
     /// Panics when either capacity is zero.
@@ -359,7 +359,7 @@ impl EventBus {
     /// Opens a SQLite-backed event bus with an explicit retention and sampling policy.
     ///
     /// # Errors
-    /// Returns an error when the database cannot be opened, migrated, or read.
+    /// Returns an error when the database cannot be opened, initialized, or read.
     pub fn persistent_with_policy(
         path: impl AsRef<Path>,
         capacity: usize,
@@ -388,19 +388,6 @@ impl EventBus {
              CREATE INDEX IF NOT EXISTS idx_domain_events_wall_time
                ON domain_events(timestamp_wall_ns);",
         )?;
-        let has_event_type = {
-            let mut columns = connection.prepare("PRAGMA table_info(domain_events)")?;
-            columns
-                .query_map([], |row| row.get::<_, String>(1))?
-                .filter_map(Result::ok)
-                .any(|name| name == "event_type")
-        };
-        if !has_event_type {
-            connection.execute(
-                "ALTER TABLE domain_events ADD COLUMN event_type TEXT NOT NULL DEFAULT ''",
-                [],
-            )?;
-        }
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_domain_events_type_time
              ON domain_events(event_type, timestamp_wall_ns)",
@@ -698,36 +685,6 @@ mod tests {
         assert_eq!(restored.events_after(0).len(), 25);
         assert_eq!(restored.events_after(0)[0].event_id, 76);
         drop(restored);
-        remove_temporary_store(&path);
-    }
-
-    #[test]
-    fn opens_and_migrates_the_legacy_event_table() {
-        let path = temporary_store("migration");
-        {
-            let connection = Connection::open(&path).expect("legacy store should open");
-            connection
-                .execute_batch(
-                    "CREATE TABLE domain_events (
-                       event_id INTEGER PRIMARY KEY,
-                       timestamp_wall_ns INTEGER NOT NULL,
-                       event_json TEXT NOT NULL
-                     );",
-                )
-                .expect("legacy schema should be created");
-        }
-        let bus = EventBus::persistent(&path, 8, 8).expect("legacy store should migrate");
-        let connection = Connection::open(&path).expect("migrated store should open");
-        let has_event_type = connection
-            .prepare("PRAGMA table_info(domain_events)")
-            .expect("columns should load")
-            .query_map([], |row| row.get::<_, String>(1))
-            .expect("columns should query")
-            .filter_map(Result::ok)
-            .any(|name| name == "event_type");
-        assert!(has_event_type);
-        drop(connection);
-        drop(bus);
         remove_temporary_store(&path);
     }
 

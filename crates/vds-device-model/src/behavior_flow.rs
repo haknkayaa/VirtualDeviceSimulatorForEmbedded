@@ -393,28 +393,25 @@ fn optional_integer(data: &Map<String, Value>, field: &str) -> Result<Option<u64
 mod tests {
     use super::compile_behavior_flow;
 
-    const GENERIC_SPI_FLOW: &str =
-        include_str!("../../../device-models/examples/generic-spi-flash/flows/behavior.yaml");
+    const MICRON_FLOW: &str = include_str!(
+        "../../../device-models/examples/micron-mt25ql256aba8esf-0sit/flows/behavior.yaml"
+    );
 
     #[test]
-    fn compiles_reference_package_states_and_typed_signal_graph() {
+    fn compiles_micron_package_state_machine() {
         let (machine, graph) =
-            compile_behavior_flow(GENERIC_SPI_FLOW).expect("reference flow should compile");
+            compile_behavior_flow(MICRON_FLOW).expect("Micron flow should compile");
         assert_eq!(machine.initial_state, "resetting");
-        assert_eq!(machine.states.len(), 8);
-        assert_eq!(graph.nodes.len(), 13);
+        assert_eq!(machine.states.len(), 7);
         assert!(
-            graph
-                .state_roots
-                .get("ready")
-                .expect("ready roots")
+            machine.states["ready"]
+                .transitions
                 .iter()
-                .any(|root| root.target == "design-timer" && root.target_port == "in")
+                .any(|transition| {
+                    transition.event == "write_enable" && transition.target == "write_enabled"
+                })
         );
-        assert!(graph.edges.iter().any(|edge| {
-            edge.source == "design-file-read"
-                && edge.target == "design-file-write"
-                && edge.target_port == "b"
-        }));
+        assert!(graph.nodes.is_empty());
+        assert!(graph.edges.is_empty());
     }
 }

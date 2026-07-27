@@ -60,15 +60,6 @@ typedef struct {
 vds_status_t vds_client_connect(vds_client_t *client, const char *socket_path);
 void vds_client_close(vds_client_t *client);
 
-vds_status_t vds_spi_transfer(vds_client_t *client,
-                              const char *device_id,
-                              const uint8_t *tx,
-                              size_t tx_length,
-                              uint8_t *rx,
-                              size_t rx_capacity,
-                              size_t *rx_length,
-                              vds_error_t *error);
-
 vds_status_t vds_spi_transfer_configured(vds_client_t *client,
                                          const char *device_id,
                                          const uint8_t *tx,

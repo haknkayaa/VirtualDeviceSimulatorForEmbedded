@@ -474,13 +474,13 @@ fn device_store_root() -> crate::Result<PathBuf> {
     }
     let home = std::env::var_os("HOME").ok_or_else(|| crate::Error::DevicePackageInstall {
         source_path: PathBuf::from("device-models/examples"),
-        target_path: PathBuf::from("~/vsd4e/devices"),
+        target_path: PathBuf::from("~/vds4e/devices"),
         source: std::io::Error::new(
             std::io::ErrorKind::NotFound,
             "HOME is not set and VDS4E_DEVICE_STORE was not provided",
         ),
     })?;
-    Ok(PathBuf::from(home).join("vsd4e/devices"))
+    Ok(PathBuf::from(home).join("vds4e/devices"))
 }
 
 fn is_example_package(root: &Path) -> bool {
@@ -544,7 +544,7 @@ mod tests {
     #[test]
     fn loads_reference_package_and_resolves_declared_resources() {
         let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../device-models/examples/generic-spi-flash");
+            .join("../../device-models/examples/micron-mt25ql256aba8esf-0sit");
         let package = DevicePackage::load(root).expect("reference package should be valid");
 
         assert_eq!(package.manifest().spec.bus.kind, DeviceBusKind::Spi);
@@ -555,7 +555,7 @@ mod tests {
                 .expect("behavior flow")
                 .ends_with("flows/behavior.yaml")
         );
-        assert_eq!(package.scenario_paths().expect("scenarios").len(), 10);
+        assert_eq!(package.scenario_paths().expect("scenarios").len(), 4);
     }
 
     #[test]
@@ -592,7 +592,7 @@ spec:
     #[test]
     fn installs_an_example_copy_into_the_device_store() {
         let source = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../device-models/examples/generic-spi-flash");
+            .join("../../device-models/examples/micron-mt25ql256aba8esf-0sit");
         let package = DevicePackage::load(&source).expect("reference package");
         let store =
             std::env::temp_dir().join(format!("vds4e-device-store-test-{}", std::process::id()));
@@ -609,7 +609,7 @@ spec:
                 .manifest()
                 .metadata
                 .id,
-            "generic-spi-flash-128m"
+            "micron-mt25ql256aba8esf-0sit"
         );
         std::fs::remove_file(installed.join("model/device.yaml"))
             .expect("installed model should be removable");

@@ -13,7 +13,7 @@ use adapter_routes::{
 mod devices;
 use devices::{
     create_device, device, device_commands, device_flow, device_state, device_templates, devices,
-    execute_device_command, registers, reset_device, write_register,
+    registers, reset_device, write_register,
 };
 mod scenarios;
 use scenarios::{run, run_result, run_result_junit, run_scenario, scenario, scenarios};
@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 use vds_core::{
     clock::SimulatorClock,
     config::ServerConfig,
-    device::{Device, SpiLaneWidth, SpiTransferRate, SpiWireConfig},
+    device::Device,
     device_package::{DevicePackage, install_device_package, installed_device_packages},
     registry::{DeviceRegistry, DeviceSnapshot},
 };
@@ -176,10 +176,6 @@ pub fn router(state: ApiState) -> Router {
         )
         .route("/api/v1/devices/{id}", get(device))
         .route("/api/v1/devices/{id}/commands", get(device_commands))
-        .route(
-            "/api/v1/devices/{id}/commands/execute",
-            post(execute_device_command),
-        )
         .route("/api/v1/devices/{id}/flow", get(device_flow))
         .route("/api/v1/devices/{id}/registers", get(registers))
         .route(
