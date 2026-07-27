@@ -6,6 +6,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WEB_DIR="$ROOT_DIR/apps/vds-web"
 WEB_PORT="${VDS_WEB_PORT:-4174}"
 CONTROL_PORT=8080
+SPI_CUSE_BUILD_DIR="$ROOT_DIR/.vds4e-build/spi-cuse"
+SPI_CUSE_EXECUTABLE="$SPI_CUSE_BUILD_DIR/vds4e-spi-cuse"
 LOCK_FILE="${TMPDIR:-/tmp}/vds4e-dev-${UID}.lock"
 SERVER_PID=""
 WEB_PID=""
@@ -54,7 +56,15 @@ fi
 
 cd "$ROOT_DIR"
 
-setsid cargo run -p vds-server -- --config config/vds-server.yaml &
+echo "Configuring and building the SPI CUSE adapter..."
+cmake \
+  -S "$ROOT_DIR/adapters/spi-cuse" \
+  -B "$SPI_CUSE_BUILD_DIR" \
+  -DCMAKE_BUILD_TYPE=Debug
+cmake --build "$SPI_CUSE_BUILD_DIR" --parallel
+
+setsid env VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
+  cargo run -p vds-server -- --config config/vds-server.yaml &
 SERVER_PID=$!
 
 setsid npm --prefix "$WEB_DIR" run dev -- --host 127.0.0.1 --port "$WEB_PORT" --strictPort &
