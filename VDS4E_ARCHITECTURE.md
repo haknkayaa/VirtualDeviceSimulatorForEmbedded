@@ -55,6 +55,14 @@ must run without a browser, and applications must not depend on Web code.
 - `adapters/spi-preload` maps normal Linux spidev calls into VDS4E without root.
 - `adapters/spi-cuse` provides the privileged CUSE-based spidev integration.
 
+Host adapters implement standard Linux userspace ABIs so existing distribution
+tools run unchanged against virtual devices. VDS4E does not recreate tools such
+as `spidev_test`, `i2cdetect`, `i2cget`, `i2cset`, `i2ctransfer`, `gpiodetect`,
+`gpioinfo`, `gpioget`, `gpioset`, or `gpiomon`. Adapter completeness is
+measured by compatibility with those real tools. Protocol and device behavior
+remain in the transaction data plane and virtual device runtime rather than
+being hardcoded into tool-specific adapter paths.
+
 The REST API is the control plane. Protobuf-framed Unix-socket messages are the
 transaction data plane. WebSocket delivery provides ordered event replay and
 live updates. REST payloads remain independent of Web component structures.
