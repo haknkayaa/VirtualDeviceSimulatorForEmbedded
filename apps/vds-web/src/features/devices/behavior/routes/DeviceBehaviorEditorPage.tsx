@@ -8,7 +8,7 @@ import { serializeFlowDocument } from '../../../flows/serialization/flowDocument
 import { localFlowRepository } from '../../../flows/serialization/localFlowRepository'
 import { useFlowStore } from '../../../flows/store/flowStore'
 import { DeviceBehaviorEditor } from '../components/DeviceBehaviorEditor'
-import { createDeviceBehaviorFlowDocument, exampleDeviceBehaviorFlow, genericSpiFlashBehaviorFlow } from '../serialization/deviceBehaviorFlowDocument'
+import { createDeviceBehaviorFlowDocument } from '../serialization/deviceBehaviorFlowDocument'
 import { behaviorSettings } from '../types/deviceBehaviorFlow'
 import '../registry/deviceBehaviorRegistry'
 
@@ -27,14 +27,12 @@ export function DeviceBehaviorEditorPage() {
     const key = `${deviceId ?? 'unbound'}:${flowId ?? 'new'}`; if (loaded.current === key) return; loaded.current = key
     if (!flowId) { useFlowStore.getState().newDocument(createDeviceBehaviorFlowDocument({ deviceId })); useFlowStore.getState().setReadOnly(false); return }
     const local = localFlowRepository.load(flowId)
-    const example = [exampleDeviceBehaviorFlow, genericSpiFlashBehaviorFlow].find((candidate) => candidate.flow.id === flowId)
-    const exampleDocument = example ? structuredClone(example) : null
     const packageDocument = packagedFlow.data?.flow.id === flowId ? structuredClone(packagedFlow.data) : null
-    if (deviceId && !local && !exampleDocument && packagedFlow.isPending) {
+    if (deviceId && !local && packagedFlow.isPending) {
       loaded.current = null
       return
     }
-    const document = local ?? packageDocument ?? exampleDocument
+    const document = local ?? packageDocument
     if (document && deviceId) {
       document.metadata = {
         ...document.metadata,

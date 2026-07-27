@@ -5,7 +5,6 @@ import { libraryKindLabel } from './deviceLibraryCatalog'
 
 interface DevicePackageListProps {
   bus: string
-  installedPackages: ReadonlySet<string>
   onBusChange: (bus: string) => void
   onQueryChange: (query: string) => void
   onSelect: (id: string) => void
@@ -16,7 +15,6 @@ interface DevicePackageListProps {
 
 export function DevicePackageList({
   bus,
-  installedPackages,
   onBusChange,
   onQueryChange,
   onSelect,
@@ -41,7 +39,7 @@ export function DevicePackageList({
           <option value="all">All buses</option>
           <option value="SPI">SPI</option>
           <option value="I2C">I2C</option>
-          <option value="Ethernet">Ethernet</option>
+          <option value="GPIO">GPIO</option>
         </select>
         <button className="button button-secondary" disabled title="Additional registry filters require a package service." type="button">
           <SlidersHorizontal aria-hidden="true" size={14} /> More filters
@@ -60,11 +58,7 @@ export function DevicePackageList({
             onClick={() => onSelect(item.id)}
             type="button"
           >
-            {item.image ? (
-              <img alt={item.image.alt} className="package-row-image" src={item.image.src} />
-            ) : (
-              <span className={`package-acronym package-kind-${item.kind}`}>{item.acronym}</span>
-            )}
+            <span className={`package-acronym package-kind-${item.kind}`}>{item.acronym}</span>
             <span className="package-row-copy">
               <strong>{item.name}</strong>
               <small>{item.source}</small>
@@ -75,7 +69,7 @@ export function DevicePackageList({
               <i>v{item.version}</i>
               <b>
                 <CheckCircle2 aria-hidden="true" size={11} />
-                {installedPackages.has(item.id) ? 'Installed' : 'Not installed'}
+                Installed
               </b>
             </span>
             <span className="package-row-kind">{libraryKindLabel()}</span>

@@ -2,10 +2,26 @@ import { render, screen } from '@testing-library/react'
 import { ReactFlowProvider, type NodeProps } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
-import { nodeRegistry } from '../registry/nodeRegistry'
+import { GenericNodeInspector } from '../components/GenericInspectorSection'
 import { flowFixture } from '../testFixtures'
-import type { FlowCanvasNode } from '../types/flow'
+import type { FlowCanvasNode, NodeRegistryEntry } from '../types/flow'
 import { BaseFlowNode } from './BaseFlowNode'
+import { PlaceholderActionNode } from './PlaceholderActionNode'
+
+const definition: NodeRegistryEntry = {
+  kind: 'placeholder_action',
+  displayName: 'Placeholder Action',
+  description: 'Test action',
+  category: 'Test',
+  iconIdentifier: 'test',
+  accentToken: 'cyan',
+  defaultData: {},
+  inputPorts: [{ id: 'in', label: 'Input' }],
+  outputPorts: [{ id: 'out', label: 'Output' }],
+  component: PlaceholderActionNode,
+  inspectorComponent: GenericNodeInspector,
+  validationRules: [],
+}
 
 describe('runtime status rendering hook', () => {
   it('renders externally supplied runtime status without semantic mutation', () => {
@@ -13,7 +29,7 @@ describe('runtime status rendering hook', () => {
     const props = {
       id: document.id,
       type: document.kind,
-      data: { document, definition: nodeRegistry.get(document.kind)!, runtimeStatus: 'running', issues: [], readOnly: false },
+      data: { document, definition, runtimeStatus: 'running', issues: [], readOnly: false },
       selected: false,
       dragging: false,
       draggable: true,
@@ -35,7 +51,7 @@ describe('runtime status rendering hook', () => {
     const props = {
       id: document.id,
       type: document.kind,
-      data: { document, definition: nodeRegistry.get(document.kind)!, runtimeStatus: 'idle', issues: [], readOnly: false },
+      data: { document, definition, runtimeStatus: 'idle', issues: [], readOnly: false },
       selected: false,
       dragging: false,
       draggable: true,

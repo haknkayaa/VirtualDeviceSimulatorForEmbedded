@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import { edgeRegistry, FlowEdgeRegistry } from './edgeRegistry'
 import { nodeRegistry, FlowNodeRegistry } from './nodeRegistry'
+import { PlaceholderActionNode } from '../nodes/PlaceholderActionNode'
+import { GenericNodeInspector } from '../components/GenericInspectorSection'
 
 describe('flow registries', () => {
-  it('exposes the three generic node contracts', () => {
-    expect(nodeRegistry.list().map((entry) => entry.kind)).toEqual(['start', 'end', 'placeholder_action'])
-    expect(nodeRegistry.get('placeholder_action')).toMatchObject({ category: 'Actions', inputPorts: [{ id: 'in' }], outputPorts: [{ id: 'out' }] })
+  it('starts without product-specific node contracts', () => {
+    expect(nodeRegistry.list()).toEqual([])
   })
 
   it('exposes the generic edge contract', () => {
@@ -15,7 +16,20 @@ describe('flow registries', () => {
 
   it('rejects duplicate registrations', () => {
     const nodes = new FlowNodeRegistry()
-    const entry = nodeRegistry.get('start')!
+    const entry = {
+      kind: 'test',
+      displayName: 'Test',
+      description: 'Test node',
+      category: 'Test',
+      iconIdentifier: 'test',
+      accentToken: 'cyan',
+      defaultData: {},
+      inputPorts: [],
+      outputPorts: [],
+      component: PlaceholderActionNode,
+      inspectorComponent: GenericNodeInspector,
+      validationRules: [],
+    }
     nodes.register(entry)
     expect(() => nodes.register(entry)).toThrow('already registered')
     const edges = new FlowEdgeRegistry()

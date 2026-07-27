@@ -1,4 +1,46 @@
 import type { FlowDocument } from './types/flow'
+import { GenericNodeInspector } from './components/GenericInspectorSection'
+import { PlaceholderActionNode } from './nodes/PlaceholderActionNode'
+import { nodeRegistry } from './registry/nodeRegistry'
+
+const testNodes = [
+  {
+    kind: 'start',
+    displayName: 'Start',
+    inputPorts: [],
+    outputPorts: [{ id: 'out', label: 'Output', required: true }],
+  },
+  {
+    kind: 'placeholder_action',
+    displayName: 'Placeholder Action',
+    inputPorts: [{ id: 'in', label: 'Input' }],
+    outputPorts: [{ id: 'out', label: 'Output' }],
+  },
+  {
+    kind: 'end',
+    displayName: 'End',
+    inputPorts: [{ id: 'in', label: 'Input', required: true }],
+    outputPorts: [],
+  },
+] as const
+
+testNodes.forEach((node) => {
+  if (nodeRegistry.has(node.kind)) return
+  nodeRegistry.register({
+    ...node,
+    description: 'Test-only generic flow node.',
+    category: 'Test',
+    iconIdentifier: 'test',
+    accentToken: 'cyan',
+    defaultData: { label: node.displayName },
+    inputPorts: [...node.inputPorts],
+    outputPorts: [...node.outputPorts],
+    component: PlaceholderActionNode,
+    inspectorComponent: GenericNodeInspector,
+    validationRules: [],
+    flowKinds: ['generic'],
+  })
+})
 
 export function flowFixture(): FlowDocument {
   return {

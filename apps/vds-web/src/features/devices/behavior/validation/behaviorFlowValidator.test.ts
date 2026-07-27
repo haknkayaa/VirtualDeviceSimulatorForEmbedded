@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { DeviceRegister } from '../../../../types/api'
-import { exampleDeviceBehaviorFlow, genericSpiFlashBehaviorFlow } from '../serialization/deviceBehaviorFlowDocument'
+import { exampleDeviceBehaviorFlow, micronMt25ql256BehaviorFlow } from '../serialization/deviceBehaviorFlowFixtures'
 import { validateBehaviorFlow } from './behaviorFlowValidator'
 
 const registers: DeviceRegister[] = [{ name: 'STATUS', address: 1, width_bits: 8, access: 'ro', value: 0 }]
@@ -42,7 +42,7 @@ describe('device behavior validation', () => {
     expect(rules(document)).toEqual(expect.arrayContaining(['behavior-unreachable-state', 'behavior-unsupported-guard']))
   })
   it('rejects signal cycles and file paths outside the runtime sandbox', () => {
-    const document = structuredClone(genericSpiFlashBehaviorFlow)
+    const document = structuredClone(micronMt25ql256BehaviorFlow)
     document.edges.push({
       id: 'signal-cycle',
       kind: 'device_behavior.signal',

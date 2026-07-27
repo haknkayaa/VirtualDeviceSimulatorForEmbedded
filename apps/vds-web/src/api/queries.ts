@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from './client'
-import type { AttachAdapterDeviceInput, CreateAdapterInput, CreateDeviceInput, DeviceRegister, ExecuteDeviceCommandInput, RunStatus, WriteDeviceRegisterInput } from '../types/api'
+import type { AttachAdapterDeviceInput, CreateAdapterInput, CreateDeviceInput, DeviceRegister, RunStatus, WriteDeviceRegisterInput } from '../types/api'
 
 export const queryKeys = {
   health: ['health'] as const,
@@ -125,20 +125,6 @@ export function useDeviceCommands(id: string | undefined) {
     queryKey: queryKeys.deviceCommands(id ?? ''),
     queryFn: () => api.deviceCommands(id as string),
     enabled: Boolean(id),
-  })
-}
-
-export function useExecuteDeviceCommand() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (input: ExecuteDeviceCommandInput) => api.executeDeviceCommand(input),
-    onSuccess: (result, input) => {
-      queryClient.setQueryData(queryKeys.registers(input.deviceId), result.registers)
-      queryClient.setQueryData(queryKeys.state(input.deviceId), {
-        device_id: input.deviceId,
-        state: result.state,
-      })
-    },
   })
 }
 

@@ -32,5 +32,4 @@ export const localFlowRepository = {
   save(document: FlowDocument) {
     storage()?.setItem(`${PREFIX}${document.flow.id}`, serializeFlowDocument(document))
   },
-  remove(id: string) { storage()?.removeItem(`${PREFIX}${id}`) },
 }

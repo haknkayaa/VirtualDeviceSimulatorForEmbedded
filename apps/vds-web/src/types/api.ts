@@ -150,29 +150,6 @@ export interface DeviceCommand {
   }
 }
 
-export interface ExecuteDeviceCommandInput {
-  deviceId: string
-  tx: number[]
-  rx_length: number
-  wire: {
-    mode: number
-    bits_per_word: number
-    max_speed_hz: number
-    command_width: SpiLaneWidth
-    address_width: SpiLaneWidth
-    data_width: SpiLaneWidth
-    rate: SpiTransferRate
-    dummy_cycles: number
-    lsb_first: boolean
-  }
-}
-
-export interface ExecuteDeviceCommandResult {
-  rx: number[]
-  state: string | null
-  registers: DeviceRegister[]
-}
-
 export type BusHealth = 'idle' | 'healthy' | 'degraded' | 'unhealthy'
 
 export interface BusTelemetry {

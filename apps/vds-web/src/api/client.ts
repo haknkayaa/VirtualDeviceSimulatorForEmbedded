@@ -11,8 +11,6 @@ import type {
   DeviceRegister,
   DeviceState,
   DeviceTemplate,
-  ExecuteDeviceCommandInput,
-  ExecuteDeviceCommandResult,
   DownloadArtifact,
   Fault,
   Health,
@@ -112,12 +110,6 @@ export const api = {
   device: (id: string) => request<Device>(`/devices/${encodeURIComponent(id)}`),
   deviceCommands: (id: string) =>
     request<DeviceCommand[]>(`/devices/${encodeURIComponent(id)}/commands`),
-  executeDeviceCommand: ({ deviceId, ...input }: ExecuteDeviceCommandInput) =>
-    request<ExecuteDeviceCommandResult>(`/devices/${encodeURIComponent(deviceId)}/commands/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    }),
   deviceFlow: (id: string) => request<FlowDocument>(`/devices/${encodeURIComponent(id)}/flow`),
   registers: (id: string) =>
     request<DeviceRegister[]>(`/devices/${encodeURIComponent(id)}/registers`),

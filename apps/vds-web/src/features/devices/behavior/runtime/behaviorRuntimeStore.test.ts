@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { DomainEvent } from '../../../../types/events'
 import { useFlowStore } from '../../../flows/store/flowStore'
-import { exampleDeviceBehaviorFlow } from '../serialization/deviceBehaviorFlowDocument'
+import { exampleDeviceBehaviorFlow } from '../serialization/deviceBehaviorFlowFixtures'
 import { useBehaviorRuntimeStore } from './behaviorRuntimeStore'
 import { transitionRuntimeKey } from './deviceEventMapper'
 
