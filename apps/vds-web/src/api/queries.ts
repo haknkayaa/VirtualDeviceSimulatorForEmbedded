@@ -1,14 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from './client'
-import type { CreateDeviceInput, RunStatus } from '../types/api'
+import type { AttachAdapterDeviceInput, CreateAdapterInput, CreateDeviceInput, DeviceRegister, ExecuteDeviceCommandInput, RunStatus, WriteDeviceRegisterInput } from '../types/api'
 
 export const queryKeys = {
   health: ['health'] as const,
+  clock: ['clock'] as const,
   busTelemetry: ['telemetry', 'buses'] as const,
   devices: ['devices'] as const,
+  adapters: ['adapters'] as const,
   deviceTemplates: ['device-models'] as const,
   device: (id: string) => ['devices', id] as const,
+  deviceFlow: (id: string) => ['devices', id, 'flow'] as const,
+  deviceCommands: (id: string) => ['devices', id, 'commands'] as const,
   registers: (id: string) => ['devices', id, 'registers'] as const,
   state: (id: string) => ['devices', id, 'state'] as const,
   faults: ['faults'] as const,
@@ -24,6 +28,15 @@ export function useHealth() {
   return useQuery({ queryKey: queryKeys.health, queryFn: api.health, refetchInterval: 5_000, retry: 1 })
 }
 
+export function useClock() {
+  return useQuery({
+    queryKey: queryKeys.clock,
+    queryFn: api.clock,
+    refetchInterval: 1_000,
+    retry: 1,
+  })
+}
+
 export function useBusTelemetry() {
   return useQuery({
     queryKey: queryKeys.busTelemetry,
@@ -34,6 +47,38 @@ export function useBusTelemetry() {
 
 export function useDevices() {
   return useQuery({ queryKey: queryKeys.devices, queryFn: api.devices })
+}
+
+export function useAdapters() {
+  return useQuery({ queryKey: queryKeys.adapters, queryFn: api.adapters, refetchInterval: 2_000 })
+}
+
+function useAdapterMutation<T>(mutationFn: (input: T) => Promise<unknown>) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.adapters }),
+  })
+}
+
+export function useCreateAdapter() {
+  return useAdapterMutation<CreateAdapterInput>(api.createAdapter)
+}
+
+export function useLoadAdapter() {
+  return useAdapterMutation<string>(api.loadAdapter)
+}
+
+export function useUnloadAdapter() {
+  return useAdapterMutation<string>(api.unloadAdapter)
+}
+
+export function useAttachAdapterDevice() {
+  return useAdapterMutation<AttachAdapterDeviceInput>(api.attachAdapterDevice)
+}
+
+export function useDetachAdapterDevice() {
+  return useAdapterMutation<{ adapterId: string; deviceId: string }>(api.detachAdapterDevice)
 }
 
 export function useDeviceTemplates(enabled = true) {
@@ -66,11 +111,54 @@ export function useDevice(id: string | undefined) {
   })
 }
 
+export function useDeviceFlow(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.deviceFlow(id ?? ''),
+    queryFn: () => api.deviceFlow(id as string),
+    enabled: Boolean(id),
+    retry: false,
+  })
+}
+
+export function useDeviceCommands(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.deviceCommands(id ?? ''),
+    queryFn: () => api.deviceCommands(id as string),
+    enabled: Boolean(id),
+  })
+}
+
+export function useExecuteDeviceCommand() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: ExecuteDeviceCommandInput) => api.executeDeviceCommand(input),
+    onSuccess: (result, input) => {
+      queryClient.setQueryData(queryKeys.registers(input.deviceId), result.registers)
+      queryClient.setQueryData(queryKeys.state(input.deviceId), {
+        device_id: input.deviceId,
+        state: result.state,
+      })
+    },
+  })
+}
+
 export function useRegisters(id: string | undefined) {
   return useQuery({
     queryKey: queryKeys.registers(id ?? ''),
     queryFn: () => api.registers(id as string),
     enabled: Boolean(id),
+  })
+}
+
+export function useWriteRegister() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: WriteDeviceRegisterInput) => api.writeRegister(input),
+    onSuccess: (updated, input) => {
+      queryClient.setQueryData<DeviceRegister[]>(queryKeys.registers(input.deviceId), (current) =>
+        current?.map((register) => register.address === updated.address ? updated : register) ?? [updated],
+      )
+    },
   })
 }
 

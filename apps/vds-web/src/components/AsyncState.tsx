@@ -1,9 +1,10 @@
 import { AlertTriangle, Inbox, LoaderCircle, WifiOff } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 interface AsyncStateProps {
   kind: 'loading' | 'empty' | 'error' | 'disconnected'
   title: string
-  detail?: string
+  detail?: ReactNode
 }
 
 const icons = {

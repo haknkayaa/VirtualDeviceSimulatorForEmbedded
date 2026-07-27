@@ -15,7 +15,7 @@ import {
   type OnReconnect,
 } from '@xyflow/react'
 
-import { FLOW_NODE_MIME } from './NodePalette'
+import { FLOW_NODE_MIME, FLOW_REUSABLE_NODE_MIME } from './NodePalette'
 import { canvasEdgeTypes } from '../registry/edgeRegistry'
 import { canvasNodeTypes } from '../registry/nodeRegistry'
 import { edgeRegistry } from '../registry/edgeRegistry'
@@ -35,7 +35,11 @@ interface FlowCanvasProps {
 export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: FlowCanvasProps) {
   const store = useFlowStore()
   const instance = useReactFlow<FlowCanvasNode, FlowCanvasEdge>()
-  const registeredNodeTypes = useMemo(() => canvasNodeTypes(), [])
+  const nodeTypeSignature = nodeRegistry.list().map((entry) => entry.kind).join('|')
+  const registeredNodeTypes = useMemo(() => {
+    void nodeTypeSignature
+    return canvasNodeTypes()
+  }, [nodeTypeSignature])
   const registeredEdgeTypes = useMemo(() => canvasEdgeTypes(), [])
   const defaultEdgeKind = typeof store.document.metadata.default_edge_kind === 'string' && edgeRegistry.has(store.document.metadata.default_edge_kind)
     ? store.document.metadata.default_edge_kind
@@ -107,9 +111,16 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
     target: connection.target,
     targetHandle: connection.targetHandle ?? null,
   }), [])
-  const onConnect = useCallback((connection: Connection) => { store.connect(connectionFrom(connection), defaultEdgeKind) }, [connectionFrom, defaultEdgeKind, store])
+  const connectionKind = useCallback((connection: Pick<Connection, 'source' | 'target'>) => {
+    if (store.document.flow.kind !== 'device_behavior') return defaultEdgeKind
+    const sourceKind = store.document.nodes.find((node) => node.id === connection.source)?.kind
+    const targetKind = store.document.nodes.find((node) => node.id === connection.target)?.kind
+    const runtimeState = (kind?: string) => kind === 'device_behavior.initial_state' || kind === 'device_behavior.state'
+    return runtimeState(sourceKind) && runtimeState(targetKind) ? 'device_behavior.transition' : 'device_behavior.signal'
+  }, [defaultEdgeKind, store.document.flow.kind, store.document.nodes])
+  const onConnect = useCallback((connection: Connection) => { store.connect(connectionFrom(connection), connectionKind(connection)) }, [connectionFrom, connectionKind, store])
   const onReconnect = useCallback<OnReconnect<FlowCanvasEdge>>((edge, connection) => { store.reconnect(edge.id, connectionFrom(connection)) }, [connectionFrom, store])
-  const isValidConnection = useCallback<IsValidConnection<FlowCanvasEdge>>((connection) => validateFlowConnection(store.document, connectionFrom(connection), defaultEdgeKind), [connectionFrom, defaultEdgeKind, store.document])
+  const isValidConnection = useCallback<IsValidConnection<FlowCanvasEdge>>((connection) => validateFlowConnection(store.document, connectionFrom(connection), connectionKind(connection)), [connectionFrom, connectionKind, store.document])
 
   return (
     <div
@@ -148,8 +159,11 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
         onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy' }}
         onDrop={(event) => {
           event.preventDefault()
+          const reusableId = event.dataTransfer.getData(FLOW_REUSABLE_NODE_MIME)
           const kind = event.dataTransfer.getData(FLOW_NODE_MIME)
-          if (kind) store.addNode(kind, instance.screenToFlowPosition({ x: event.clientX, y: event.clientY }, { snapToGrid: true }))
+          const position = instance.screenToFlowPosition({ x: event.clientX, y: event.clientY }, { snapToGrid: true })
+          if (reusableId) store.addReusableNode(reusableId, position)
+          else if (kind) store.addNode(kind, position)
         }}
         panOnDrag={[1, 2]}
         selectionMode={SelectionMode.Partial}

@@ -4,22 +4,30 @@ import { describe, expect, it } from 'vitest'
 import { DashboardHealthPanels } from './DashboardHealthPanels'
 
 describe('dashboard health panels', () => {
-  it('lists application nodes and linked runtime modules', () => {
-    render(<DashboardHealthPanels healthStatus="ok" />)
+  it('lists only independently running processes', () => {
+    render(<DashboardHealthPanels
+      adapters={[{
+        id: 'spi0',
+        name: 'SPI 0',
+        bus_type: 'spi',
+        driver: 'cuse',
+        state: 'loaded',
+        readiness: 'ready',
+        bus_number: 0,
+        bindings: [{ device_id: 'flash-0', endpoint: 0, device_path: '/dev/spidev0.0' }],
+        daemon_pids: [4321],
+      }]}
+      healthStatus="ok"
+    />)
 
     expect(screen.getByRole('heading', { name: 'Server Health' })).toBeInTheDocument()
     expect(screen.getByText('vds-server')).toBeInTheDocument()
-    expect(screen.getByText('vds-web')).toBeInTheDocument()
-    expect(screen.getByText('vds-cli')).toBeInTheDocument()
-    expect(screen.queryByText('C client SDK')).not.toBeInTheDocument()
-    expect(screen.queryByText('Event stream')).not.toBeInTheDocument()
-    expect(screen.getByText('vds-core')).toBeInTheDocument()
-    expect(screen.getByText('vds-device-model')).toBeInTheDocument()
-    expect(screen.getByText('vds-events')).toBeInTheDocument()
-    expect(screen.getByText('vds-protocol')).toBeInTheDocument()
-    expect(screen.getByText('vds-registers')).toBeInTheDocument()
-    expect(screen.getByText('vds-scenario')).toBeInTheDocument()
-    expect(screen.getAllByText('RUNNING')).toHaveLength(9)
+    expect(screen.getByText('spi0 adapter')).toBeInTheDocument()
+    expect(screen.getByText('cuse daemon · endpoint 0 · PID 4321')).toBeInTheDocument()
+    expect(screen.queryByText('vds-web')).not.toBeInTheDocument()
+    expect(screen.queryByText('vds-events')).not.toBeInTheDocument()
+    expect(screen.queryByText('vds-core')).not.toBeInTheDocument()
+    expect(screen.getAllByText('RUNNING')).toHaveLength(2)
     expect(
       screen.getByRole('heading', { name: 'System Health' }).compareDocumentPosition(
         screen.getByRole('heading', { name: 'Server Health' }),
@@ -38,11 +46,12 @@ describe('dashboard health panels', () => {
     expect(screen.getAllByText('Not exposed').length).toBeGreaterThanOrEqual(4)
   })
 
-  it('marks server-backed modules as failed when server health is unavailable', () => {
+  it('marks the server process as failed when health is unavailable', () => {
     render(<DashboardHealthPanels healthStatus="offline" />)
 
-    expect(screen.getAllByText('FAIL')).toHaveLength(8)
-    expect(screen.getAllByText('RUNNING')).toHaveLength(1)
+    expect(screen.getByText('FAIL')).toBeInTheDocument()
+    expect(screen.queryByText('RUNNING')).not.toBeInTheDocument()
+    expect(screen.getByText('No separate adapter processes are running.')).toBeInTheDocument()
   })
 
   it('formats typed host telemetry when supplied by the health contract', () => {
@@ -66,5 +75,20 @@ describe('dashboard health panels', () => {
     expect(screen.getByText('120.0 GB / 500.0 GB')).toBeInTheDocument()
     expect(screen.getByText('1.5 MB/s')).toBeInTheDocument()
     expect(screen.getByText('250.0 KB/s')).toBeInTheDocument()
+  })
+
+  it('rounds byte-level network rates', () => {
+    render(
+      <DashboardHealthPanels
+        healthStatus="ok"
+        systemMetrics={{
+          network_rx_bytes_per_sec: 42.738291,
+          network_tx_bytes_per_sec: 7.193847,
+        }}
+      />,
+    )
+
+    expect(screen.getByText('43 B/s')).toBeInTheDocument()
+    expect(screen.getByText('7 B/s')).toBeInTheDocument()
   })
 })

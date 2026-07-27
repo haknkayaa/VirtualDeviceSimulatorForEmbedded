@@ -14,6 +14,7 @@ interface AddDeviceDialogProps {
 }
 
 const deviceIdPattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
+const busTypes = ['gpio', 'spi', 'i2c', 'qspi', 'uart', 'ethernet'] as const
 
 export function AddDeviceDialog({
   defaultDeviceId,
@@ -25,9 +26,14 @@ export function AddDeviceDialog({
   templates,
 }: AddDeviceDialogProps) {
   const [deviceId, setDeviceId] = useState(defaultDeviceId)
+  const [busType, setBusType] = useState('')
   const [templateId, setTemplateId] = useState('')
-  const effectiveTemplateId = templateId || templates[0]?.id || ''
+  const effectiveTemplateId = templates.some((template) => template.id === templateId)
+    ? templateId
+    : templates[0]?.id || ''
   const selectedTemplate = templates.find((template) => template.id === effectiveTemplateId)
+  const effectiveBusType = busType || selectedTemplate?.bus.toLowerCase() || 'spi'
+  const availableBusTypes = new Set(templates.map((template) => template.bus.toLowerCase()))
   const idError = deviceId.length > 0 && !deviceIdPattern.test(deviceId)
     ? 'Use 1–64 letters, numbers, dots, underscores or hyphens.'
     : undefined
@@ -56,11 +62,34 @@ export function AddDeviceDialog({
 
         <div className="add-device-fields">
           <label>
+            <span>Bus type</span>
+            <select
+              aria-label="Bus type"
+              onChange={(event) => {
+                setBusType(event.target.value)
+                const matchingTemplate = templates.find(
+                  (template) => template.bus.toLowerCase() === event.target.value,
+                )
+                setTemplateId(matchingTemplate?.id ?? '')
+              }}
+              value={effectiveBusType}
+            >
+              {busTypes.map((bus) => (
+                <option disabled={!availableBusTypes.has(bus)} key={bus} value={bus}>{bus.toUpperCase()}</option>
+              ))}
+            </select>
+          </label>
+
+          <label>
             <span>Device model</span>
             <select
               aria-label="Device model"
               disabled={isLoadingTemplates || templates.length === 0}
-              onChange={(event) => setTemplateId(event.target.value)}
+              onChange={(event) => {
+                setTemplateId(event.target.value)
+                const template = templates.find((item) => item.id === event.target.value)
+                setBusType(template?.bus.toLowerCase() ?? '')
+              }}
               value={effectiveTemplateId}
             >
               {isLoadingTemplates && <option value="">Loading configured models…</option>}
@@ -88,21 +117,30 @@ export function AddDeviceDialog({
               : <small id="device-id-help">Must be unique in the current environment.</small>}
           </div>
 
-          <div className="add-device-readonly-grid">
-            <label>
-              <span>Environment</span>
-              <input disabled value="Local simulator" />
-            </label>
-            <label>
-              <span>Bus type</span>
-              <input disabled value={selectedTemplate?.bus.toUpperCase() ?? '—'} />
-            </label>
-          </div>
+          <label>
+            <span>Environment</span>
+            <input disabled value="Local simulator" />
+          </label>
+
+          {effectiveBusType === 'spi' && (
+            <div className="add-device-field">
+              <label htmlFor="new-device-path"><span>Suggested device path</span></label>
+              <input
+                aria-describedby="device-path-help"
+                disabled
+                id="new-device-path"
+                value="/dev/spidev0.0"
+              />
+              <small id="device-path-help">
+                Created by the SPI CUSE adapter for {deviceId || '<device-id>'}.
+              </small>
+            </div>
+          )}
         </div>
 
         <aside className="add-device-runtime-note">
           <Info aria-hidden="true" size={15} />
-          <span>This creates an in-memory runtime instance. It is removed when the server restarts. Bus topology and chip-select assignment are not exposed by the current runtime.</span>
+          <span>This creates an in-memory runtime instance. Start the bus-specific adapter from Configuration to create its kernel device node.</span>
         </aside>
 
         {errorMessage && <p className="add-device-error" role="alert">{errorMessage}</p>}

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Ellipsis, Pencil, Power, RadioTower, RefreshCw, RotateCcw } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Ellipsis, Pencil, Power, RadioTower, RefreshCw, RotateCcw, Save } from 'lucide-react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import {
   useCreateDevice,
+  useAdapters,
   useDevice,
   useDeviceTemplates,
   useDevices,
@@ -12,6 +13,7 @@ import {
   useRegisters,
   useResetDevice,
   useSetFault,
+  useWriteRegister,
 } from '../../api/queries'
 import { AsyncState } from '../../components/AsyncState'
 import { GlassPanel } from '../../components/GlassPanel'
@@ -21,30 +23,27 @@ import { useEventStore } from '../../stores/eventStore'
 import { humanize } from '../../utils/format'
 import { AddDeviceDialog } from './AddDeviceDialog'
 import { BitfieldInspector } from './BitfieldInspector'
+import { DeviceConfiguration } from './DeviceConfiguration'
+import { DeviceCommandConsole } from './DeviceCommandConsole'
 import { DeviceFooterPanels } from './DeviceFooterPanels'
+import { DeviceFlows } from './DeviceFlows'
 import { DeviceInstanceList } from './DeviceInstanceList'
 import { DeviceProfileCard } from './DeviceProfileCard'
+import { DeviceScenarios } from './DeviceScenarios'
 import { RegisterMap } from './RegisterMap'
 import { RegisterMapOverview } from './RegisterMapOverview'
 
 const deviceTabs = [
   { id: 'registers', label: 'Registers' },
   { id: 'commands', label: 'Commands' },
-  { id: 'memory', label: 'Memory' },
-  { id: 'state-machine', label: 'State Machine' },
+  { id: 'flows', label: 'Flows' },
+  { id: 'scenarios', label: 'Scenarios' },
   { id: 'faults', label: 'Faults' },
   { id: 'events', label: 'Events' },
   { id: 'configuration', label: 'Configuration' },
 ] as const
 
 type DeviceTab = (typeof deviceTabs)[number]['id']
-
-const unavailableTabCopy: Record<Exclude<DeviceTab, 'registers' | 'faults' | 'events'>, string> = {
-  commands: 'Command metadata is not exposed by the current Control API.',
-  memory: 'Memory inspection is not exposed by the current Control API.',
-  'state-machine': 'State-machine definitions are not exposed by the current Control API.',
-  configuration: 'Device configuration is not exposed by the current Control API.',
-}
 
 function nextDeviceId(ids: string[], selectedId?: string) {
   const source = selectedId ?? ids[0] ?? 'device-0'
@@ -57,12 +56,40 @@ function nextDeviceId(ids: string[], selectedId?: string) {
 
 export function DevicesPage() {
   const { deviceId: routeDeviceId } = useParams()
+  const location = useLocation()
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<DeviceTab>('registers')
+  const routeTab: DeviceTab = location.pathname.endsWith('/scenarios')
+    ? 'scenarios'
+    : location.pathname.endsWith('/flows')
+      ? 'flows'
+      : 'registers'
+  const [selectedTab, setActiveTab] = useState<DeviceTab>(routeTab)
+  const activeTab = routeTab === 'registers' ? selectedTab : routeTab
   const [liveRead, setLiveRead] = useState(false)
   const [showAddDevice, setShowAddDevice] = useState(false)
   const [selectedRegisterAddress, setSelectedRegisterAddress] = useState<number | null>(null)
+  const [configurationDirty, setConfigurationDirty] = useState(false)
+  const [configurationBusy, setConfigurationBusy] = useState(false)
+  const [configurationSummary, setConfigurationSummary] = useState<{
+    devicePath: string
+    adapterId: string
+    endpoint: number
+    driver: string
+  }>()
+  const configurationSave = useRef<() => void>(() => undefined)
+  const updateConfigurationAction = useCallback((next: {
+    dirty: boolean
+    busy: boolean
+    save: () => void
+    summary?: { devicePath: string; adapterId: string; endpoint: number; driver: string }
+  }) => {
+    configurationSave.current = next.save
+    setConfigurationDirty((current) => current === next.dirty ? current : next.dirty)
+    setConfigurationBusy((current) => current === next.busy ? current : next.busy)
+    setConfigurationSummary((current) => JSON.stringify(current) === JSON.stringify(next.summary) ? current : next.summary)
+  }, [])
   const devices = useDevices()
+  const adapters = useAdapters()
   const deviceTemplates = useDeviceTemplates(showAddDevice)
   const createDevice = useCreateDevice()
   const deviceId = routeDeviceId ?? devices.data?.[0]?.id
@@ -71,6 +98,7 @@ export function DevicesPage() {
   const registers = useRegisters(deviceId)
   const faults = useFaults()
   const reset = useResetDevice()
+  const writeRegister = useWriteRegister()
   const faultToggle = useSetFault()
   const events = useEventStore((store) => store.events)
   const deviceFaults = faults.data?.filter((fault) => fault.device_id === deviceId) ?? []
@@ -87,6 +115,9 @@ export function DevicesPage() {
   const selectedRegister = registerList.find((register) => register.address === selectedRegisterAddress) ?? registerList[0]
   const effectiveSelectedAddress = selectedRegister?.address ?? null
   const isRefreshing = devices.isFetching || device.isFetching || state.isFetching || registers.isFetching || faults.isFetching
+  const adapterAssignment = adapters.data
+    ?.flatMap((adapter) => adapter.bindings.map((binding) => ({ adapter, binding })))
+    .find(({ binding }) => binding.device_id === deviceId)
 
   const refresh = useCallback(() => {
     void Promise.all([
@@ -149,6 +180,18 @@ export function DevicesPage() {
       )
     }
 
+    if (activeTab === 'flows') {
+      return deviceId ? <DeviceFlows deviceId={deviceId} /> : null
+    }
+
+    if (activeTab === 'commands') {
+      return deviceId ? <DeviceCommandConsole deviceId={deviceId} /> : null
+    }
+
+    if (activeTab === 'scenarios') {
+      return deviceId ? <DeviceScenarios deviceId={deviceId} /> : null
+    }
+
     if (activeTab === 'events') {
       return (
         <GlassPanel eyebrow="Domain telemetry" title="Device events">
@@ -159,18 +202,49 @@ export function DevicesPage() {
       )
     }
 
-    return (
-      <GlassPanel eyebrow="Control API boundary" title={deviceTabs.find((tab) => tab.id === activeTab)?.label ?? activeTab}>
-        <AsyncState detail={unavailableTabCopy[activeTab]} kind="empty" title="Not exposed yet" />
-      </GlassPanel>
-    )
+    if (activeTab === 'configuration') {
+      return device.data
+        ? <DeviceConfiguration adapter={adapterAssignment?.adapter} adapters={adapters.data ?? []} binding={adapterAssignment?.binding} device={device.data} onSaveStateChange={updateConfigurationAction} />
+        : <AsyncState kind="loading" title="Loading device configuration" />
+    }
+
+    return null
   }
 
   const renderInspectorContent = () => {
+    if (activeTab === 'configuration') {
+      const summary = configurationSummary ?? (adapterAssignment ? {
+        devicePath: adapterAssignment.binding.device_path,
+        adapterId: adapterAssignment.adapter.id,
+        endpoint: adapterAssignment.binding.endpoint,
+        driver: adapterAssignment.adapter.driver,
+      } : undefined)
+      return (
+        <GlassPanel className="device-context-inspector" eyebrow={configurationDirty ? 'Unsaved topology' : 'SPI topology'} title="Configuration Inspector">
+          {summary
+            ? <dl className="device-configuration-grid configuration-inspector-grid">
+              <div><dt>Device path</dt><dd><code>{summary.devicePath}</code></dd></div>
+              <div><dt>Adapter</dt><dd>{summary.adapterId}</dd></div>
+              <div><dt>Chip select</dt><dd>CS{summary.endpoint}</dd></div>
+              <div><dt>Driver</dt><dd>{summary.driver.toUpperCase()}</dd></div>
+            </dl>
+            : <AsyncState detail="Save an adapter and chip-select assignment to populate this summary." kind="empty" title="No adapter assigned" />}
+        </GlassPanel>
+      )
+    }
+
     if (activeTab === 'registers') {
       return (
         <>
-          <BitfieldInspector key={selectedRegister?.address ?? 'none'} register={selectedRegister} />
+          <BitfieldInspector
+            errorMessage={writeRegister.error?.message}
+            isApplying={writeRegister.isPending}
+            key={selectedRegister?.address ?? 'none'}
+            onApply={deviceId && selectedRegister
+              ? (value) => writeRegister.mutate({ deviceId, address: selectedRegister.address, value })
+              : undefined}
+            register={selectedRegister}
+          />
           <RegisterMapOverview
             onSelect={setSelectedRegisterAddress}
             registers={registerList}
@@ -203,9 +277,13 @@ export function DevicesPage() {
       >
         <RadioTower aria-hidden="true" size={15} /> Live Read
       </button>
-      <button className="button button-secondary" disabled title="Device editing is not available in this phase." type="button">
-        <Pencil aria-hidden="true" size={15} /> Edit
-      </button>
+      {activeTab === 'configuration'
+        ? <button className={`button configuration-save${configurationDirty ? ' configuration-save-dirty' : ''}`} disabled={!configurationDirty || configurationBusy} onClick={() => configurationSave.current()} type="button">
+          <Save aria-hidden="true" size={15} /> {configurationBusy ? 'Saving…' : 'Save'}
+        </button>
+        : <button className="button button-secondary" disabled title="Device editing is not available in this phase." type="button">
+          <Pencil aria-hidden="true" size={15} /> Edit
+        </button>}
       <details className="device-more-menu">
         <summary className="button button-secondary"><Ellipsis aria-hidden="true" size={16} /> More</summary>
         <div className="device-more-popover">
@@ -243,7 +321,7 @@ export function DevicesPage() {
           {device.data && <DeviceProfileCard actions={deviceActions} currentState={state.data?.state ?? device.data.state} device={device.data} />}
           {reset.isError && <AsyncState detail={reset.error.message} kind="error" title="Reset failed" />}
 
-          <div className="device-workspace-layout">
+          <div className={`device-workspace-layout${activeTab === 'registers' ? ' register-workspace-layout' : ''}`}>
             <div className="device-workspace-main">
               <nav aria-label="Device detail sections" className="device-detail-tabs" role="tablist">
                 {deviceTabs.map((tab) => (
@@ -253,7 +331,18 @@ export function DevicesPage() {
                     className={activeTab === tab.id ? 'active' : ''}
                     id={`device-tab-${tab.id}`}
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => {
+                      setActiveTab(tab.id)
+                      if (deviceId) {
+                        const base = `/devices/${encodeURIComponent(deviceId)}`
+                        const target = tab.id === 'scenarios'
+                          ? `${base}/scenarios`
+                          : tab.id === 'flows'
+                            ? `${base}/flows`
+                            : base
+                        navigate(target, { replace: true })
+                      }
+                    }}
                     role="tab"
                     type="button"
                   >

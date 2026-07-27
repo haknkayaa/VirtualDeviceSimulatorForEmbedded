@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
-import { Activity, Boxes, Cpu, PlayCircle, ShieldAlert } from 'lucide-react'
+import { Activity, Boxes, Cable, Cpu, PlayCircle, ShieldAlert } from 'lucide-react'
 
-import { useDevices, useFaults, useHealth, useRun } from '../../api/queries'
+import { useAdapters, useDevices, useFaults, useHealth, useRun } from '../../api/queries'
 import { AsyncState } from '../../components/AsyncState'
 import { GlassPanel } from '../../components/GlassPanel'
 import { MetricCard } from '../../components/MetricCard'
@@ -15,6 +15,7 @@ import { LiveEventStream } from './LiveEventStream'
 
 export function DashboardPage() {
   const health = useHealth()
+  const adapters = useAdapters()
   const devices = useDevices()
   const faults = useFaults()
   const activeRunId = useRunStore((state) => state.activeRunId)
@@ -30,7 +31,7 @@ export function DashboardPage() {
   return (
     <div className="page-stack dashboard-page">
       <PageHeader
-        eyebrow="Control plane / Overview"
+        eyebrow="Control Panel / Overview"
         title="System overview"
         description="Authoritative snapshots from REST, live operational context from the domain event stream."
         action={<div className="header-status"><span>Event stream</span><StatusBadge status={connectionStatus} /></div>}
@@ -48,21 +49,51 @@ export function DashboardPage() {
         <MetricCard detail="Current session" icon={Activity} label="Domain events" value={events.length} />
       </div>
       <div className="dashboard-command-grid">
-        <GlassPanel className="runtime-map-panel" eyebrow="Runtime snapshot" title="Device map" action={<span className="panel-count">{devices.data?.length ?? 0} loaded</span>}>
-          {devices.isPending && <AsyncState kind="loading" title="Loading devices" />}
-          {devices.isError && <AsyncState detail={devices.error.message} kind="error" title="Device snapshot unavailable" />}
-          {devices.data?.length === 0 && <AsyncState kind="empty" title="No devices loaded" />}
-          <div className="runtime-device-grid">
-            {devices.data?.map((device) => (
-              <article className="runtime-device-card" key={device.id}>
-                <div className="runtime-device-icon"><Cpu aria-hidden="true" size={18} /></div>
-                <div><strong>{device.id}</strong><span>{humanize(device.bus)} bus</span></div>
-                <StatusBadge status={device.state} />
-              </article>
-            ))}
-          </div>
-        </GlassPanel>
+        <div className="runtime-snapshot-grid">
+          <GlassPanel
+            action={<span className="panel-count">{adapters.data?.length ?? 0} total</span>}
+            className="runtime-resource-card"
+            eyebrow="Runtime snapshot"
+            title="Adapters"
+          >
+            {adapters.isPending && <AsyncState kind="loading" title="Loading adapters" />}
+            {adapters.isError && <AsyncState detail={adapters.error.message} kind="error" title="Adapter snapshot unavailable" />}
+            {adapters.data?.length === 0 && <AsyncState kind="empty" title="No adapters configured" />}
+            <div className="runtime-resource-list">
+              {adapters.data?.map((adapter) => (
+                <article className="runtime-resource-row" key={adapter.id}>
+                  <div className="runtime-resource-icon"><Cable aria-hidden="true" size={16} /></div>
+                  <div>
+                    <strong>{adapter.name}</strong>
+                    <span>{adapter.id} · {humanize(adapter.bus_type)} {adapter.bus_number}</span>
+                  </div>
+                  <StatusBadge status={adapter.state} />
+                </article>
+              ))}
+            </div>
+          </GlassPanel>
+          <GlassPanel
+            action={<span className="panel-count">{devices.data?.length ?? 0} total</span>}
+            className="runtime-resource-card"
+            eyebrow="Runtime snapshot"
+            title="Devices"
+          >
+            {devices.isPending && <AsyncState kind="loading" title="Loading devices" />}
+            {devices.isError && <AsyncState detail={devices.error.message} kind="error" title="Device snapshot unavailable" />}
+            {devices.data?.length === 0 && <AsyncState kind="empty" title="No devices loaded" />}
+            <div className="runtime-resource-list">
+              {devices.data?.map((device) => (
+                <article className="runtime-resource-row" key={device.id}>
+                  <div className="runtime-resource-icon"><Cpu aria-hidden="true" size={16} /></div>
+                  <div><strong>{device.id}</strong><span>{humanize(device.bus)} bus</span></div>
+                  <StatusBadge status={device.state} />
+                </article>
+              ))}
+            </div>
+          </GlassPanel>
+        </div>
         <DashboardHealthPanels
+          adapters={adapters.data}
           healthStatus={health.data?.status}
           systemMetrics={health.data?.system}
         />

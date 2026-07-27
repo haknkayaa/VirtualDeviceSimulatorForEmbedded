@@ -1,4 +1,4 @@
-import { CheckCircle2, Code2, FileCode2, GitBranch, PackageCheck, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, Download, FileCode2, PackageCheck, Plus, ShieldCheck, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import type { LibraryPackage } from './deviceLibraryCatalog'
@@ -6,13 +6,19 @@ import { libraryKindLabel } from './deviceLibraryCatalog'
 
 interface DevicePackageDetailProps {
   item: LibraryPackage
+  installed: boolean
+  onInstalledChange: (installed: boolean) => void
 }
 
-export function DevicePackageDetail({ item }: DevicePackageDetailProps) {
+export function DevicePackageDetail({ installed, item, onInstalledChange }: DevicePackageDetailProps) {
   return (
     <aside aria-label={`${item.name} package details`} className="library-detail-panel">
       <header className="package-detail-hero">
-        <span className={`package-detail-acronym package-kind-${item.kind}`}>{item.acronym}</span>
+        {item.image ? (
+          <img alt={item.image.alt} className="package-detail-image" src={item.image.src} />
+        ) : (
+          <span className={`package-detail-acronym package-kind-${item.kind}`}>{item.acronym}</span>
+        )}
         <div>
           <p>{libraryKindLabel()}</p>
           <h2>{item.name}</h2>
@@ -29,7 +35,7 @@ export function DevicePackageDetail({ item }: DevicePackageDetailProps) {
         <div className="package-install-state">
           <strong>
             <CheckCircle2 aria-hidden="true" size={14} />
-            {item.readiness === 'runtime_ready' ? 'Available locally' : 'Template only'}
+            {installed ? 'Installed' : 'Not installed'}
           </strong>
           <span>Version {item.version}</span>
         </div>
@@ -68,15 +74,19 @@ export function DevicePackageDetail({ item }: DevicePackageDetailProps) {
       </section>
 
       <footer className="package-detail-actions">
-        <button className="button button-secondary" disabled title="Package export requires a reviewed package service." type="button">
-          <Code2 aria-hidden="true" size={14} /> Export package
-        </button>
-        {item.editorPath ? (
-          <Link className="button button-primary" to={item.editorPath}>
-            <GitBranch aria-hidden="true" size={14} /> Open in editor
-          </Link>
+        {installed ? (
+          <>
+            <button className="button button-secondary" onClick={() => onInstalledChange(false)} type="button">
+              <Trash2 aria-hidden="true" size={14} /> Uninstall
+            </button>
+            <Link className="button button-primary" to="/devices">
+              <Plus aria-hidden="true" size={14} /> Add Device
+            </Link>
+          </>
         ) : (
-          <button className="button button-primary" disabled type="button"><GitBranch aria-hidden="true" size={14} /> Runtime adapter required</button>
+          <button className="button button-primary" onClick={() => onInstalledChange(true)} type="button">
+            <Download aria-hidden="true" size={14} /> Install
+          </button>
         )}
       </footer>
     </aside>

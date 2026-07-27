@@ -1,36 +1,24 @@
 import {
   Activity,
-  Blocks,
+  Cable,
   Cpu,
   Database,
   Gauge,
-  Globe2,
   HardDrive,
   MemoryStick,
   Network,
   Server,
-  TerminalSquare,
 } from 'lucide-react'
 
 import { GlassPanel } from '../../components/GlassPanel'
 import { StatusBadge } from '../../components/StatusBadge'
-import type { SystemMetrics } from '../../types/api'
+import type { Adapter, SystemMetrics } from '../../types/api'
 
 interface DashboardHealthPanelsProps {
+  adapters?: Adapter[]
   healthStatus?: string
   systemMetrics?: SystemMetrics
 }
-
-const platformModules = [
-  { id: 'vds-web', detail: 'Operator UI', icon: Globe2 },
-  { id: 'vds-cli', detail: 'Automation client', icon: TerminalSquare },
-  { id: 'vds-core', detail: 'Routing & fault engine', icon: Cpu },
-  { id: 'vds-device-model', detail: 'Device runtime', icon: Gauge },
-  { id: 'vds-events', detail: 'Domain event bus', icon: Activity },
-  { id: 'vds-protocol', detail: 'Protobuf contracts', icon: Network },
-  { id: 'vds-registers', detail: 'Register engine', icon: Database },
-  { id: 'vds-scenario', detail: 'Scenario runtime', icon: Blocks },
-] as const
 
 function percent(used?: number, total?: number) {
   if (used === undefined || total === undefined || total <= 0) return undefined
@@ -42,7 +30,7 @@ function formatBytes(value?: number) {
   if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)} GB`
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} MB`
   if (value >= 1_000) return `${(value / 1_000).toFixed(1)} KB`
-  return `${value} B`
+  return `${Math.round(value)} B`
 }
 
 function formatRate(value?: number) {
@@ -50,10 +38,18 @@ function formatRate(value?: number) {
 }
 
 export function DashboardHealthPanels({
+  adapters = [],
   healthStatus,
   systemMetrics,
 }: DashboardHealthPanelsProps) {
   const serverRunning = healthStatus === 'ok'
+  const adapterProcesses = adapters.flatMap((adapter) =>
+    adapter.daemon_pids.map((pid, index) => ({
+      adapter,
+      endpoint: adapter.bindings[index]?.endpoint,
+      pid,
+    })),
+  )
   const cpu = systemMetrics?.cpu_percent
   const ram = percent(systemMetrics?.memory_used_bytes, systemMetrics?.memory_total_bytes)
   const disk = percent(systemMetrics?.disk_used_bytes, systemMetrics?.disk_total_bytes)
@@ -113,7 +109,7 @@ export function DashboardHealthPanels({
       <GlassPanel
         action={<StatusBadge status={healthStatus === 'ok' ? 'healthy' : healthStatus ?? 'checking'} />}
         className="server-health-panel"
-        eyebrow="Platform nodes"
+        eyebrow="Operating system processes"
         title="Server Health"
       >
         <div className="platform-node-map">
@@ -124,18 +120,24 @@ export function DashboardHealthPanels({
               <i /> {serverRunning ? 'RUNNING' : 'FAIL'}
             </span>
           </article>
-          <div aria-hidden="true" className="node-map-rail" />
-          <div className="platform-node-clients">
-            {platformModules.map((module) => (
-              <article className="platform-node" key={module.id}>
-                <span><module.icon aria-hidden="true" size={15} /></span>
-                <div><strong title={module.id}>{module.id}</strong><small>{module.detail}</small></div>
-                <span className={`platform-node-status ${module.id === 'vds-web' || serverRunning ? 'running' : 'failed'}`}>
-                  <i /> {module.id === 'vds-web' || serverRunning ? 'RUNNING' : 'FAIL'}
-                </span>
-              </article>
-            ))}
-          </div>
+          {adapterProcesses.length === 0 ? (
+            <p className="platform-process-empty">No separate adapter processes are running.</p>
+          ) : (
+            <div className="platform-node-clients">
+              {adapterProcesses.map(({ adapter, endpoint, pid }) => (
+                <article className="platform-node" key={`${adapter.id}-${pid}`}>
+                  <span><Cable aria-hidden="true" size={15} /></span>
+                  <div>
+                    <strong title={adapter.name}>{adapter.id} adapter</strong>
+                    <small>{adapter.driver} daemon{endpoint === undefined ? '' : ` · endpoint ${endpoint}`} · PID {pid}</small>
+                  </div>
+                  <span className="platform-node-status running">
+                    <i /> RUNNING
+                  </span>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
       </GlassPanel>
     </aside>

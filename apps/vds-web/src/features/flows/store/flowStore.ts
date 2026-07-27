@@ -55,6 +55,8 @@ interface FlowStoreState {
   importJson: (input: string) => { ok: true; issues: ReturnType<typeof validateFlowDocument> } | { ok: false; error: string }
   prepareLocalSave: () => FlowDocument
   addNode: (kind: string, position: XYPosition, id?: string) => string | null
+  addReusableNode: (reusableId: string, position: XYPosition, id?: string) => string | null
+  setNodeReusable: (id: string, reusable: boolean) => void
   updateNodeData: (id: string, patch: JsonObject) => void
   updateEdgeData: (id: string, patch: JsonObject) => void
   updateFlowName: (name: string) => void
@@ -163,7 +165,51 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
       if (added) set({ selectedNodeIds: [id], selectedEdgeIds: [] })
       return added ? id : null
     },
-    updateNodeData: (id, patch) => { commit((document) => withUpdated(document, { nodes: document.nodes.map((node) => node.id === id ? { ...node, data: { ...node.data, ...patch } } : node) })) },
+    addReusableNode: (reusableId, position, id = uniqueId('reusable')) => {
+      const state = get()
+      const source = state.document.nodes.find((node) => node.ui.reusable_id === reusableId)
+      if (!source || state.document.nodes.some((node) => node.id === id)) return null
+      const node = {
+        ...structuredClone(source),
+        id,
+        position,
+        ui: { ...structuredClone(source.ui), reusable_id: reusableId },
+      }
+      const added = commit((document) => withUpdated(document, { nodes: [...document.nodes, node] }))
+      if (added) set({ selectedNodeIds: [id], selectedEdgeIds: [] })
+      return added ? id : null
+    },
+    setNodeReusable: (id, reusable) => {
+      commit((document) => {
+        const selected = document.nodes.find((node) => node.id === id)
+        if (!selected) return document
+        const reusableId = reusable
+          ? (typeof selected.ui.reusable_id === 'string' ? selected.ui.reusable_id : uniqueId('reusable'))
+          : null
+        return withUpdated(document, {
+          nodes: document.nodes.map((node) => node.id === id
+            ? {
+                ...node,
+                ui: reusableId
+                  ? { ...node.ui, reusable_id: reusableId }
+                  : Object.fromEntries(Object.entries(node.ui).filter(([key]) => key !== 'reusable_id')),
+              }
+            : node),
+        })
+      })
+    },
+    updateNodeData: (id, patch) => {
+      commit((document) => {
+        const selected = document.nodes.find((node) => node.id === id)
+        if (!selected) return document
+        const reusableId = typeof selected.ui.reusable_id === 'string' ? selected.ui.reusable_id : null
+        return withUpdated(document, {
+          nodes: document.nodes.map((node) => node.id === id || (reusableId && node.ui.reusable_id === reusableId)
+            ? { ...node, data: { ...node.data, ...patch } }
+            : node),
+        })
+      })
+    },
     updateEdgeData: (id, patch) => { commit((document) => withUpdated(document, { edges: document.edges.map((edge) => edge.id === id ? { ...edge, data: { ...edge.data, ...patch } } : edge) })) },
     updateFlowName: (name) => { commit((document) => ({ ...document, flow: { ...document.flow, name, updated_at: new Date().toISOString() } })) },
     updateMetadata: (patch) => { commit((document) => withUpdated(document, { metadata: { ...document.metadata, ...patch } })) },

@@ -1,39 +1,41 @@
-import { Activity, Bell, Boxes, CircleHelp, Gauge, GitBranch, LibraryBig, Moon, PlaySquare, Radio, Settings, Sun } from 'lucide-react'
+import { Activity, Bell, Boxes, Cable, CircleHelp, Gauge, LibraryBig, Moon, Radio, ScrollText, Settings, Sun } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { BrandLogo } from '../components/BrandLogo'
 import { EventDetailDrawer } from '../components/EventDetailDrawer'
 import { StatusBadge } from '../components/StatusBadge'
+import { useAdapters, useClock, useDevices } from '../api/queries'
 import { useEventStore } from '../stores/eventStore'
 import { useTheme } from '../hooks/useTheme'
-import { formatVirtualTime } from '../utils/format'
+import { formatVirtualTime, humanize } from '../utils/format'
 
 const navigation = [
   { to: '/', label: 'Dashboard', icon: Gauge, end: true },
   { to: '/devices', label: 'Devices', icon: Boxes, end: false },
+  { to: '/adapters', label: 'Adapters', icon: Cable, end: false },
   { to: '/transactions', label: 'Transactions', icon: Activity, end: false },
-  { to: '/scenarios', label: 'Scenarios', icon: PlaySquare, end: false },
   { to: '/device-library', label: 'Device Library', icon: LibraryBig, end: false },
-  { to: '/flows', label: 'Flows', icon: GitBranch, end: false },
+  { to: '/logs', label: 'Logs', icon: ScrollText, end: false },
 ] as const
 
 const workspaceNavigation = [
   { to: '/', label: 'Overview', end: true },
   { to: '/devices', label: 'Devices', end: false },
+  { to: '/adapters', label: 'Adapters', end: false },
   { to: '/transactions', label: 'Transactions', end: false },
-  { to: '/scenarios', label: 'Scenarios', end: false },
   { to: '/device-library', label: 'Device Library', end: false },
-  { to: '/flows', label: 'Flow editor', end: false },
+  { to: '/logs', label: 'Logs', end: false },
 ] as const
 
 const currentYear = new Date().getFullYear()
 
 export function AppShell() {
   const { theme, toggleTheme } = useTheme()
+  const adapters = useAdapters()
+  const clock = useClock()
+  const devices = useDevices()
   const connectionStatus = useEventStore((state) => state.connectionStatus)
-  const lastEventId = useEventStore((state) => state.lastEventId)
-  const retainedEvents = useEventStore((state) => state.events.length)
-  const virtualTime = useEventStore((state) => state.events.at(-1)?.timestamp_virtual_ns ?? 0)
+  const virtualTime = clock.data?.virtual_time_ns ?? 0
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -53,11 +55,42 @@ export function AppShell() {
           <div className="sidebar-runtime-row"><span>Event stream</span><StatusBadge status={connectionStatus} /></div>
           <dl className="sidebar-runtime-stats">
             <div><dt>Virtual time</dt><dd>{virtualTime ? formatVirtualTime(virtualTime) : '—'}</dd></div>
-            <div><dt>Retained</dt><dd>{retainedEvents.toLocaleString()}</dd></div>
-            <div><dt>Cursor</dt><dd>#{lastEventId || '—'}</dd></div>
           </dl>
+          <div className="sidebar-resource-groups">
+            <section>
+              <header><Cable aria-hidden="true" size={13} /><strong>Adapters</strong><span>{adapters.data?.length ?? 0}</span></header>
+              <div className="sidebar-resource-list">
+                {adapters.isPending && <small>Loading adapters…</small>}
+                {adapters.data?.map((adapter) => {
+                  const online = adapter.state === 'loaded'
+                  return (
+                    <div className="sidebar-resource-row" key={adapter.id}>
+                      <i className={online ? 'online' : adapter.state === 'error' ? 'error' : 'offline'} />
+                      <strong title={adapter.name}>{adapter.name}</strong>
+                      <span>{online ? 'Online' : adapter.state === 'error' ? 'Error' : 'Offline'}</span>
+                    </div>
+                  )
+                })}
+                {!adapters.isPending && adapters.data?.length === 0 && <small>No adapters</small>}
+              </div>
+            </section>
+            <section>
+              <header><Boxes aria-hidden="true" size={13} /><strong>Devices</strong><span>{devices.data?.length ?? 0}</span></header>
+              <div className="sidebar-resource-list">
+                {devices.isPending && <small>Loading devices…</small>}
+                {devices.data?.map((device) => (
+                  <div className="sidebar-resource-row" key={device.id}>
+                    <i className={device.state ? 'online' : 'offline'} />
+                    <strong title={device.id}>{device.name ?? device.id}</strong>
+                    <span>{device.state ? humanize(device.state) : 'Offline'}</span>
+                  </div>
+                ))}
+                {!devices.isPending && devices.data?.length === 0 && <small>No devices</small>}
+              </div>
+            </section>
+          </div>
         </div>
-        <div className="workspace-identity"><span>LW</span><div><strong>Local workspace</strong><small>Control plane</small></div></div>
+        <div className="workspace-identity"><span>LW</span><div><strong>Local workspace</strong><small>Control Panel</small></div></div>
       </aside>
       <div className="workspace-shell">
         <header className="workspace-topbar">
@@ -92,7 +125,7 @@ export function AppShell() {
           </div>
           <div>
             <code>v0.1.0-alpha</code>
-            <span>Local control plane</span>
+            <span>Local Control Panel</span>
             <span>© {currentYear} VDS4E</span>
           </div>
         </footer>

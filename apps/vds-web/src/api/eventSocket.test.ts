@@ -56,10 +56,15 @@ describe('event stream reconnect', () => {
     sockets[0].emit('open')
     sockets[0].emit('message', { data: JSON.stringify(domainEvent) } as MessageEvent<string>)
     expect(onEvent).toHaveBeenCalledWith(domainEvent)
+    sockets[0].emit('message', {
+      data: JSON.stringify([{ ...domainEvent, event_id: 9 }, { ...domainEvent, event_id: 10 }]),
+    } as MessageEvent<string>)
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ event_id: 9 }))
+    expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({ event_id: 10 }))
     sockets[0].emit('close')
     expect(statuses).toContainEqual(['reconnecting', 1])
     scheduled[0]()
-    expect(urls[1]).toContain('after_event_id=8')
+    expect(urls[1]).toContain('after_event_id=10')
     stream.stop()
     expect(statuses.at(-1)).toEqual(['disconnected', 0])
   })
