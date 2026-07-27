@@ -46,7 +46,7 @@ public extension interfaces from separate private repositories.
 - The first executable milestone is smaller and easier to test end to end.
 - One generic SPI capability from Phase 2 is pulled forward solely to exercise
   the Phase 1 boundaries.
-- No dynamic plugin ABI is introduced; the implementation is statically linked
+- No dynamic extension ABI is introduced; the implementation is statically linked
   behind core device interfaces.
 - Private device work remains outside this repository.
 

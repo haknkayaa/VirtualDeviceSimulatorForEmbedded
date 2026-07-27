@@ -31,7 +31,7 @@ JUnit messages identify the step action and whether the outcome was an assertion
 Run a scenario through the existing deterministic executor and write both formats:
 
 ```shell
-vds-cli scenario run scenarios/examples/delayed-write-with-timeout.yaml \
+vds-cli scenario run device-models/examples/generic-spi-flash/scenarios/09-program-timeout-fault.yaml \
   --config config/vds-server.yaml \
   --json-output result.json \
   --junit-output result.xml

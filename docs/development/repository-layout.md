@@ -11,7 +11,7 @@ The Phase 0 and first vertical-slice Cargo workspace members are:
   replay-aware WebSocket events, device controls, and scenario run views
 - `crates/vds-core`: backend-independent clock, deterministic one-shot
   scheduler, generic finite-state machine, device, registry, transaction,
-  configuration, and error foundations
+  configuration, portable DevicePackage manifest SDK, and error foundations
 - `crates/vds-protocol`: Protobuf contract and length-prefixed framing
 - `crates/vds-device-model`: declarative generic device-model loading and
   command handling, including device-specific state definitions, register
@@ -22,10 +22,13 @@ The Phase 0 and first vertical-slice Cargo workspace members are:
   execution, public runtime orchestration, assertions, and JSON results
 - `crates/vds-events`: typed domain-event envelope and payloads, monotonic event
   IDs, bounded replay ring, filters, and non-blocking broadcast subscriptions
+- `device-models/`: independently movable device packages. Each package owns a
+  `device-package.yaml` manifest plus its model, flows, scenarios, fixtures,
+  documentation, and assets.
+- `schemas/device-package.schema.json`: public, versioned DevicePackage contract
 
-Other architecture-defined directories are reserved for their documented
-phases. They must not gain placeholder implementations or cross-layer
-dependencies merely to fill the tree.
+Directories are added only with working source. Future components stay in the
+roadmap until implementation begins; placeholder directories are not kept.
 
 Company-private protocol implementations, examples, fixtures, and test vectors
 must live in separate private repositories. The public repository exposes only

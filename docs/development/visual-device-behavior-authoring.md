@@ -1,5 +1,10 @@
 # Visual device behavior authoring
 
+The public file-format, node, port, and parameter contract is documented in the
+[Device behavior flow reference](../device-models/device-behavior-flow-reference.md).
+The package-load compilation and runtime execution decision is recorded in
+[ADR 0007](../adr/0007-compile-device-behavior-flows-into-typed-runtime-graphs.md).
+
 Visual Device Behavior Editor v1 is an authoring surface for the existing
 device-model state-machine schema. It does not execute transitions in React and
 does not introduce another register engine, clock, scheduler, or state-machine
@@ -15,8 +20,9 @@ The editor uses one unambiguous edge-centric model:
   event, optional register-equals guard, optional state-entry delay, and
   deterministic priority.
 - Entry and exit register actions belong to state nodes.
-- The remaining conceptual node catalog is registered for extension discovery,
-  but is rejected if placed in an edge-centric v1 behavior graph.
+- Typed logical, timing, and file-I/O nodes form a signal graph connected by
+  `device_behavior.signal` edges. A state-to-signal edge activates its target
+  when that state is entered.
 - Cycles are valid. Generic scenario cycle rejection is not applied.
 
 An edge delay compiles to the source state's existing `delayed_events` entry and
@@ -60,11 +66,13 @@ endpoint is added.
 
 ## Supported and unsupported constructs
 
-Supported behavior is deliberately limited to the current runtime: flat states,
-event transitions, register-equals guards, state-entry delayed events, and
-internal register set actions. Hierarchical or parallel states, history states,
-arbitrary expressions, scripts, runtime JavaScript, operation orchestration,
-and ambiguous mixed node/edge semantics are rejected.
+Supported behavior includes flat states, event transitions, register-equals
+guards, state-entry delayed events, internal register actions, typed boolean
+logic, virtual-clock Timer/Delay/Timeout/Interval nodes, and sandboxed
+File Read/File Write nodes. File reads remain inside the package root; writes
+are restricted to the package `runtime-data/` directory. Hierarchical or
+parallel states, history states, arbitrary expressions, scripts, runtime
+JavaScript, and ambiguous mixed node/edge semantics are rejected.
 
 Resource selectors use REST snapshots. If a device or register disappears, its
 authored identifier remains visible and validation reports the missing
