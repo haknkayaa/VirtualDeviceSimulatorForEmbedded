@@ -1,0 +1,34 @@
+api_version: vds4e.dev/v1alpha1
+kind: DevicePackage
+
+metadata:
+  id: atmel-at24c128
+  display_name: Atmel AT24C128
+  version: 1.0.0
+  description: Datasheet-derived 128-Kbit two-wire serial EEPROM model.
+  license: LicenseRef-Datasheet-Derived
+  authors: [VDS4E Contributors]
+  tags: [atmel, i2c, eeprom, 128kbit, at24c128]
+
+spec:
+  bus:
+    type: i2c
+    profile: i2c.fast-plus
+    options:
+      default_address: 0x50
+      address_pins: [A1, A0]
+      max_frequency_hz: 1000000
+      voltage_min_v: 1.8
+      voltage_max_v: 5.5
+  runtime:
+    driver: at24c-eeprom
+    model: model/device.yaml
+  documentation: docs
+  assets: assets
+  extensions:
+    atmel.com/datasheet:
+      document: doc0670.pdf
+      document_number: 0670T-SEEPR-3/07
+      revision: T
+      published: 2007-03
+      source_part: AT24C128

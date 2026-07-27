@@ -1,0 +1,20 @@
+schema_version: 1
+
+device:
+  id: atmel-at24c256
+  name: Atmel AT24C256 256-Kbit Serial EEPROM
+  bus: i2c
+  model: at24c-eeprom
+  i2c:
+    register_address_bytes: 2
+    auto_increment: true
+    write_cycle_us: 5000
+    write_protect: false
+  commands: []
+  memory:
+    size_bytes: 32768
+    page_size_bytes: 64
+    sector_size_bytes: 64
+    erased_value: 0xFF
+  registers: []
+  faults: []

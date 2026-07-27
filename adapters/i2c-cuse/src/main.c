@@ -71,9 +71,9 @@ static bool valid_id(const char *id) {
     return false;
   }
   for (; *id != '\0'; ++id) {
-    if (!( (*id >= 'a' && *id <= 'z') || (*id >= 'A' && *id <= 'Z') ||
-           (*id >= '0' && *id <= '9') || *id == '-' || *id == '_' ||
-           *id == '.')) {
+    if (!((*id >= 'a' && *id <= 'z') || (*id >= 'A' && *id <= 'Z') ||
+          (*id >= '0' && *id <= '9') || *id == '-' || *id == '_' ||
+          *id == '.')) {
       return false;
     }
   }
@@ -162,7 +162,8 @@ static int ensure_connected(i2c_handle_t *handle) {
   if (handle->connected) {
     return 0;
   }
-  if (vds_client_connect(&handle->client, handle->config->socket_path) != VDS_OK) {
+  if (vds_client_connect(&handle->client, handle->config->socket_path) !=
+      VDS_OK) {
     return ENOTCONN;
   }
   handle->connected = true;
@@ -170,10 +171,15 @@ static int ensure_connected(i2c_handle_t *handle) {
 }
 
 static int status_errno(vds_status_t status, const vds_error_t *error) {
-  if (status == VDS_OK) return 0;
-  if (status == VDS_ERR_SERVER && error != NULL && error->code == 1) return ENXIO;
-  if (status == VDS_ERR_ARGUMENT) return EINVAL;
-  if (status == VDS_ERR_BUFFER_TOO_SMALL) return EMSGSIZE;
+  if (status == VDS_OK)
+    return 0;
+  if (status == VDS_ERR_SERVER && error != NULL &&
+      (error->code == 1 || error->code == 9))
+    return ENXIO; /* Missing targets and EEPROM write-cycle NACKs. */
+  if (status == VDS_ERR_ARGUMENT)
+    return EINVAL;
+  if (status == VDS_ERR_BUFFER_TOO_SMALL)
+    return EMSGSIZE;
   return EIO;
 }
 
@@ -222,7 +228,8 @@ static void i2c_open(fuse_req_t request, struct fuse_file_info *info) {
 static void i2c_release(fuse_req_t request, struct fuse_file_info *info) {
   i2c_handle_t *handle = get_handle(info);
   if (handle != NULL) {
-    if (handle->connected) vds_client_close(&handle->client);
+    if (handle->connected)
+      vds_client_close(&handle->client);
     pthread_mutex_destroy(&handle->mutex);
     free(handle);
   }
@@ -255,8 +262,8 @@ static void handle_rdwr(fuse_req_t request, void *argument,
   }
   const size_t headers_size = data.nmsgs * sizeof(struct i2c_msg);
   if (input_size < sizeof(data) + headers_size) {
-    const struct iovec vectors[2] = {
-        {argument, sizeof(data)}, {data.msgs, headers_size}};
+    const struct iovec vectors[2] = {{argument, sizeof(data)},
+                                     {data.msgs, headers_size}};
     fuse_reply_ioctl_retry(request, vectors, 2U, NULL, 0U);
     return;
   }
@@ -301,7 +308,8 @@ static void handle_rdwr(fuse_req_t request, void *argument,
         .length = headers[index].len,
         .flags = headers[index].flags,
     };
-    if (!read) offset += headers[index].len;
+    if (!read)
+      offset += headers[index].len;
   }
   uint8_t *reads = malloc(required_output == 0U ? 1U : required_output);
   if (reads == NULL) {
@@ -363,17 +371,18 @@ static int smbus_messages(const struct i2c_smbus_ioctl_data *request,
     write[0] = request->command;
     if (read) {
       const size_t length = data->block[0];
-      if (length == 0U || length > I2C_SMBUS_BLOCK_MAX) return EINVAL;
+      if (length == 0U || length > I2C_SMBUS_BLOCK_MAX)
+        return EINVAL;
       messages[0] = (vds_i2c_message_t){.data = write, .length = 1U};
       messages[1] = (vds_i2c_message_t){.read = 1U, .length = length};
       *count = 2U;
       *read_length = length;
     } else {
       const size_t length = data->block[0];
-      if (length > I2C_SMBUS_BLOCK_MAX) return EINVAL;
+      if (length > I2C_SMBUS_BLOCK_MAX)
+        return EINVAL;
       memcpy(write + 1U, data->block + 1U, length);
-      messages[0] =
-          (vds_i2c_message_t){.data = write, .length = length + 1U};
+      messages[0] = (vds_i2c_message_t){.data = write, .length = length + 1U};
     }
     return 0;
   default:
@@ -467,7 +476,8 @@ static void i2c_ioctl(fuse_req_t request, int command, void *argument,
         I2C_FUNC_I2C | I2C_FUNC_SMBUS_QUICK | I2C_FUNC_SMBUS_BYTE |
         I2C_FUNC_SMBUS_BYTE_DATA | I2C_FUNC_SMBUS_WORD_DATA |
         I2C_FUNC_SMBUS_I2C_BLOCK;
-    reply_pointer(request, argument, &functions, sizeof(functions), output_size);
+    reply_pointer(request, argument, &functions, sizeof(functions),
+                  output_size);
     break;
   }
   case I2C_SLAVE:
@@ -505,8 +515,10 @@ static void i2c_ioctl(fuse_req_t request, int command, void *argument,
 
 static void *watch_parent(void *argument) {
   const pid_t pid = *(const pid_t *)argument;
-  while (kill(pid, 0) == 0 || errno == EPERM) sleep(1U);
-  if (errno == ESRCH) kill(getpid(), SIGTERM);
+  while (kill(pid, 0) == 0 || errno == EPERM)
+    sleep(1U);
+  if (errno == ESRCH)
+    kill(getpid(), SIGTERM);
   return NULL;
 }
 
@@ -515,11 +527,27 @@ static void *make_device_accessible(void *argument) {
   char path[sizeof(config->device_name) + sizeof("/dev/")];
   const int written =
       snprintf(path, sizeof(path), "/dev/%s", config->device_name);
-  if (written < 0 || (size_t)written >= sizeof(path)) return NULL;
+  if (written < 0 || (size_t)written >= sizeof(path))
+    return NULL;
+  uid_t owner = getuid();
+  gid_t group = getgid();
+  if (config->parent_pid > 0) {
+    char parent_path[64];
+    const int parent_written = snprintf(parent_path, sizeof(parent_path),
+                                        "/proc/%ld", (long)config->parent_pid);
+    struct stat parent_status;
+    if (parent_written > 0 && (size_t)parent_written < sizeof(parent_path) &&
+        stat(parent_path, &parent_status) == 0) {
+      owner = parent_status.st_uid;
+      group = parent_status.st_gid;
+    }
+  }
 
   for (unsigned int attempt = 0; attempt < 12000U; ++attempt) {
-    if (chmod(path, 0666) == 0) return NULL;
-    if (errno != ENOENT) return NULL;
+    if (chown(path, owner, group) == 0 && chmod(path, 0660) == 0)
+      return NULL;
+    if (errno != ENOENT)
+      return NULL;
     usleep(10000U);
   }
   return NULL;
@@ -533,7 +561,8 @@ int main(int argc, char **argv) {
   memset(&config, 0, sizeof(config));
   const int parsed = parse_arguments(argc, argv, &config);
   if (parsed != 0) {
-    if (parsed < 0) fputs(usage, stderr);
+    if (parsed < 0)
+      fputs(usage, stderr);
     return parsed > 0 ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   if (config.parent_pid > 0) {
@@ -548,7 +577,8 @@ int main(int argc, char **argv) {
     pthread_detach(watcher);
   }
   pthread_t permissions;
-  if (pthread_create(&permissions, NULL, make_device_accessible, &config) != 0) {
+  if (pthread_create(&permissions, NULL, make_device_accessible, &config) !=
+      0) {
     return EXIT_FAILURE;
   }
   pthread_detach(permissions);
