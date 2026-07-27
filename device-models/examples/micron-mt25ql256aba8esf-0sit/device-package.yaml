@@ -1,0 +1,38 @@
+api_version: vds4e.dev/v1alpha1
+kind: DevicePackage
+
+metadata:
+  id: micron-mt25ql256aba8esf-0sit
+  display_name: Micron MT25QL256ABA8ESF-0SIT
+  version: 0.1.0
+  description: Datasheet-derived MT25QL256ABA SPI NOR simulation profile.
+  license: LicenseRef-Datasheet-Derived
+  authors: [VDS4E Contributors]
+  tags: [micron, spi, nor-flash, 256mbit, mt25ql]
+
+spec:
+  bus:
+    type: spi
+    profile: spi.mode0
+    options:
+      mode: 0
+      transfer_bits: 8
+      max_frequency_hz: 133000000
+      voltage_min_v: 2.7
+      voltage_max_v: 3.6
+  runtime:
+    driver: generic-spi-command
+    model: model/device.yaml
+  authoring:
+    behavior_flow: flows/behavior.yaml
+  validation:
+    scenarios: scenarios
+    fixtures: fixtures
+  documentation: docs
+  assets: assets
+  extensions:
+    micron.com/datasheet:
+      document: mt25q_qljs_l_256_aba_xxt.pdf
+      revision: L
+      published: 2024-03
+      source_part: MT25QL256ABA8ESF-0SIT

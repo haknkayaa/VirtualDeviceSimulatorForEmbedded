@@ -1,0 +1,263 @@
+# Datasheet-derived runtime subset for MT25QL256ABA8ESF-0SIT.
+schema_version: 1
+
+device:
+  id: micron-mt25ql256aba8esf-0sit
+  name: Micron MT25QL256ABA8ESF-0SIT
+  bus: spi
+  model: generic-spi-command
+  spi:
+    mode: 0
+    transfer_bits: 8
+    max_frequency_hz: 133000000
+    supports_dtr: true
+
+  memory:
+    size_bytes: 33554432
+    page_size_bytes: 256
+    sector_size_bytes: 4096
+    erased_value: 0xFF
+
+  commands:
+    - { name: READ_ID, opcode: 0x9F, response: [0x20, 0xBA, 0x19], allowed_states: [resetting, ready, write_enabled] }
+    - { name: READ_STATUS_REGISTER, opcode: 0x05, operation: register_read, register: STATUS_REGISTER, allowed_states: [resetting, ready, write_enabled, programming, erasing] }
+    - { name: READ_FLAG_STATUS_REGISTER, opcode: 0x70, operation: register_read, register: FLAG_STATUS_REGISTER, allowed_states: [resetting, ready, write_enabled, programming, erasing] }
+    - { name: WRITE_ENABLE, opcode: 0x06, response: [], event: write_enable, allowed_states: [ready] }
+    - { name: WRITE_DISABLE, opcode: 0x04, response: [], event: write_disable, allowed_states: [write_enabled] }
+    - { name: READ_4_BYTE, opcode: 0x13, operation: memory_read, address_bytes: 4, wire: { command_width: single, address_width: single, data_width: single, rate: str, dummy_cycles: 0 }, allowed_states: [ready, write_enabled] }
+    - { name: FAST_READ_4_BYTE, opcode: 0x0C, operation: memory_read, address_bytes: 4, wire: { command_width: single, address_width: single, data_width: single, rate: str, dummy_cycles: 8 }, allowed_states: [ready, write_enabled] }
+    - { name: DUAL_OUTPUT_FAST_READ_4_BYTE, opcode: 0x3C, operation: memory_read, address_bytes: 4, wire: { command_width: single, address_width: single, data_width: dual, rate: str, dummy_cycles: 8 }, allowed_states: [ready, write_enabled] }
+    - { name: DUAL_IO_FAST_READ_4_BYTE, opcode: 0xBC, operation: memory_read, address_bytes: 4, wire: { command_width: single, address_width: dual, data_width: dual, rate: str, dummy_cycles: 8 }, allowed_states: [ready, write_enabled] }
+    - { name: QUAD_OUTPUT_FAST_READ_4_BYTE, opcode: 0x6C, operation: memory_read, address_bytes: 4, wire: { command_width: single, address_width: single, data_width: quad, rate: str, dummy_cycles: 10 }, allowed_states: [ready, write_enabled] }
+    - { name: QUAD_IO_FAST_READ_4_BYTE, opcode: 0xEC, operation: memory_read, address_bytes: 4, wire: { command_width: single, address_width: quad, data_width: quad, rate: str, dummy_cycles: 10 }, allowed_states: [ready, write_enabled] }
+    - { name: DTR_FAST_READ_4_BYTE, opcode: 0x0E, operation: memory_read, address_bytes: 4, wire: { command_width: single, address_width: single, data_width: single, rate: dtr, dummy_cycles: 6 }, allowed_states: [ready, write_enabled] }
+    - { name: DTR_DUAL_IO_FAST_READ_4_BYTE, opcode: 0xBE, operation: memory_read, address_bytes: 4, wire: { command_width: single, address_width: dual, data_width: dual, rate: dtr, dummy_cycles: 6 }, allowed_states: [ready, write_enabled] }
+    - { name: DTR_QUAD_IO_FAST_READ_4_BYTE, opcode: 0xEE, operation: memory_read, address_bytes: 4, wire: { command_width: single, address_width: quad, data_width: quad, rate: dtr, dummy_cycles: 8 }, allowed_states: [ready, write_enabled] }
+    - name: PAGE_PROGRAM_4_BYTE
+      opcode: 0x12
+      operation: page_program
+      address_bytes: 4
+      event: page_program
+      allowed_states: [write_enabled]
+      timing: { latency_us: 120, busy_during_operation: true }
+    - name: SUBSECTOR_ERASE_4KB_4_BYTE
+      opcode: 0x21
+      operation: sector_erase
+      address_bytes: 4
+      event: subsector_erase
+      allowed_states: [write_enabled]
+      timing: { latency_us: 50000, busy_during_operation: true }
+    - name: BULK_ERASE
+      opcode: 0xC7
+      operation: chip_erase
+      event: bulk_erase
+      allowed_states: [write_enabled]
+      timing: { latency_us: 77000000, busy_during_operation: true }
+    - { name: ENTER_DEEP_POWER_DOWN, opcode: 0xB9, response: [], event: deep_power_down, allowed_states: [ready] }
+    - { name: RELEASE_FROM_DEEP_POWER_DOWN, opcode: 0xAB, response: [], event: release_power_down, event_delay_us: 30, allowed_states: [deep_power_down] }
+    - { name: RESET_ENABLE, opcode: 0x66, response: [], allowed_states: [resetting, ready, write_enabled, programming, erasing, deep_power_down, error] }
+    - { name: RESET_MEMORY, opcode: 0x99, response: [], event: reset, allowed_states: [resetting, ready, write_enabled, programming, erasing, deep_power_down, error] }
+
+  busy: { register_address: 0x00, mask: 0x01 }
+
+  registers:
+    - name: STATUS_REGISTER
+      address: 0x00
+      width_bits: 8
+      reset_value: 0x00
+      access: rw
+      description: Nonvolatile protection controls plus volatile write-enable and write-in-progress status.
+      bitfields:
+        - { name: SRWD, lsb: 7, width: 1, access: rw, description: "Status-register write disable: 0 = enabled, 1 = disabled with W# LOW." }
+        - { name: BP3, lsb: 6, width: 1, access: rw, description: Most-significant block-protect bit. }
+        - { name: TB, lsb: 5, width: 1, access: rw, description: "Protected-area origin: 0 = top, 1 = bottom." }
+        - { name: BP2_BP0, lsb: 2, width: 3, access: rw, description: Block-protect field selecting the protected 64KB-sector range. }
+        - { name: WEL, lsb: 1, width: 1, access: ro, description: "Write-enable latch: 0 = clear, 1 = set." }
+        - { name: WIP, lsb: 0, width: 1, access: ro, description: "Write in progress: 0 = ready, 1 = busy." }
+    - name: FLAG_STATUS_REGISTER
+      address: 0x01
+      width_bits: 8
+      reset_value: 0x80
+      access: ro
+      description: Volatile program/erase readiness, suspend, error, protection and address-mode flags.
+      bitfields:
+        - { name: P_E_CONTROLLER, lsb: 7, width: 1, access: ro, description: "Program/erase controller: 0 = busy, 1 = ready." }
+        - { name: ERASE_SUSPEND, lsb: 6, width: 1, access: ro, description: "Erase suspend status: 0 = clear, 1 = suspended." }
+        - { name: ERASE_ERROR, lsb: 5, width: 1, access: ro, description: Erase failure or protection error; cleared by Clear Flag Status Register. }
+        - { name: PROGRAM_ERROR, lsb: 4, width: 1, access: ro, description: Program or CRC failure/protection error; cleared by Clear Flag Status Register. }
+        - { name: RESERVED, lsb: 3, width: 1, access: ro, description: Reserved; reads 0. }
+        - { name: PROGRAM_SUSPEND, lsb: 2, width: 1, access: ro, description: "Program suspend status: 0 = clear, 1 = suspended." }
+        - { name: PROTECTION_ERROR, lsb: 1, width: 1, access: ro, description: Protected-array or locked-OTP access failure. }
+        - { name: ADDRESSING, lsb: 0, width: 1, access: ro, description: "Address mode: 0 = 3-byte, 1 = 4-byte." }
+    - name: EXTENDED_ADDRESS_REGISTER
+      address: 0x02
+      width_bits: 8
+      reset_value: 0x00
+      access: rw
+      description: Selects one of two 128Mb array segments while using 3-byte addressing.
+      bitfields:
+        - { name: RESERVED, lsb: 1, width: 7, access: ro, description: Reserved A31:A25 bits; read as zero. }
+        - { name: A24, lsb: 0, width: 1, access: rw, description: "Segment select: 0 = lowest 128Mb, 1 = highest 128Mb." }
+    - name: NONVOLATILE_CONFIGURATION_REGISTER
+      address: 0x03
+      width_bits: 16
+      reset_value: 0xFFFF
+      access: rw
+      description: Power-on configuration downloaded into the internal configuration register after reset.
+      bitfields:
+        - { name: DUMMY_CLOCK_CYCLES, lsb: 12, width: 4, access: rw, description: "Fast-read dummy cycles; 0xF selects the command default." }
+        - { name: XIP_MODE_AT_POWER_ON, lsb: 9, width: 3, access: rw, description: "Power-on XIP protocol selection; 0b111 disables XIP." }
+        - { name: OUTPUT_DRIVER_STRENGTH, lsb: 6, width: 3, access: rw, description: "Output impedance selection; 001=90Ω, 011=45Ω, 101=20Ω, 111=30Ω." }
+        - { name: DTR_PROTOCOL, lsb: 5, width: 1, access: rw, description: "0 = DTR enabled, 1 = STR/default." }
+        - { name: HOLD_ENABLE, lsb: 4, width: 1, access: rw, description: "HOLD# on DQ3: 0 = disabled, 1 = enabled." }
+        - { name: QUAD_IO_PROTOCOL, lsb: 3, width: 1, access: rw, description: "4-4-4 protocol: 0 = enabled, 1 = disabled." }
+        - { name: DUAL_IO_PROTOCOL, lsb: 2, width: 1, access: rw, description: "2-2-2 protocol: 0 = enabled, 1 = disabled." }
+        - { name: SEGMENT_SELECT, lsb: 1, width: 1, access: rw, description: "Power-on 128Mb segment: 0 = highest, 1 = lowest." }
+        - { name: ADDRESS_BYTES, lsb: 0, width: 1, access: rw, description: "0 = 4-byte addressing, 1 = 3-byte addressing." }
+    - name: VOLATILE_CONFIGURATION_REGISTER
+      address: 0x04
+      width_bits: 8
+      reset_value: 0xFB
+      access: rw
+      description: Runtime dummy-cycle, XIP and burst-wrap configuration.
+      bitfields:
+        - { name: DUMMY_CLOCK_CYCLES, lsb: 4, width: 4, access: rw, description: "Fast-read dummy cycles; 0xF selects the command default." }
+        - { name: XIP_ENABLE, lsb: 3, width: 1, access: rw, description: "0 = XIP enabled, 1 = disabled." }
+        - { name: RESERVED, lsb: 2, width: 1, access: ro, description: Reserved fixed-zero bit. }
+        - { name: WRAP, lsb: 0, width: 2, access: rw, description: "Read wrap: 00=16B, 01=32B, 10=64B, 11=continuous." }
+    - name: ENHANCED_VOLATILE_CONFIGURATION_REGISTER
+      address: 0x05
+      width_bits: 8
+      reset_value: 0xFF
+      access: rw
+      description: Runtime protocol, DTR, HOLD# and output-driver configuration.
+      bitfields:
+        - { name: QUAD_IO_PROTOCOL, lsb: 7, width: 1, access: rw, description: "4-4-4 protocol: 0 = enabled, 1 = disabled." }
+        - { name: DUAL_IO_PROTOCOL, lsb: 6, width: 1, access: rw, description: "2-2-2 protocol: 0 = enabled, 1 = disabled." }
+        - { name: DTR_PROTOCOL, lsb: 5, width: 1, access: rw, description: "0 = DTR enabled, 1 = STR/default." }
+        - { name: HOLD_ENABLE, lsb: 4, width: 1, access: rw, description: "HOLD# on DQ3: 0 = disabled, 1 = enabled." }
+        - { name: RESERVED, lsb: 3, width: 1, access: ro, description: Reserved fixed-one bit. }
+        - { name: OUTPUT_DRIVER_STRENGTH, lsb: 0, width: 3, access: rw, description: "Output impedance selection; 001=90Ω, 011=45Ω, 101=20Ω, 111=30Ω." }
+    - name: SECTOR_PROTECTION_REGISTER
+      address: 0x06
+      width_bits: 16
+      reset_value: 0xFFFF
+      access: rw
+      description: Advanced sector-protection OTP controls.
+      bitfields:
+        - { name: RESERVED_HIGH, lsb: 3, width: 13, access: ro, description: Reserved bits; default one. }
+        - { name: PASSWORD_PROTECTION_LOCK, lsb: 2, width: 1, access: rw, description: "OTP: 1 = password protection disabled, 0 = permanently enabled." }
+        - { name: SECTOR_PROTECTION_LOCK, lsb: 1, width: 1, access: rw, description: "OTP selector for sector protection with or without password protection." }
+        - { name: RESERVED_LOW, lsb: 0, width: 1, access: ro, description: Reserved bit; default one. }
+    - name: GLOBAL_FREEZE_BIT_REGISTER
+      address: 0x07
+      width_bits: 8
+      reset_value: 0x01
+      access: rw
+      description: Volatile global control protecting all nonvolatile sector lock bits.
+      bitfields:
+        - { name: RESERVED, lsb: 1, width: 7, access: ro, description: Reserved bits; read zero. }
+        - { name: GLOBAL_FREEZE, lsb: 0, width: 1, access: rw, description: "1 = lock-bit updates allowed, 0 = nonvolatile lock bits frozen." }
+    - name: VOLATILE_LOCK_REGISTER_SELECTED_SECTOR
+      address: 0x08
+      width_bits: 8
+      reset_value: 0x00
+      access: rw
+      description: Address-qualified volatile lock register for the selected sector or edge subsector.
+      bitfields:
+        - { name: RESERVED, lsb: 2, width: 6, access: ro, description: Reserved bits; read zero. }
+        - { name: SECTOR_LOCK_DOWN, lsb: 1, width: 1, access: rw, description: "1 = lock bits cannot change until reset or power cycle." }
+        - { name: SECTOR_WRITE_LOCK, lsb: 0, width: 1, access: rw, description: "1 = program and erase disabled for the addressed sector." }
+    - name: NONVOLATILE_LOCK_BIT_SELECTED_SECTOR
+      address: 0x09
+      width_bits: 1
+      reset_value: 0x01
+      access: rw
+      description: Address-qualified nonvolatile sector lock bit; one instance exists per 64KB sector.
+      bitfields:
+        - { name: NONVOLATILE_LOCK, lsb: 0, width: 1, access: rw, description: "1 = unlocked, 0 = program/erase protected." }
+    - name: PASSWORD_REGISTER
+      address: 0x0A
+      width_bits: 64
+      reset_value: 0x0000000000000000
+      access: wo
+      description: 64-bit advanced-sector-protection password; write and unlock semantics are one-way after password protection is enabled.
+      bitfields:
+        - { name: PASSWORD, lsb: 0, width: 64, access: wo, description: User-programmed 64-bit password value. }
+    - name: GENERAL_PURPOSE_READ_REGISTER
+      address: 0x0B
+      width_bits: 8
+      reset_value: 0x00
+      access: ro
+      description: General-purpose/tuning read register returned by command 0x96 after eight dummy cycles.
+      bitfields:
+        - { name: DATA, lsb: 0, width: 8, access: ro, description: Device-provided general-purpose read data. }
+
+  state_machine:
+    initial_state: resetting
+    states:
+      powered_off:
+        transitions:
+          - { event: power_on, target: resetting }
+      resetting:
+        entry_actions:
+          - { set_register: { name: STATUS_REGISTER, value: 0x01, mask: 0x03 } }
+          - { set_register: { name: FLAG_STATUS_REGISTER, value: 0x00, mask: 0x80 } }
+        transitions:
+          - { event: reset_complete, target: ready }
+          - { event: reset, target: resetting }
+        delayed_events:
+          # Runtime timing resolution is microseconds; datasheet tSHSL3 is 40ns.
+          - { event: reset_complete, delay_us: 1 }
+      ready:
+        entry_actions:
+          - { set_register: { name: STATUS_REGISTER, value: 0x00, mask: 0x03 } }
+          - { set_register: { name: FLAG_STATUS_REGISTER, value: 0x80, mask: 0x80 } }
+        transitions:
+          - { event: write_enable, target: write_enabled }
+          - { event: deep_power_down, target: deep_power_down }
+          - { event: reset, target: resetting }
+      write_enabled:
+        entry_actions:
+          - { set_register: { name: STATUS_REGISTER, value: 0x02, mask: 0x03 } }
+          - { set_register: { name: FLAG_STATUS_REGISTER, value: 0x80, mask: 0x80 } }
+        exit_actions:
+          - { set_register: { name: STATUS_REGISTER, value: 0x00, mask: 0x02 } }
+        transitions:
+          - { event: write_disable, target: ready }
+          - { event: page_program, target: programming }
+          - { event: subsector_erase, target: erasing }
+          - { event: bulk_erase, target: erasing }
+          - { event: reset, target: resetting }
+      programming:
+        entry_actions:
+          - { set_register: { name: STATUS_REGISTER, value: 0x01, mask: 0x03 } }
+          - { set_register: { name: FLAG_STATUS_REGISTER, value: 0x00, mask: 0x80 } }
+        transitions:
+          - { event: operation_completed, target: ready }
+          - { event: reset, target: resetting }
+      erasing:
+        entry_actions:
+          - { set_register: { name: STATUS_REGISTER, value: 0x01, mask: 0x03 } }
+          - { set_register: { name: FLAG_STATUS_REGISTER, value: 0x00, mask: 0x80 } }
+        transitions:
+          - { event: operation_completed, target: ready }
+          - { event: reset, target: resetting }
+      deep_power_down:
+        entry_actions:
+          - { set_register: { name: STATUS_REGISTER, value: 0x00, mask: 0x03 } }
+        transitions:
+          - { event: release_power_down, target: ready }
+          - { event: reset, target: resetting }
+      error:
+        entry_actions:
+          - { set_register: { name: STATUS_REGISTER, value: 0x01, mask: 0x01 } }
+        transitions:
+          - { event: reset, target: resetting }
+
+  faults:
+    - { id: mt25ql_page_program_timeout, enabled: false, priority: 100, target: { command: PAGE_PROGRAM_4_BYTE }, trigger: always, action: { type: timeout, duration_ms: 2 } }
+    - { id: mt25ql_subsector_erase_timeout, enabled: false, priority: 100, target: { command: SUBSECTOR_ERASE_4KB_4_BYTE }, trigger: always, action: { type: timeout, duration_ms: 400 } }
+    - { id: mt25ql_status_wip_stuck, enabled: false, persistent: true, target: { command: READ_STATUS_REGISTER, register: STATUS_REGISTER }, trigger: always, action: { type: stuck_at, value: 0x01, mask: 0x01 } }
+    - { id: mt25ql_read_corruption, enabled: false, target: { command: READ_4_BYTE }, trigger: always, action: { type: corrupt_response, xor_mask: 0x01 } }
+    - { id: mt25ql_power_loss_during_program, enabled: false, priority: 90, target: { command: PAGE_PROGRAM_4_BYTE }, trigger: always, action: { type: return_error, code: power_loss, message: simulated power loss before MT25QL page commit } }
