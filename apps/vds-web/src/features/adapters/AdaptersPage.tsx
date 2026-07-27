@@ -192,7 +192,7 @@ function AdapterCard({ adapter, availableDevices, attachDraft, busy, onAttach, o
           <CircleAlert aria-hidden="true" size={16} />
           <span>{adapter.readiness === 'authorization_required'
             ? 'CUSE needs operating-system authorization.'
-            : 'Build the SPI CUSE adapter before loading.'}</span>
+            : 'SPI CUSE driver is unavailable.'}</span>
         </div>
       )}
 

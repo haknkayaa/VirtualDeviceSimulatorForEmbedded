@@ -146,10 +146,21 @@ struct ManagedChild {
 impl SystemCuseDriver {
     #[must_use]
     pub fn from_config(config: &ServerConfig) -> Self {
-        let executable = std::env::var_os("VDS4E_SPI_CUSE_EXECUTABLE").map_or_else(
-            || PathBuf::from("build/spi-cuse/vds4e-spi-cuse"),
-            PathBuf::from,
-        );
+        let executable = std::env::var_os("VDS4E_SPI_CUSE_EXECUTABLE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                [
+                    PathBuf::from(".vds4e-build/spi-cuse/vds4e-spi-cuse"),
+                    PathBuf::from("build/spi-cuse/vds4e-spi-cuse"),
+                    PathBuf::from("/usr/local/bin/vds4e-spi-cuse"),
+                    PathBuf::from("/usr/bin/vds4e-spi-cuse"),
+                ]
+                .into_iter()
+                .find(|candidate| candidate.is_file())
+                .unwrap_or_else(|| {
+                    PathBuf::from(".vds4e-build/spi-cuse/vds4e-spi-cuse")
+                })
+            });
         Self {
             executable,
             socket_path: config.data_plane.unix_socket.clone(),
