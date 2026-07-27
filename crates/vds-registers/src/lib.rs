@@ -4,6 +4,6 @@ mod definition;
 mod engine;
 mod error;
 
-pub use definition::{AccessType, RegisterDefinition};
+pub use definition::{AccessType, BitFieldDefinition, RegisterDefinition};
 pub use engine::{RegisterEngine, RegisterMetadata, RegisterRead, RegisterWrite};
 pub use error::RegisterError;

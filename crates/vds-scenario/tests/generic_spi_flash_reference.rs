@@ -4,7 +4,8 @@ use vds_core::{clock::ManualClock, registry::DeviceRegistry};
 use vds_device_model::DeviceModel;
 use vds_scenario::{RegistryRuntime, ResultStatus, ScenarioDocument, ScenarioExecutor};
 
-const MODEL: &str = include_str!("../../../device-models/examples/generic-spi-flash/model.yaml");
+const MODEL: &str =
+    include_str!("../../../device-models/examples/generic-spi-flash/model/device.yaml");
 
 fn executor() -> ScenarioExecutor<RegistryRuntime> {
     let clock = Arc::new(ManualClock::default());

@@ -1,0 +1,14 @@
+api_version: vds4e.dev/v1alpha1
+kind: DevicePackage
+
+metadata:
+  id: spi-flash-0
+  display_name: SPI Flash Integration Test
+  version: 1.0.0
+
+spec:
+  bus:
+    type: spi
+  runtime:
+    driver: generic-spi-command
+    model: model/device.yaml

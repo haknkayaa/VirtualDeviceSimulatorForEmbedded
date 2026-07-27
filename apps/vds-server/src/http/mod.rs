@@ -1,7 +1,34 @@
+mod adapters;
+mod host_telemetry;
 mod runs;
 mod telemetry;
 
-use std::{collections::HashMap, fs, sync::Arc};
+mod packages;
+use packages::{device_packages, import_device_package};
+mod adapter_routes;
+use adapter_routes::{
+    adapters, attach_adapter_device, create_adapter, detach_adapter_device, load_adapter,
+    unload_adapter,
+};
+mod devices;
+use devices::{
+    create_device, device, device_commands, device_flow, device_state, device_templates, devices,
+    execute_device_command, registers, reset_device, write_register,
+};
+mod scenarios;
+use scenarios::{run, run_result, run_result_junit, run_scenario, scenario, scenarios};
+mod faults;
+use faults::{disable_fault, enable_fault, faults};
+mod events;
+use events::events;
+
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Component, PathBuf},
+    sync::{Arc, RwLock},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use axum::{
     Json, Router,
@@ -11,19 +38,25 @@ use axum::{
     },
     http::{StatusCode, header},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{delete, get, post},
 };
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use serde::{Deserialize, Serialize};
 use vds_core::{
     clock::SimulatorClock,
     config::ServerConfig,
-    device::Device,
+    device::{Device, SpiLaneWidth, SpiTransferRate, SpiWireConfig},
+    device_package::{DevicePackage, install_device_package, installed_device_packages},
     registry::{DeviceRegistry, DeviceSnapshot},
 };
 use vds_device_model::DeviceModel;
 use vds_events::{EventBus, EventDraft, EventPayload};
 use vds_scenario::{JUnitReportMetadata, ScenarioDocument, ScenarioResult, to_junit_xml};
 
+pub use adapters::{
+    AdapterBinding, AdapterDriver, AdapterError, AdapterManager, AdapterSnapshot, AdapterState,
+    DriverReadiness,
+};
 pub use runs::{RunManager, RunRecord, RunStatus};
 
 #[derive(Clone)]
@@ -32,9 +65,13 @@ pub struct ApiState {
     pub events: Arc<EventBus>,
     pub scenarios: Arc<HashMap<String, ScenarioDocument>>,
     pub runs: Arc<RunManager>,
+    pub adapters: Arc<AdapterManager>,
     pub config: ServerConfig,
     device_templates: Arc<HashMap<String, DeviceModel>>,
+    device_flows: Arc<HashMap<String, serde_json::Value>>,
+    device_template_instances: Arc<RwLock<HashMap<String, String>>>,
     clock: Arc<dyn SimulatorClock>,
+    host_telemetry: Arc<std::sync::Mutex<host_telemetry::HostTelemetrySampler>>,
 }
 
 impl ApiState {
@@ -49,8 +86,11 @@ impl ApiState {
         clock: Arc<dyn SimulatorClock>,
     ) -> Result<Self, String> {
         let mut scenarios = HashMap::new();
-        for path in &config.scenarios {
-            let yaml = fs::read_to_string(path).map_err(|error| {
+        for path in config
+            .resolved_scenarios()
+            .map_err(|error| error.to_string())?
+        {
+            let yaml = fs::read_to_string(&path).map_err(|error| {
                 format!("failed to read scenario '{}': {error}", path.display())
             })?;
             let scenario = ScenarioDocument::from_yaml(&yaml)
@@ -61,25 +101,53 @@ impl ApiState {
             }
         }
         let mut device_templates = HashMap::new();
-        for path in &config.device_models {
-            let model = DeviceModel::load(path)
-                .map_err(|error| format!("invalid device model '{}': {error}", path.display()))?;
+        let mut device_template_instances = HashMap::new();
+        let mut device_flows = HashMap::new();
+        for package in config
+            .resolved_device_packages()
+            .map_err(|error| error.to_string())?
+        {
+            let model_path = package.model_path();
+            let model = crate::load_package_runtime_model(&package).map_err(|error| {
+                format!(
+                    "invalid device package runtime '{}': {error}",
+                    model_path.display()
+                )
+            })?;
+            crate::validate_device_package_model(&package, &model)?;
             let template_id = model.device.id.clone();
-            if device_templates
-                .insert(template_id.clone(), model)
-                .is_some()
-            {
-                return Err(format!("duplicate device template id '{template_id}'"));
-            }
+            device_templates
+                .entry(template_id.clone())
+                .or_insert_with(|| model.clone());
+            device_template_instances
+                .entry(template_id.clone())
+                .or_insert(template_id);
+            let Some(flow_path) = package.behavior_flow_path() else {
+                continue;
+            };
+            let yaml = fs::read_to_string(&flow_path).map_err(|error| {
+                format!("failed to read flow '{}': {error}", flow_path.display())
+            })?;
+            let yaml_value: serde_yaml::Value = serde_yaml::from_str(&yaml)
+                .map_err(|error| format!("invalid flow '{}': {error}", flow_path.display()))?;
+            let flow = serde_json::to_value(yaml_value)
+                .map_err(|error| format!("invalid flow '{}': {error}", flow_path.display()))?;
+            device_flows.insert(model.device.id, flow);
         }
         Ok(Self {
             registry,
             events,
             scenarios: Arc::new(scenarios),
             runs: Arc::new(RunManager::default()),
+            adapters: Arc::new(AdapterManager::system(&config)),
             config,
             device_templates: Arc::new(device_templates),
+            device_flows: Arc::new(device_flows),
+            device_template_instances: Arc::new(RwLock::new(device_template_instances)),
             clock,
+            host_telemetry: Arc::new(std::sync::Mutex::new(
+                host_telemetry::HostTelemetrySampler::new(),
+            )),
         })
     }
 }
@@ -87,10 +155,37 @@ impl ApiState {
 pub fn router(state: ApiState) -> Router {
     Router::new()
         .route("/api/v1/health", get(health))
+        .route("/api/v1/clock", get(clock))
         .route("/api/v1/devices", get(devices).post(create_device))
         .route("/api/v1/device-models", get(device_templates))
+        .route("/api/v1/device-packages", get(device_packages))
+        .route(
+            "/api/v1/device-packages/import",
+            post(import_device_package),
+        )
+        .route("/api/v1/adapters", get(adapters).post(create_adapter))
+        .route("/api/v1/adapters/{id}/load", post(load_adapter))
+        .route("/api/v1/adapters/{id}/unload", post(unload_adapter))
+        .route(
+            "/api/v1/adapters/{id}/bindings",
+            post(attach_adapter_device),
+        )
+        .route(
+            "/api/v1/adapters/{id}/bindings/{device_id}",
+            delete(detach_adapter_device),
+        )
         .route("/api/v1/devices/{id}", get(device))
+        .route("/api/v1/devices/{id}/commands", get(device_commands))
+        .route(
+            "/api/v1/devices/{id}/commands/execute",
+            post(execute_device_command),
+        )
+        .route("/api/v1/devices/{id}/flow", get(device_flow))
         .route("/api/v1/devices/{id}/registers", get(registers))
+        .route(
+            "/api/v1/devices/{id}/registers/{address}",
+            post(write_register),
+        )
         .route("/api/v1/devices/{id}/state", get(device_state))
         .route("/api/v1/devices/{id}/reset", post(reset_device))
         .route("/api/v1/scenarios", get(scenarios))
@@ -110,481 +205,29 @@ pub fn router(state: ApiState) -> Router {
 #[derive(Serialize)]
 struct Health {
     status: &'static str,
+    system: host_telemetry::SystemMetrics,
 }
-async fn health() -> Json<Health> {
-    Json(Health { status: "ok" })
-}
-
-#[derive(Serialize)]
-struct DeviceDto {
-    id: String,
-    bus: String,
-    state: Option<String>,
-}
-
-#[derive(Serialize)]
-struct DeviceTemplateDto {
-    id: String,
-    name: String,
-    bus: String,
-    model: String,
-}
-
-async fn device_templates(State(state): State<ApiState>) -> Json<Vec<DeviceTemplateDto>> {
-    let mut templates = state
-        .device_templates
-        .iter()
-        .map(|(id, template)| DeviceTemplateDto {
-            id: id.clone(),
-            name: template.device.name.clone(),
-            bus: template.device.bus.clone(),
-            model: template.device.model.clone(),
-        })
-        .collect::<Vec<_>>();
-    templates.sort_by(|left, right| left.id.cmp(&right.id));
-    Json(templates)
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct CreateDeviceRequest {
-    template_id: String,
-    device_id: String,
-}
-
-async fn create_device(
-    State(state): State<ApiState>,
-    Json(request): Json<CreateDeviceRequest>,
-) -> ApiResult<(StatusCode, Json<DeviceDto>)> {
-    if !valid_device_id(&request.device_id) {
-        return Err(ApiError::bad_request(
-            "invalid_device_id",
-            "device_id must be 1-64 ASCII letters, numbers, '.', '_' or '-', and start with a letter or number".to_owned(),
-        ));
-    }
-    if state
-        .registry
-        .snapshots()
-        .map_err(ApiError::device)?
-        .iter()
-        .any(|device| device.id == request.device_id)
-    {
-        return Err(ApiError::conflict(
-            "device_id_conflict",
-            format!("device '{}' already exists", request.device_id),
-        ));
-    }
-    let mut model = state
-        .device_templates
-        .get(&request.template_id)
-        .cloned()
-        .ok_or_else(|| {
-            ApiError::not_found(
-                "device_template_not_found",
-                format!("device template '{}' was not found", request.template_id),
-            )
-        })?;
-    model.device.id.clone_from(&request.device_id);
-    let device = model
-        .into_spi_device_with_clock(Arc::clone(&state.clock))
-        .map_err(|error| {
-            ApiError::bad_request(
-                "device_instance_create_failed",
-                format!("device instance could not be created: {error}"),
-            )
-        })?;
-    let snapshot = DeviceDto {
-        id: device.id().to_owned(),
-        bus: device.bus_type().to_string(),
-        state: device.current_state().map_err(ApiError::device)?,
-    };
-    state.registry.register(Arc::new(device)).map_err(|error| {
-        if error.to_string().contains("duplicate device id") {
-            ApiError::conflict("device_id_conflict", error.to_string())
-        } else {
-            ApiError::device(error)
-        }
-    })?;
-    Ok((StatusCode::CREATED, Json(snapshot)))
-}
-
-fn valid_device_id(value: &str) -> bool {
-    let mut characters = value.chars();
-    let Some(first) = characters.next() else {
-        return false;
-    };
-    value.len() <= 64
-        && first.is_ascii_alphanumeric()
-        && characters.all(|character| {
-            character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
-        })
-}
-
-impl From<DeviceSnapshot> for DeviceDto {
-    fn from(value: DeviceSnapshot) -> Self {
-        Self {
-            id: value.id,
-            bus: value.bus,
-            state: value.state,
-        }
-    }
-}
-
-async fn devices(State(state): State<ApiState>) -> ApiResult<Json<Vec<DeviceDto>>> {
-    Ok(Json(
-        state
-            .registry
-            .snapshots()
-            .map_err(ApiError::device)?
-            .into_iter()
-            .map(Into::into)
-            .collect(),
-    ))
-}
-
-async fn device(
-    State(state): State<ApiState>,
-    Path(id): Path<String>,
-) -> ApiResult<Json<DeviceDto>> {
-    let found = state
-        .registry
-        .snapshots()
-        .map_err(ApiError::device)?
-        .into_iter()
-        .find(|device| device.id == id)
-        .ok_or_else(|| {
-            ApiError::not_found("device_not_found", format!("device '{id}' was not found"))
-        })?;
-    Ok(Json(found.into()))
-}
-
-#[derive(Serialize)]
-struct RegisterDto {
-    name: String,
-    address: u64,
-    width_bits: u8,
-    access: String,
-    value: u64,
-}
-async fn registers(
-    State(state): State<ApiState>,
-    Path(id): Path<String>,
-) -> ApiResult<Json<Vec<RegisterDto>>> {
-    Ok(Json(
-        state
-            .registry
-            .registers(&id)
-            .map_err(ApiError::device)?
-            .into_iter()
-            .map(|register| RegisterDto {
-                name: register.name,
-                address: register.address,
-                width_bits: register.width_bits,
-                access: register.access.to_string(),
-                value: register.value,
-            })
-            .collect(),
-    ))
-}
-
-#[derive(Serialize)]
-struct StateDto {
-    device_id: String,
-    state: Option<String>,
-}
-async fn device_state(
-    State(state): State<ApiState>,
-    Path(id): Path<String>,
-) -> ApiResult<Json<StateDto>> {
-    let current = state
-        .registry
-        .current_state(&id)
-        .map_err(ApiError::device)?;
-    Ok(Json(StateDto {
-        device_id: id,
-        state: current,
-    }))
-}
-
-async fn reset_device(
-    State(state): State<ApiState>,
-    Path(id): Path<String>,
-) -> ApiResult<Json<StateDto>> {
-    let events = state.registry.reset(&id).map_err(ApiError::device)?;
-    let now = state
-        .registry
-        .virtual_time_ns(&id)
-        .map_err(ApiError::device)?;
-    let _ = state.events.publish(EventDraft {
-        virtual_time_ns: now,
-        device_id: Some(id.clone()),
-        scenario_run_id: None,
-        payload: EventPayload::DeviceReset {
-            result: "success".to_owned(),
-        },
-    });
-    for event in events {
-        let _ = state.events.publish(EventDraft {
-            virtual_time_ns: now,
-            device_id: Some(id.clone()),
-            scenario_run_id: None,
-            payload: EventPayload::from_device_event(&event),
-        });
-    }
-    let current = state
-        .registry
-        .current_state(&id)
-        .map_err(ApiError::device)?;
-    Ok(Json(StateDto {
-        device_id: id,
-        state: current,
-    }))
-}
-
-#[derive(Serialize)]
-struct ScenarioSummary {
-    id: String,
-    name: String,
-    timeout_ms: u64,
-    steps: usize,
-}
-async fn scenarios(State(state): State<ApiState>) -> Json<Vec<ScenarioSummary>> {
-    let mut values = state
-        .scenarios
-        .values()
-        .map(|scenario| ScenarioSummary {
-            id: scenario.scenario.id.clone(),
-            name: scenario.scenario.name.clone(),
-            timeout_ms: scenario.scenario.timeout_ms,
-            steps: scenario.steps.len(),
-        })
-        .collect::<Vec<_>>();
-    values.sort_by(|left, right| left.id.cmp(&right.id));
-    Json(values)
-}
-async fn scenario(
-    State(state): State<ApiState>,
-    Path(id): Path<String>,
-) -> ApiResult<Json<ScenarioDocument>> {
-    state.scenarios.get(&id).cloned().map(Json).ok_or_else(|| {
-        ApiError::not_found(
-            "scenario_not_found",
-            format!("scenario '{id}' was not found"),
-        )
-    })
-}
-async fn run_scenario(
-    State(state): State<ApiState>,
-    Path(id): Path<String>,
-    Query(query): Query<RunScenarioQuery>,
-    body: Option<Json<serde_json::Value>>,
-) -> ApiResult<(StatusCode, Json<RunRecord>)> {
-    let scenario_revision = query.revision.unwrap_or(1);
-    if scenario_revision == 0 {
-        return Err(ApiError::bad_request(
-            "invalid_scenario_revision",
-            "scenario revision must be greater than zero".to_owned(),
-        ));
-    }
-    let scenario = if let Some(Json(value)) = body {
-        let scenario = ScenarioDocument::from_json_value(value).map_err(|error| {
-            ApiError::bad_request("invalid_scenario", format!("invalid scenario: {error}"))
-        })?;
-        if scenario.scenario.id != id {
-            return Err(ApiError::bad_request(
-                "scenario_id_mismatch",
-                format!(
-                    "path scenario '{id}' does not match body scenario '{}'",
-                    scenario.scenario.id
-                ),
-            ));
-        }
-        scenario
-    } else {
-        state.scenarios.get(&id).cloned().ok_or_else(|| {
-            ApiError::not_found(
-                "scenario_not_found",
-                format!("scenario '{id}' was not found"),
-            )
-        })?
-    };
-    let record = state.runs.start(
-        scenario,
-        scenario_revision,
-        state.config.clone(),
-        Arc::clone(&state.events),
-    );
-    Ok((StatusCode::ACCEPTED, Json(record)))
-}
-
-#[derive(Deserialize, Default)]
-struct RunScenarioQuery {
-    revision: Option<u64>,
-}
-async fn run(
-    State(state): State<ApiState>,
-    Path(run_id): Path<String>,
-) -> ApiResult<Json<RunRecord>> {
-    state.runs.get(&run_id).map(Json).ok_or_else(|| {
-        ApiError::not_found("run_not_found", format!("run '{run_id}' was not found"))
-    })
-}
-async fn run_result(
-    State(state): State<ApiState>,
-    Path(run_id): Path<String>,
-) -> ApiResult<Json<ScenarioResult>> {
-    let record = state.runs.get(&run_id).ok_or_else(|| {
-        ApiError::not_found("run_not_found", format!("run '{run_id}' was not found"))
-    })?;
-    record.result.map(Json).ok_or_else(|| {
-        ApiError::conflict(
-            "run_not_complete",
-            format!("run '{run_id}' is not complete"),
-        )
+async fn health(State(state): State<ApiState>) -> Json<Health> {
+    let system = state
+        .host_telemetry
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .sample();
+    Json(Health {
+        status: "ok",
+        system,
     })
 }
 
-async fn run_result_junit(
-    State(state): State<ApiState>,
-    Path(run_id): Path<String>,
-) -> ApiResult<Response> {
-    let record = state.runs.get(&run_id).ok_or_else(|| {
-        ApiError::not_found("run_not_found", format!("run '{run_id}' was not found"))
-    })?;
-    let result = record.result.as_ref().ok_or_else(|| {
-        ApiError::conflict(
-            "run_not_complete",
-            format!("run '{run_id}' is not complete"),
-        )
-    })?;
-    let xml = to_junit_xml(
-        result,
-        JUnitReportMetadata {
-            run_id: &run_id,
-            scenario_revision: record.scenario_revision,
-        },
-    );
-    let filename = junit_filename(&record.scenario_id, &run_id);
-    let mut response = xml.into_response();
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        "application/xml; charset=utf-8"
-            .parse()
-            .expect("static content type is valid"),
-    );
-    response.headers_mut().insert(
-        header::CONTENT_DISPOSITION,
-        format!("attachment; filename=\"{filename}\"")
-            .parse()
-            .expect("sanitized filename creates a valid header"),
-    );
-    response.headers_mut().insert(
-        header::CACHE_CONTROL,
-        "no-store".parse().expect("static cache control is valid"),
-    );
-    Ok(response)
-}
-
-fn junit_filename(scenario_id: &str, run_id: &str) -> String {
-    let safe = |value: &str| {
-        value
-            .chars()
-            .map(|character| {
-                if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
-                    character
-                } else {
-                    '_'
-                }
-            })
-            .collect::<String>()
-    };
-    format!("{}-{}.junit.xml", safe(scenario_id), safe(run_id))
-}
-
 #[derive(Serialize)]
-struct FaultDto {
-    id: String,
-    device_id: String,
-    enabled: bool,
-    priority: i32,
-    persistent: bool,
-    trigger: String,
-    action: String,
-}
-async fn faults(State(state): State<ApiState>) -> ApiResult<Json<Vec<FaultDto>>> {
-    Ok(Json(
-        state
-            .registry
-            .fault_snapshots()
-            .map_err(ApiError::device)?
-            .into_iter()
-            .map(|item| FaultDto {
-                id: item.fault.id,
-                device_id: item.device_id,
-                enabled: item.fault.enabled,
-                priority: item.fault.priority,
-                persistent: item.fault.persistent,
-                trigger: item.fault.trigger.to_owned(),
-                action: item.fault.action.to_owned(),
-            })
-            .collect(),
-    ))
-}
-async fn enable_fault(
-    State(state): State<ApiState>,
-    Path(id): Path<String>,
-) -> ApiResult<StatusCode> {
-    set_fault(&state, &id, true)?;
-    Ok(StatusCode::NO_CONTENT)
-}
-async fn disable_fault(
-    State(state): State<ApiState>,
-    Path(id): Path<String>,
-) -> ApiResult<StatusCode> {
-    set_fault(&state, &id, false)?;
-    Ok(StatusCode::NO_CONTENT)
-}
-fn set_fault(state: &ApiState, id: &str, enabled: bool) -> ApiResult<()> {
-    match state
-        .registry
-        .set_fault_enabled(id, enabled)
-        .map_err(ApiError::device)?
-    {
-        1 => Ok(()),
-        0 => Err(ApiError::not_found(
-            "fault_not_found",
-            format!("fault '{id}' was not found"),
-        )),
-        count => Err(ApiError::conflict(
-            "fault_ambiguous",
-            format!("fault '{id}' matched {count} devices"),
-        )),
-    }
+struct ClockSnapshot {
+    virtual_time_ns: u64,
 }
 
-#[derive(Deserialize, Default)]
-struct EventsQuery {
-    after_event_id: Option<u64>,
-}
-async fn events(
-    State(state): State<ApiState>,
-    Query(query): Query<EventsQuery>,
-    ws: WebSocketUpgrade,
-) -> Response {
-    ws.on_upgrade(move |socket| {
-        event_socket(socket, state.events, query.after_event_id.unwrap_or(0))
+async fn clock(State(state): State<ApiState>) -> Json<ClockSnapshot> {
+    Json(ClockSnapshot {
+        virtual_time_ns: state.clock.now_ns(),
     })
-}
-async fn event_socket(mut socket: WebSocket, events: Arc<EventBus>, after_event_id: u64) {
-    let mut subscription = events.subscribe_from(after_event_id);
-    while let Some(event) = subscription.recv().await {
-        let Ok(json) = serde_json::to_string(event.as_ref()) else {
-            continue;
-        };
-        if socket.send(Message::Text(json.into())).await.is_err() {
-            break;
-        }
-    }
 }
 
 type ApiResult<T> = Result<T, ApiError>;
@@ -612,6 +255,45 @@ impl ApiError {
     fn conflict(code: &'static str, message: String) -> Self {
         Self {
             status: StatusCode::CONFLICT,
+            code,
+            message,
+        }
+    }
+    fn internal(code: &'static str, message: String) -> Self {
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            code,
+            message,
+        }
+    }
+    fn adapter(error: AdapterError) -> Self {
+        let (status, code, message) = match error {
+            AdapterError::NotFound(message) => {
+                (StatusCode::NOT_FOUND, "adapter_not_found", message)
+            }
+            AdapterError::Duplicate(message) => {
+                (StatusCode::CONFLICT, "adapter_id_conflict", message)
+            }
+            AdapterError::Invalid(message) => (StatusCode::BAD_REQUEST, "adapter_invalid", message),
+            AdapterError::Conflict(message) => (StatusCode::CONFLICT, "adapter_conflict", message),
+            AdapterError::AuthorizationRequired(message) => (
+                StatusCode::FORBIDDEN,
+                "adapter_authorization_required",
+                message,
+            ),
+            AdapterError::DriverUnavailable(message) => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "adapter_driver_unavailable",
+                message,
+            ),
+            AdapterError::Process(message) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "adapter_process_failed",
+                message,
+            ),
+        };
+        Self {
+            status,
             code,
             message,
         }

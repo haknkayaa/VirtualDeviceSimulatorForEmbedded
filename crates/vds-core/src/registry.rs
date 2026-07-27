@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::device::{Device, DeviceError, DeviceTransfer};
+use crate::device::{Device, DeviceError, DeviceTransfer, SpiWireConfig};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DeviceSnapshot {
@@ -60,6 +60,21 @@ impl DeviceRegistry {
         device.transfer(request)
     }
 
+    /// Routes a configured SPI transaction to a registered device.
+    ///
+    /// # Errors
+    /// Returns an error when the device does not exist or rejects the transfer.
+    pub fn transfer_spi(
+        &self,
+        device_id: &str,
+        request: &[u8],
+        rx_length: usize,
+        wire: SpiWireConfig,
+    ) -> Result<DeviceTransfer, DeviceError> {
+        self.device(device_id)?
+            .transfer_spi(request, rx_length, wire)
+    }
+
     /// Resets one registered device.
     ///
     /// # Errors
@@ -74,6 +89,20 @@ impl DeviceRegistry {
     /// Returns an error when the device or register is unknown.
     pub fn read_register(&self, device_id: &str, name: &str) -> Result<u64, DeviceError> {
         self.device(device_id)?.read_register(name)
+    }
+
+    /// Writes a register through a registered device's public control API.
+    ///
+    /// # Errors
+    /// Returns an error when the device or register is unknown, read-only, or
+    /// rejects the supplied value.
+    pub fn write_register(
+        &self,
+        device_id: &str,
+        address: u64,
+        value: u64,
+    ) -> Result<crate::device::RegisterTrace, DeviceError> {
+        self.device(device_id)?.write_register(address, value)
     }
 
     /// Returns a registered device's current state.

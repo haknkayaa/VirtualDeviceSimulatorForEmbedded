@@ -9,19 +9,17 @@ data_plane:
 observability:
   log_level: info
 
-device_models:
-  - device-models/examples/spi-flash.yaml
-  - device-models/examples/generic-spi-flash/model.yaml
+event_store:
+  enabled: true
+  max_size_mb: 1024
+  max_events: 1000000
+  cleanup_interval_seconds: 60
+  transaction_retention_hours: 24
+  register_read_retention_hours: 1
+  critical_retention_days: 30
+  register_read_sample_rate: 100
 
-scenarios:
-  - scenarios/examples/delayed-write-with-timeout.yaml
-  - device-models/examples/generic-spi-flash/scenarios/01-read-id.yaml
-  - device-models/examples/generic-spi-flash/scenarios/02-write-enable-lifecycle.yaml
-  - device-models/examples/generic-spi-flash/scenarios/03-page-program-success.yaml
-  - device-models/examples/generic-spi-flash/scenarios/04-program-without-wel.yaml
-  - device-models/examples/generic-spi-flash/scenarios/05-sector-erase-success.yaml
-  - device-models/examples/generic-spi-flash/scenarios/06-busy-timing.yaml
-  - device-models/examples/generic-spi-flash/scenarios/07-deep-power-down.yaml
-  - device-models/examples/generic-spi-flash/scenarios/08-reset-cancels-program.yaml
-  - device-models/examples/generic-spi-flash/scenarios/09-program-timeout-fault.yaml
-  - device-models/examples/generic-spi-flash/scenarios/10-corrupted-read.yaml
+device_packages:
+  # Repository examples are installed into ~/vsd4e/devices/ before loading.
+  - device-models/examples/generic-spidev
+  - device-models/examples/micron-mt25ql256aba8esf-0sit

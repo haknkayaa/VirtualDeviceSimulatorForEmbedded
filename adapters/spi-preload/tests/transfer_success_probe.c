@@ -30,7 +30,7 @@ static int transfer_once(const char *path, int null_tx, int null_rx) {
         return -1;
     }
     if (!null_rx) {
-        const uint8_t expected[] = {0x00U, 0xEFU, 0x40U, 0x18U};
+        const uint8_t expected[] = {0x00U, 0x00U, 0x40U, 0x18U};
         if (memcmp(rx, expected, sizeof(expected)) != 0) {
             errno = EPROTO;
             return -1;

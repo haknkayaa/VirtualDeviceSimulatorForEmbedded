@@ -3,9 +3,20 @@ use std::path::PathBuf;
 /// Error type for VDS4E core foundation services.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
+    DevicePackage(#[from] crate::device_package::DevicePackageError),
+
     #[error("failed to read configuration '{path}': {source}")]
     ConfigRead {
         path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    #[error("failed to install device package from '{source_path}' to '{target_path}': {source}")]
+    DevicePackageInstall {
+        source_path: PathBuf,
+        target_path: PathBuf,
         #[source]
         source: std::io::Error,
     },

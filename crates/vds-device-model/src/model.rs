@@ -1,0 +1,213 @@
+use super::{
+    BTreeMap, Deserialize, FaultDefinition, RegisterDefinition, Serialize, SignalGraphDefinition,
+};
+
+pub(super) const DEVICE_MODEL_SCHEMA: &str =
+    include_str!("../../../schemas/device-model.schema.json");
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceModel {
+    pub schema_version: u32,
+    pub device: DeviceDefinition,
+    #[serde(skip)]
+    pub signal_graph: Option<SignalGraphDefinition>,
+    #[serde(skip)]
+    pub package_root: Option<std::path::PathBuf>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceDefinition {
+    pub id: String,
+    pub name: String,
+    pub bus: String,
+    pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spi: Option<SpiBusDefinition>,
+    pub commands: Vec<SpiCommandDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory: Option<MemoryDefinition>,
+    #[serde(default)]
+    pub registers: Vec<RegisterDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub busy: Option<BusyDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state_machine: Option<DeviceStateMachineDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub faults: Vec<FaultDefinition>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpiBusDefinition {
+    pub mode: u8,
+    pub transfer_bits: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_frequency_hz: Option<u64>,
+    #[serde(default)]
+    pub supports_dtr: bool,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MemoryDefinition {
+    pub size_bytes: u64,
+    pub page_size_bytes: u64,
+    pub sector_size_bytes: u64,
+    pub erased_value: u8,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct BusyDefinition {
+    pub register_address: u64,
+    pub mask: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpiCommandDefinition {
+    pub name: String,
+    pub opcode: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response: Option<Vec<u8>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operation: Option<SpiCommandOperation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub address_bytes: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub register: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_delay_us: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timing: Option<CommandTimingDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_states: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wire: Option<SpiCommandWireDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shortcut: Option<SpiCommandShortcutDefinition>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpiCommandShortcutDefinition {
+    pub tx: Vec<u8>,
+    pub rx_length: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SpiCommandWireDefinition {
+    pub command_width: SpiWidthDefinition,
+    pub address_width: SpiWidthDefinition,
+    pub data_width: SpiWidthDefinition,
+    pub rate: SpiRateDefinition,
+    #[serde(default)]
+    pub dummy_cycles: u16,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SpiWidthDefinition {
+    Single,
+    Dual,
+    Quad,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SpiRateDefinition {
+    Str,
+    Dtr,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct CommandTimingDefinition {
+    pub latency_us: u64,
+    #[serde(default)]
+    pub busy_during_operation: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceStateMachineDefinition {
+    pub initial_state: String,
+    pub states: BTreeMap<String, DeviceStateDefinition>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceStateDefinition {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub entry_actions: Vec<StateActionDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exit_actions: Vec<StateActionDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub transitions: Vec<StateTransitionDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub delayed_events: Vec<DeviceDelayedEventDefinition>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StateTransitionDefinition {
+    pub event: String,
+    pub target: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guard: Option<StateGuardDefinition>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeviceDelayedEventDefinition {
+    pub event: String,
+    pub delay_us: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StateActionDefinition {
+    SetRegister(RegisterActionDefinition),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegisterActionDefinition {
+    pub name: String,
+    pub value: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mask: Option<u64>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StateGuardDefinition {
+    Register(RegisterGuardDefinition),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegisterGuardDefinition {
+    pub name: String,
+    pub equals: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mask: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SpiCommandOperation {
+    RegisterRead,
+    RegisterWrite,
+    MemoryRead,
+    PageProgram,
+    SectorErase,
+    ChipErase,
+}

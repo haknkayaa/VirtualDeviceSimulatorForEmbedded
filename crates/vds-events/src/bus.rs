@@ -1,17 +1,287 @@
 use std::{
     collections::{HashSet, VecDeque},
+    path::Path,
     sync::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
+        mpsc::{self, SyncSender},
     },
+    thread::{self, JoinHandle},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use rusqlite::{Connection, params};
 use tokio::sync::broadcast;
 
 use crate::{DomainEvent, EventDraft, EventType};
 
 pub const DEFAULT_RING_CAPACITY: usize = 10_000;
 const DEFAULT_SUBSCRIBER_CAPACITY: usize = 1_024;
+const PERSISTENCE_QUEUE_CAPACITY: usize = 65_536;
+const PERSISTENCE_BATCH_SIZE: usize = 512;
+const PERSISTENCE_BATCH_WAIT: Duration = Duration::from_millis(10);
+const CLEANUP_BATCH_SIZE: u64 = 10_000;
+const MAX_CLEANUP_CHUNKS: usize = 8;
+
+#[derive(Clone, Copy, Debug)]
+pub struct EventPersistencePolicy {
+    pub max_size_bytes: u64,
+    pub max_events: u64,
+    pub cleanup_interval: Duration,
+    pub transaction_retention: Duration,
+    pub register_read_retention: Duration,
+    pub critical_retention: Duration,
+    pub register_read_sample_rate: u64,
+}
+
+impl Default for EventPersistencePolicy {
+    fn default() -> Self {
+        Self {
+            max_size_bytes: 1_024 * 1_024 * 1_024,
+            max_events: 1_000_000,
+            cleanup_interval: Duration::from_secs(60),
+            transaction_retention: Duration::from_secs(24 * 60 * 60),
+            register_read_retention: Duration::from_secs(60 * 60),
+            critical_retention: Duration::from_secs(30 * 24 * 60 * 60),
+            register_read_sample_rate: 100,
+        }
+    }
+}
+
+struct PersistedEvent {
+    event_id: u64,
+    timestamp_wall_ns: u64,
+    event_type: String,
+    event_json: String,
+}
+
+enum PersistenceMessage {
+    Event(PersistedEvent),
+    Shutdown,
+}
+
+struct PersistenceWorker {
+    sender: SyncSender<PersistenceMessage>,
+    handle: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl PersistenceWorker {
+    fn start(connection: Connection, policy: EventPersistencePolicy) -> Self {
+        let (sender, receiver) = mpsc::sync_channel(PERSISTENCE_QUEUE_CAPACITY);
+        let handle = thread::Builder::new()
+            .name("vds-event-persistence".to_owned())
+            .spawn(move || {
+                let mut connection = connection;
+                let mut pending = Vec::with_capacity(PERSISTENCE_BATCH_SIZE);
+                let mut last_cleanup = std::time::Instant::now();
+                loop {
+                    let message = if pending.is_empty() {
+                        receiver.recv().ok()
+                    } else {
+                        receiver.recv_timeout(PERSISTENCE_BATCH_WAIT).ok()
+                    };
+                    let mut shutdown = false;
+                    match message {
+                        Some(PersistenceMessage::Event(event)) => pending.push(event),
+                        Some(PersistenceMessage::Shutdown) | None => shutdown = true,
+                    }
+                    while pending.len() < PERSISTENCE_BATCH_SIZE {
+                        match receiver.try_recv() {
+                            Ok(PersistenceMessage::Event(event)) => pending.push(event),
+                            Ok(PersistenceMessage::Shutdown) => {
+                                shutdown = true;
+                                break;
+                            }
+                            Err(_) => break,
+                        }
+                    }
+                    if !pending.is_empty() {
+                        let transaction = connection
+                            .transaction()
+                            .expect("SQLite event transaction should begin");
+                        {
+                            let mut statement = transaction
+                                .prepare_cached(
+                                    "INSERT INTO domain_events(event_id, timestamp_wall_ns, event_type, event_json)
+                                     VALUES (?1, ?2, ?3, ?4)",
+                                )
+                                .expect("SQLite event insert should prepare");
+                            for event in pending.drain(..) {
+                                let persist_payload = event.event_type != "register_read"
+                                    || event.event_id % policy.register_read_sample_rate.max(1) == 0;
+                                if persist_payload {
+                                    statement
+                                        .execute(params![
+                                            i64::try_from(event.event_id).unwrap_or(i64::MAX),
+                                            i64::try_from(event.timestamp_wall_ns).unwrap_or(i64::MAX),
+                                            event.event_type,
+                                            event.event_json
+                                        ])
+                                        .expect("SQLite event persistence failed");
+                                }
+                                transaction
+                                    .execute(
+                                        "INSERT INTO event_store_meta(key, value) VALUES ('last_event_id', ?1)
+                                         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                                        [i64::try_from(event.event_id).unwrap_or(i64::MAX)],
+                                    )
+                                    .expect("SQLite event high watermark should persist");
+                            }
+                        }
+                        transaction
+                            .commit()
+                            .expect("SQLite event transaction should commit");
+                    }
+                    if last_cleanup.elapsed() >= policy.cleanup_interval {
+                        cleanup_events(&mut connection, policy)
+                            .expect("SQLite event retention cleanup failed");
+                        last_cleanup = std::time::Instant::now();
+                    }
+                    if shutdown {
+                        break;
+                    }
+                }
+            })
+            .expect("event persistence worker should start");
+        Self {
+            sender,
+            handle: Mutex::new(Some(handle)),
+        }
+    }
+
+    fn persist(&self, event: &DomainEvent) {
+        self.sender
+            .send(PersistenceMessage::Event(PersistedEvent {
+                event_id: event.event_id,
+                timestamp_wall_ns: event.timestamp_wall_ns,
+                event_type: event.event_type.as_str().to_owned(),
+                event_json: serde_json::to_string(event)
+                    .expect("domain events must remain JSON serializable"),
+            }))
+            .expect("event persistence worker should remain available");
+    }
+}
+
+fn cutoff_ns(retention: Duration) -> i64 {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let cutoff = now.saturating_sub(retention.as_nanos());
+    i64::try_from(cutoff).unwrap_or(i64::MAX)
+}
+
+fn delete_chunk(
+    connection: &Connection,
+    predicate: &str,
+    cutoff: i64,
+) -> Result<usize, rusqlite::Error> {
+    connection.execute(
+        &format!(
+            "DELETE FROM domain_events WHERE event_id IN (
+               SELECT event_id FROM domain_events
+               WHERE {predicate} AND timestamp_wall_ns < ?1
+               ORDER BY event_id LIMIT ?2
+             )"
+        ),
+        params![
+            cutoff,
+            i64::try_from(CLEANUP_BATCH_SIZE).unwrap_or(i64::MAX)
+        ],
+    )
+}
+
+fn delete_expired(
+    connection: &Connection,
+    predicate: &str,
+    cutoff: i64,
+) -> Result<(), rusqlite::Error> {
+    for _ in 0..MAX_CLEANUP_CHUNKS {
+        if delete_chunk(connection, predicate, cutoff)? < CLEANUP_BATCH_SIZE as usize {
+            break;
+        }
+    }
+    Ok(())
+}
+
+fn cleanup_events(
+    connection: &mut Connection,
+    policy: EventPersistencePolicy,
+) -> Result<(), rusqlite::Error> {
+    let transaction = connection.transaction()?;
+    delete_expired(
+        &transaction,
+        "event_type = 'register_read'",
+        cutoff_ns(policy.register_read_retention),
+    )?;
+    delete_expired(
+        &transaction,
+        "event_type IN ('transaction_started', 'transaction_completed', 'operation_started', 'operation_completed')",
+        cutoff_ns(policy.transaction_retention),
+    )?;
+    delete_expired(
+        &transaction,
+        "event_type NOT IN ('register_read', 'transaction_started', 'transaction_completed', 'operation_started', 'operation_completed')",
+        cutoff_ns(policy.critical_retention),
+    )?;
+    let count = transaction.query_row("SELECT COUNT(*) FROM domain_events", [], |row| {
+        row.get::<_, u64>(0)
+    })?;
+    let mut overflow = count.saturating_sub(policy.max_events);
+    for _ in 0..MAX_CLEANUP_CHUNKS {
+        if overflow == 0 {
+            break;
+        }
+        let requested = overflow.min(CLEANUP_BATCH_SIZE);
+        let deleted = transaction.execute(
+            "DELETE FROM domain_events WHERE event_id IN (
+               SELECT event_id FROM domain_events ORDER BY event_id LIMIT ?1
+             )",
+            [i64::try_from(requested).unwrap_or(i64::MAX)],
+        )? as u64;
+        overflow = overflow.saturating_sub(deleted);
+        if deleted < requested {
+            break;
+        }
+    }
+    let page_count = transaction.query_row("PRAGMA page_count", [], |row| row.get::<_, u64>(0))?;
+    let freelist_count =
+        transaction.query_row("PRAGMA freelist_count", [], |row| row.get::<_, u64>(0))?;
+    let page_size = transaction.query_row("PRAGMA page_size", [], |row| row.get::<_, u64>(0))?;
+    let logical_size = page_count
+        .saturating_sub(freelist_count)
+        .saturating_mul(page_size);
+    if logical_size > policy.max_size_bytes {
+        transaction.execute(
+            "DELETE FROM domain_events WHERE event_id IN (
+               SELECT event_id FROM domain_events ORDER BY event_id LIMIT ?1
+             )",
+            [i64::try_from(CLEANUP_BATCH_SIZE).unwrap_or(i64::MAX)],
+        )?;
+    }
+    transaction.commit()?;
+    if logical_size > policy.max_size_bytes {
+        connection.execute_batch(
+            "PRAGMA wal_checkpoint(TRUNCATE);
+             PRAGMA incremental_vacuum(1000);",
+        )?;
+    }
+    Ok(())
+}
+
+impl Drop for PersistenceWorker {
+    fn drop(&mut self) {
+        let _ = self.sender.send(PersistenceMessage::Shutdown);
+        if let Some(handle) = self
+            .handle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take()
+        {
+            let _ = handle.join();
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct EventFilter {
@@ -41,6 +311,7 @@ pub struct EventBus {
     capacity: usize,
     events: Mutex<VecDeque<Arc<DomainEvent>>>,
     sender: broadcast::Sender<Arc<DomainEvent>>,
+    persistence: Option<PersistenceWorker>,
 }
 
 impl EventBus {
@@ -61,7 +332,110 @@ impl EventBus {
             capacity,
             events: Mutex::new(VecDeque::with_capacity(capacity)),
             sender,
+            persistence: None,
         }
+    }
+
+    /// Opens a SQLite-backed event bus and restores the newest retained events.
+    ///
+    /// # Errors
+    /// Returns an error when the database cannot be opened, migrated, or read.
+    ///
+    /// # Panics
+    /// Panics when either capacity is zero.
+    pub fn persistent(
+        path: impl AsRef<Path>,
+        capacity: usize,
+        subscriber_capacity: usize,
+    ) -> Result<Self, rusqlite::Error> {
+        Self::persistent_with_policy(
+            path,
+            capacity,
+            subscriber_capacity,
+            EventPersistencePolicy::default(),
+        )
+    }
+
+    /// Opens a SQLite-backed event bus with an explicit retention and sampling policy.
+    ///
+    /// # Errors
+    /// Returns an error when the database cannot be opened, migrated, or read.
+    pub fn persistent_with_policy(
+        path: impl AsRef<Path>,
+        capacity: usize,
+        subscriber_capacity: usize,
+        policy: EventPersistencePolicy,
+    ) -> Result<Self, rusqlite::Error> {
+        assert!(capacity > 0, "event ring capacity must be positive");
+        assert!(
+            subscriber_capacity > 0,
+            "subscriber capacity must be positive"
+        );
+        let connection = Connection::open(path)?;
+        connection.execute_batch(
+            "PRAGMA journal_mode=WAL;
+             PRAGMA synchronous=NORMAL;
+             CREATE TABLE IF NOT EXISTS domain_events (
+               event_id INTEGER PRIMARY KEY,
+               timestamp_wall_ns INTEGER NOT NULL,
+               event_type TEXT NOT NULL DEFAULT '',
+               event_json TEXT NOT NULL
+             );
+             CREATE TABLE IF NOT EXISTS event_store_meta (
+               key TEXT PRIMARY KEY,
+               value INTEGER NOT NULL
+             );
+             CREATE INDEX IF NOT EXISTS idx_domain_events_wall_time
+               ON domain_events(timestamp_wall_ns);",
+        )?;
+        let has_event_type = {
+            let mut columns = connection.prepare("PRAGMA table_info(domain_events)")?;
+            columns
+                .query_map([], |row| row.get::<_, String>(1))?
+                .filter_map(Result::ok)
+                .any(|name| name == "event_type")
+        };
+        if !has_event_type {
+            connection.execute(
+                "ALTER TABLE domain_events ADD COLUMN event_type TEXT NOT NULL DEFAULT ''",
+                [],
+            )?;
+        }
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_domain_events_type_time
+             ON domain_events(event_type, timestamp_wall_ns)",
+            [],
+        )?;
+        let mut statement = connection.prepare(
+            "SELECT event_json FROM domain_events
+             ORDER BY event_id DESC LIMIT ?1",
+        )?;
+        let rows = statement.query_map([i64::try_from(capacity).unwrap_or(i64::MAX)], |row| {
+            row.get::<_, String>(0)
+        })?;
+        let mut restored = rows
+            .filter_map(Result::ok)
+            .filter_map(|json| serde_json::from_str::<DomainEvent>(&json).ok())
+            .collect::<Vec<_>>();
+        restored.reverse();
+        let maximum_id = connection.query_row(
+            "SELECT MAX(
+               COALESCE((SELECT MAX(event_id) FROM domain_events), 0),
+               COALESCE((SELECT value FROM event_store_meta WHERE key = 'last_event_id'), 0)
+             )",
+            [],
+            |row| row.get::<_, u64>(0),
+        )?;
+        let next_id = maximum_id.saturating_add(1);
+        let (sender, _) = broadcast::channel(subscriber_capacity);
+        drop(statement);
+        Ok(Self {
+            next_id: AtomicU64::new(next_id),
+            capacity,
+            events: Mutex::new(restored.into_iter().map(Arc::new).collect()),
+            sender,
+            persistence: Some(PersistenceWorker::start(connection, policy)),
+        })
     }
 
     #[must_use]
@@ -81,6 +455,9 @@ impl EventBus {
             })
             .expect("domain event ID space exhausted");
         let event = Arc::new(DomainEvent::from_draft(id, draft));
+        if let Some(persistence) = &self.persistence {
+            persistence.persist(event.as_ref());
+        }
         if events.len() == self.capacity {
             events.pop_front();
         }
@@ -178,6 +555,40 @@ mod tests {
         }
     }
 
+    fn register_read_draft(value: u64) -> EventDraft {
+        EventDraft {
+            virtual_time_ns: value,
+            device_id: Some("sample-device".into()),
+            scenario_run_id: None,
+            payload: EventPayload::RegisterRead {
+                name: Some("status".into()),
+                address: 0,
+                value: Some(value),
+            },
+        }
+    }
+
+    fn temporary_store(label: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "vds4e-events-{label}-{}-{}.sqlite3",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock should follow Unix epoch")
+                .as_nanos()
+        ))
+    }
+
+    fn remove_temporary_store(path: &Path) {
+        for candidate in [
+            path.to_path_buf(),
+            path.with_extension("sqlite3-wal"),
+            path.with_extension("sqlite3-shm"),
+        ] {
+            let _ = std::fs::remove_file(candidate);
+        }
+    }
+
     #[tokio::test]
     async fn event_ids_are_ordered_and_replay_is_exclusive() {
         let bus = EventBus::new(4, 4);
@@ -200,6 +611,124 @@ mod tests {
                 .collect::<Vec<_>>(),
             [2, 3]
         );
+    }
+
+    #[test]
+    fn sqlite_events_survive_reopening() {
+        let path = std::env::temp_dir().join(format!(
+            "vds4e-events-{}-{}.sqlite3",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock should follow Unix epoch")
+                .as_nanos()
+        ));
+        {
+            let bus = EventBus::persistent(&path, 8, 8).expect("store should open");
+            assert_eq!(bus.publish(draft(42)).event_id, 1);
+        }
+        let restored = EventBus::persistent(&path, 8, 8).expect("store should reopen");
+        assert_eq!(restored.events_after(0).len(), 1);
+        assert_eq!(restored.events_after(0)[0].timestamp_virtual_ns, 42);
+        assert_eq!(restored.publish(draft(43)).event_id, 2);
+        std::fs::remove_file(path).expect("temporary store should be removable");
+    }
+
+    #[test]
+    fn sqlite_worker_flushes_large_batches_during_shutdown() {
+        let path = std::env::temp_dir().join(format!(
+            "vds4e-events-batch-{}-{}.sqlite3",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock should follow Unix epoch")
+                .as_nanos()
+        ));
+        {
+            let bus = EventBus::persistent(&path, 2_048, 8).expect("store should open");
+            for value in 0..2_000 {
+                let _ = bus.publish(draft(value));
+            }
+        }
+        let restored = EventBus::persistent(&path, 2_048, 8).expect("store should reopen");
+        assert_eq!(restored.events_after(0).len(), 2_000);
+        drop(restored);
+        std::fs::remove_file(path).expect("temporary store should be removable");
+    }
+
+    #[test]
+    fn sampled_register_reads_preserve_the_event_id_high_watermark() {
+        let path = temporary_store("sampling");
+        let policy = EventPersistencePolicy {
+            register_read_sample_rate: 10,
+            ..EventPersistencePolicy::default()
+        };
+        {
+            let bus =
+                EventBus::persistent_with_policy(&path, 64, 8, policy).expect("store should open");
+            for value in 1..=21 {
+                assert_eq!(bus.publish(register_read_draft(value)).event_id, value);
+            }
+        }
+        let restored =
+            EventBus::persistent_with_policy(&path, 64, 8, policy).expect("store should reopen");
+        assert_eq!(restored.events_after(0).len(), 2);
+        assert_eq!(restored.publish(draft(22)).event_id, 22);
+        drop(restored);
+        remove_temporary_store(&path);
+    }
+
+    #[test]
+    fn cleanup_enforces_the_maximum_event_count() {
+        let path = temporary_store("retention");
+        let policy = EventPersistencePolicy {
+            max_events: 25,
+            cleanup_interval: Duration::ZERO,
+            ..EventPersistencePolicy::default()
+        };
+        {
+            let bus =
+                EventBus::persistent_with_policy(&path, 128, 8, policy).expect("store should open");
+            for value in 1..=100 {
+                let _ = bus.publish(draft(value));
+            }
+        }
+        let restored =
+            EventBus::persistent_with_policy(&path, 128, 8, policy).expect("store should reopen");
+        assert_eq!(restored.events_after(0).len(), 25);
+        assert_eq!(restored.events_after(0)[0].event_id, 76);
+        drop(restored);
+        remove_temporary_store(&path);
+    }
+
+    #[test]
+    fn opens_and_migrates_the_legacy_event_table() {
+        let path = temporary_store("migration");
+        {
+            let connection = Connection::open(&path).expect("legacy store should open");
+            connection
+                .execute_batch(
+                    "CREATE TABLE domain_events (
+                       event_id INTEGER PRIMARY KEY,
+                       timestamp_wall_ns INTEGER NOT NULL,
+                       event_json TEXT NOT NULL
+                     );",
+                )
+                .expect("legacy schema should be created");
+        }
+        let bus = EventBus::persistent(&path, 8, 8).expect("legacy store should migrate");
+        let connection = Connection::open(&path).expect("migrated store should open");
+        let has_event_type = connection
+            .prepare("PRAGMA table_info(domain_events)")
+            .expect("columns should load")
+            .query_map([], |row| row.get::<_, String>(1))
+            .expect("columns should query")
+            .filter_map(Result::ok)
+            .any(|name| name == "event_type");
+        assert!(has_event_type);
+        drop(connection);
+        drop(bus);
+        remove_temporary_store(&path);
     }
 
     #[test]

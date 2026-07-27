@@ -4,7 +4,7 @@
   "title": "VDS4E server configuration",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "server", "data_plane", "observability", "device_models"],
+  "required": ["schema_version", "server", "data_plane", "observability", "device_packages"],
   "properties": {
     "schema_version": {
       "const": 1
@@ -42,17 +42,27 @@
         }
       }
     },
-    "device_models": {
+    "event_store": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "max_size_mb": { "type": "integer", "minimum": 16 },
+        "max_events": { "type": "integer", "minimum": 1000 },
+        "cleanup_interval_seconds": { "type": "integer", "minimum": 1 },
+        "transaction_retention_hours": { "type": "integer", "minimum": 1 },
+        "register_read_retention_hours": { "type": "integer", "minimum": 1 },
+        "critical_retention_days": { "type": "integer", "minimum": 1 },
+        "register_read_sample_rate": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "device_packages": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "string",
         "minLength": 1
       }
-    },
-    "scenarios": {
-      "type": "array",
-      "items": { "type": "string", "minLength": 1 }
     }
   }
 }

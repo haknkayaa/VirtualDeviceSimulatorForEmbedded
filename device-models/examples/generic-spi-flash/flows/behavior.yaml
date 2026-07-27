@@ -1,0 +1,161 @@
+# Editable authoring document declared by ../device-package.yaml.
+schema_version: 1
+flow:
+  id: generic-spi-flash-128m-behavior
+  name: Generic SPI Flash 128 Mbit
+  kind: device_behavior
+  revision: 1
+  created_at: "2026-01-01T00:00:00.000Z"
+  updated_at: "2026-01-01T00:00:00.000Z"
+nodes:
+  - id: state-powered-off
+    kind: device_behavior.state
+    position: { x: 20, y: 40 }
+    data: { label: powered off, state_name: powered_off, description: "", terminal: false, entry_actions: [], exit_actions: [] }
+    ui: {}
+  - id: state-resetting
+    kind: device_behavior.initial_state
+    position: { x: 300, y: 40 }
+    data:
+      label: resetting
+      state_name: resetting
+      description: ""
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS1, value: "0x01", mask: "0x03", allow_read_only_internal: true }
+      exit_actions: []
+    ui: {}
+  - id: state-ready
+    kind: device_behavior.state
+    position: { x: 600, y: 220 }
+    data:
+      label: ready
+      state_name: ready
+      description: ""
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS1, value: "0x00", mask: "0x03", allow_read_only_internal: true }
+      exit_actions: []
+    ui: {}
+  - id: state-write-enabled
+    kind: device_behavior.state
+    position: { x: 900, y: 220 }
+    data:
+      label: write enabled
+      state_name: write_enabled
+      description: ""
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS1, value: "0x02", mask: "0x03", allow_read_only_internal: true }
+      exit_actions: []
+    ui: {}
+  - id: state-programming
+    kind: device_behavior.state
+    position: { x: 1200, y: 80 }
+    data:
+      label: programming
+      state_name: programming
+      description: ""
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS1, value: "0x01", mask: "0x03", allow_read_only_internal: true }
+      exit_actions: []
+    ui: {}
+  - id: state-erasing
+    kind: device_behavior.state
+    position: { x: 1200, y: 360 }
+    data:
+      label: erasing
+      state_name: erasing
+      description: ""
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS1, value: "0x01", mask: "0x03", allow_read_only_internal: true }
+      exit_actions: []
+    ui: {}
+  - id: state-deep-power-down
+    kind: device_behavior.state
+    position: { x: 600, y: 500 }
+    data:
+      label: deep power down
+      state_name: deep_power_down
+      description: ""
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS1, value: "0x00", mask: "0x03", allow_read_only_internal: true }
+      exit_actions: []
+    ui: {}
+  - id: state-error
+    kind: device_behavior.state
+    position: { x: 900, y: 500 }
+    data:
+      label: error
+      state_name: error
+      description: ""
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS1, value: "0x01", mask: "0x01", allow_read_only_internal: true }
+      exit_actions: []
+    ui: {}
+  # Design-only catalog nodes demonstrate every authoring primitive currently
+  # exposed by the editor. They are intentionally excluded from runtime compilation.
+  - { id: design-not, kind: device_behavior.logical_not, position: { x: 20, y: 720 }, data: { label: NOT }, ui: { design_only: true } }
+  - { id: design-and, kind: device_behavior.logical_and, position: { x: 280, y: 720 }, data: { label: AND }, ui: { design_only: true } }
+  - { id: design-or, kind: device_behavior.logical_or, position: { x: 540, y: 720 }, data: { label: OR }, ui: { design_only: true } }
+  - { id: design-nand, kind: device_behavior.logical_nand, position: { x: 800, y: 720 }, data: { label: NAND }, ui: { design_only: true } }
+  - { id: design-nor, kind: device_behavior.logical_nor, position: { x: 1060, y: 720 }, data: { label: NOR }, ui: { design_only: true } }
+  - { id: design-xor, kind: device_behavior.logical_xor, position: { x: 1320, y: 720 }, data: { label: XOR }, ui: { design_only: true } }
+  - { id: design-xnor, kind: device_behavior.logical_xnor, position: { x: 1580, y: 720 }, data: { label: XNOR }, ui: { design_only: true } }
+  - { id: design-timer, kind: device_behavior.timer, position: { x: 20, y: 860 }, data: { label: Timer, duration: 1000, unit: ms }, ui: { design_only: true } }
+  - { id: design-delay, kind: device_behavior.delay, position: { x: 280, y: 860 }, data: { label: Delay, duration: 100, unit: ms }, ui: { design_only: true } }
+  - { id: design-timeout, kind: device_behavior.timeout, position: { x: 540, y: 860 }, data: { label: Timeout, duration: 5000, unit: ms }, ui: { design_only: true } }
+  - { id: design-interval, kind: device_behavior.interval, position: { x: 800, y: 860 }, data: { label: Interval, duration: 1000, unit: ms }, ui: { design_only: true } }
+  - { id: design-file-read, kind: device_behavior.file_read, position: { x: 1060, y: 860 }, data: { label: File Read, path: fixtures/signal-input.txt, format: text, offset: 0, length: null }, ui: {} }
+  - { id: design-file-write, kind: device_behavior.file_write, position: { x: 1320, y: 860 }, data: { label: File Write, path: runtime-data/signal-output.txt, format: text, mode: overwrite, create: true }, ui: {} }
+edges:
+  - { id: transition-00-powered_off-resetting, kind: device_behavior.transition, source: state-powered-off, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: event, trigger: power_on, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-01-resetting-ready, kind: device_behavior.transition, source: state-resetting, sourceHandle: out, target: state-ready, targetHandle: in, data: { trigger_type: event, trigger: reset_complete, priority: 0, guard_enabled: false, delay_value: 5, delay_unit: ms }, ui: {} }
+  - { id: transition-02-ready-write_enabled, kind: device_behavior.transition, source: state-ready, sourceHandle: out, target: state-write-enabled, targetHandle: in, data: { trigger_type: command, trigger: write_enable, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-03-write_enabled-ready, kind: device_behavior.transition, source: state-write-enabled, sourceHandle: out, target: state-ready, targetHandle: in, data: { trigger_type: command, trigger: write_disable, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-04-write_enabled-programming, kind: device_behavior.transition, source: state-write-enabled, sourceHandle: out, target: state-programming, targetHandle: in, data: { trigger_type: command, trigger: page_program, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-05-programming-ready, kind: device_behavior.transition, source: state-programming, sourceHandle: out, target: state-ready, targetHandle: in, data: { trigger_type: event, trigger: operation_completed, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-06-write_enabled-erasing, kind: device_behavior.transition, source: state-write-enabled, sourceHandle: out, target: state-erasing, targetHandle: in, data: { trigger_type: command, trigger: sector_erase, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-07-erasing-ready, kind: device_behavior.transition, source: state-erasing, sourceHandle: out, target: state-ready, targetHandle: in, data: { trigger_type: event, trigger: operation_completed, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-08-ready-deep_power_down, kind: device_behavior.transition, source: state-ready, sourceHandle: out, target: state-deep-power-down, targetHandle: in, data: { trigger_type: command, trigger: deep_power_down, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-09-deep_power_down-ready, kind: device_behavior.transition, source: state-deep-power-down, sourceHandle: out, target: state-ready, targetHandle: in, data: { trigger_type: command, trigger: release_power_down, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-10-resetting-resetting, kind: device_behavior.transition, source: state-resetting, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-11-ready-resetting, kind: device_behavior.transition, source: state-ready, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-12-write_enabled-resetting, kind: device_behavior.transition, source: state-write-enabled, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-13-programming-resetting, kind: device_behavior.transition, source: state-programming, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-14-erasing-resetting, kind: device_behavior.transition, source: state-erasing, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-15-deep_power_down-resetting, kind: device_behavior.transition, source: state-deep-power-down, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: transition-16-error-resetting, kind: device_behavior.transition, source: state-error, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: signal-ready-not, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-not, targetHandle: in, data: {}, ui: {} }
+  - { id: signal-ready-and-a, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-and, targetHandle: a, data: {}, ui: {} }
+  - { id: signal-ready-and-b, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-and, targetHandle: b, data: {}, ui: {} }
+  - { id: signal-ready-or-a, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-or, targetHandle: a, data: {}, ui: {} }
+  - { id: signal-not-or-b, kind: device_behavior.signal, source: design-not, sourceHandle: out, target: design-or, targetHandle: b, data: {}, ui: {} }
+  - { id: signal-ready-nand-a, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-nand, targetHandle: a, data: {}, ui: {} }
+  - { id: signal-ready-nand-b, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-nand, targetHandle: b, data: {}, ui: {} }
+  - { id: signal-ready-nor-a, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-nor, targetHandle: a, data: {}, ui: {} }
+  - { id: signal-not-nor-b, kind: device_behavior.signal, source: design-not, sourceHandle: out, target: design-nor, targetHandle: b, data: {}, ui: {} }
+  - { id: signal-ready-xor-a, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-xor, targetHandle: a, data: {}, ui: {} }
+  - { id: signal-not-xor-b, kind: device_behavior.signal, source: design-not, sourceHandle: out, target: design-xor, targetHandle: b, data: {}, ui: {} }
+  - { id: signal-ready-xnor-a, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-xnor, targetHandle: a, data: {}, ui: {} }
+  - { id: signal-not-xnor-b, kind: device_behavior.signal, source: design-not, sourceHandle: out, target: design-xnor, targetHandle: b, data: {}, ui: {} }
+  - { id: signal-ready-timer, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-timer, targetHandle: in, data: {}, ui: {} }
+  - { id: signal-ready-delay, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-delay, targetHandle: in, data: {}, ui: {} }
+  - { id: signal-ready-timeout, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-timeout, targetHandle: in, data: {}, ui: {} }
+  - { id: signal-ready-interval, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-interval, targetHandle: in, data: {}, ui: {} }
+  - { id: signal-ready-file-read, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-file-read, targetHandle: in, data: {}, ui: {} }
+  - { id: signal-ready-file-write-trigger, kind: device_behavior.signal, source: state-ready, sourceHandle: out, target: design-file-write, targetHandle: a, data: {}, ui: {} }
+  - { id: signal-file-content, kind: device_behavior.signal, source: design-file-read, sourceHandle: out, target: design-file-write, targetHandle: b, data: {}, ui: {} }
+viewport: { x: 0, y: 0, zoom: 0.62 }
+metadata:
+  allow_cycles: true
+  default_edge_kind: device_behavior.transition
+  source_model: model/device.yaml
+  behavior:
+    device_id: generic-spi-flash-128m
+    description: Public-safe 128 Mbit SPI flash reference behavior.
+    revision: 1

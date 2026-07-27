@@ -2,7 +2,10 @@ use std::{fs, path::Path, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Error, Result};
+use crate::{
+    Error, Result,
+    device_package::{DevicePackage, install_example_package},
+};
 
 const SERVER_CONFIG_SCHEMA: &str = include_str!("../../../schemas/server-config.schema.json");
 
@@ -14,9 +17,9 @@ pub struct ServerConfig {
     pub server: ServerSettings,
     pub data_plane: DataPlaneSettings,
     pub observability: ObservabilitySettings,
-    pub device_models: Vec<PathBuf>,
     #[serde(default)]
-    pub scenarios: Vec<PathBuf>,
+    pub event_store: EventStoreSettings,
+    pub device_packages: Vec<PathBuf>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -37,7 +40,64 @@ pub struct ObservabilitySettings {
     pub log_level: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct EventStoreSettings {
+    pub enabled: bool,
+    pub max_size_mb: u64,
+    pub max_events: u64,
+    pub cleanup_interval_seconds: u64,
+    pub transaction_retention_hours: u64,
+    pub register_read_retention_hours: u64,
+    pub critical_retention_days: u64,
+    pub register_read_sample_rate: u64,
+}
+
+impl Default for EventStoreSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_size_mb: 1_024,
+            max_events: 1_000_000,
+            cleanup_interval_seconds: 60,
+            transaction_retention_hours: 24,
+            register_read_retention_hours: 1,
+            critical_retention_days: 30,
+            register_read_sample_rate: 100,
+        }
+    }
+}
+
 impl ServerConfig {
+    /// Loads and validates every configured package manifest.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a package manifest or declared resource is invalid.
+    pub fn resolved_device_packages(&self) -> Result<Vec<DevicePackage>> {
+        self.device_packages
+            .iter()
+            .map(|path| {
+                install_example_package(path)
+                    .and_then(|path| DevicePackage::load(path).map_err(Error::from))
+            })
+            .collect::<std::result::Result<Vec<_>, _>>()
+    }
+
+    /// Returns every YAML scenario declared by configured device packages.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a package scenario directory exists but cannot be
+    /// read.
+    pub fn resolved_scenarios(&self) -> Result<Vec<PathBuf>> {
+        let mut paths = Vec::new();
+        for package in self.resolved_device_packages()? {
+            paths.extend(package.scenario_paths()?);
+        }
+        Ok(paths)
+    }
+
     /// Loads a YAML file and validates it against the versioned JSON Schema.
     ///
     /// # Errors
@@ -86,7 +146,7 @@ impl ServerConfig {
 mod tests {
     use std::path::PathBuf;
 
-    use super::ServerConfig;
+    use super::{EventStoreSettings, ServerConfig};
     use crate::Error;
 
     const VALID_CONFIG: &str = r"
@@ -97,8 +157,8 @@ data_plane:
   unix_socket: /tmp/vds4e.sock
 observability:
   log_level: info
-device_models:
-  - device-models/examples/spi-flash.yaml
+device_packages:
+  - device-models/examples/generic-spi-flash
 ";
 
     #[test]
@@ -113,9 +173,43 @@ device_models:
         );
         assert_eq!(config.observability.log_level, "info");
         assert_eq!(
-            config.device_models,
-            vec![PathBuf::from("device-models/examples/spi-flash.yaml")]
+            config.device_packages,
+            vec![PathBuf::from("device-models/examples/generic-spi-flash")]
         );
+        assert_eq!(config.event_store, EventStoreSettings::default());
+    }
+
+    #[test]
+    fn accepts_an_explicit_event_store_policy() {
+        let yaml = VALID_CONFIG.replace(
+            "device_packages:",
+            "event_store:\n  enabled: false\n  max_size_mb: 64\n  max_events: 5000\n  cleanup_interval_seconds: 5\n  transaction_retention_hours: 2\n  register_read_retention_hours: 1\n  critical_retention_days: 7\n  register_read_sample_rate: 25\ndevice_packages:",
+        );
+        let config = ServerConfig::from_yaml(&yaml).expect("event store policy should be valid");
+        assert!(!config.event_store.enabled);
+        assert_eq!(config.event_store.max_size_mb, 64);
+        assert_eq!(config.event_store.max_events, 5_000);
+        assert_eq!(config.event_store.register_read_sample_rate, 25);
+    }
+
+    #[test]
+    fn rejects_legacy_device_models() {
+        let invalid = VALID_CONFIG.replace(
+            "device_packages:\n  - device-models/examples/generic-spi-flash",
+            "device_models:\n  - device-models/examples/generic-spi-flash/model/device.yaml",
+        );
+        let error = ServerConfig::from_yaml(&invalid).expect_err("legacy models must be rejected");
+        assert!(matches!(error, Error::ConfigValidation { .. }));
+        assert!(error.to_string().contains("device_models"));
+    }
+
+    #[test]
+    fn rejects_global_scenarios() {
+        let invalid = format!("{VALID_CONFIG}scenarios: []\n");
+        let error =
+            ServerConfig::from_yaml(&invalid).expect_err("global scenarios must be rejected");
+        assert!(matches!(error, Error::ConfigValidation { .. }));
+        assert!(error.to_string().contains("scenarios"));
     }
 
     #[test]

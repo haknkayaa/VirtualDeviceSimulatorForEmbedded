@@ -75,6 +75,8 @@ mod tests {
             payload: Some(client_request::Payload::SpiTransfer(SpiTransferRequest {
                 device_id: "spi-flash-0".to_owned(),
                 tx: vec![0x9f],
+                wire: None,
+                rx_length: 0,
             })),
         };
 
