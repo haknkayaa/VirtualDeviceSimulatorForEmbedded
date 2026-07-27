@@ -26,6 +26,32 @@ command (`0x9F`) returns `00 40 18`.
 - Protocol Buffers compiler (`protoc`)
 - A C11 compiler and `make` for the C client example
 
+## Installation
+
+On Ubuntu/Debian, install the build dependencies and the real Linux bus tools
+before configuring VDS4E:
+
+```shell
+sudo apt-get update
+sudo apt-get install -y \
+  build-essential cmake pkg-config libfuse3-dev protobuf-compiler \
+  i2c-tools libi2c-dev \
+  gpiod libgpiod-dev \
+  spi-tools
+```
+
+These distribution tools are also host-adapter compatibility clients:
+`i2cdetect`, `i2cget`, `i2cset`, and `i2ctransfer` exercise I2C;
+`gpiodetect`, `gpioinfo`, `gpioget`, `gpioset`, and `gpiomon` exercise GPIO;
+and `spi-config`/`spi-pipe` exercise spidev. Ubuntu does not package the Linux
+kernel's `tools/spi/spidev_test.c` utility separately. When that exact utility
+is needed, build the upstream Linux source for the x86_64 host instead of
+maintaining a VDS4E-specific replacement.
+
+VDS4E does not reimplement these utilities. Its host adapters provide the
+standard Linux device nodes and ioctl behavior required to run the real tools
+unchanged.
+
 ## Quick start
 
 Start the simulator server and hot-reloading Web UI together from the repository
