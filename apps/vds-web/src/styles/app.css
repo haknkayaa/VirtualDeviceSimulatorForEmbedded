@@ -625,7 +625,7 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
 .logs-virtual-row:hover { background: color-mix(in srgb,var(--cyan) 5%,var(--panel)); }.logs-table-body code,.logs-table-body time,.logs-table-body strong,.logs-table-body span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.logs-table-body code { color: #88a1b8; font-size: var(--font-size-min); }.logs-table-body strong { color: var(--text-strong); }
 .logs-empty { display: grid; place-items: center; gap: 8px; min-height: 180px; color: var(--muted); }
 .live-transaction-table { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow-x: auto; }
-.live-transaction-table-head,.live-transaction-table-body > button { display: grid; grid-template-columns: 88px 42px minmax(70px,1fr) 65px 58px; align-items: center; gap: 5px; min-width: 360px; }
+.live-transaction-table-head,.live-transaction-table-body > button { display: grid; grid-template-columns: 88px 48px 128px 108px 96px; align-items: center; gap: 5px; min-width: 488px; }
 .live-transaction-table-head { min-height: 31px; padding: 0 8px; color: var(--muted); background: rgba(255,255,255,.018); border-bottom: 1px solid var(--border); font-size: var(--font-size-min); text-transform: uppercase; }
 .live-transaction-table-body { min-height: 0; flex: 1; overflow-y: auto; }
 .live-transaction-table-body > button { width: 100%; min-height: 39px; padding: 4px 8px; color: var(--muted); background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; text-align: left; }
@@ -633,8 +633,9 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
 .live-transaction-table-body > button.active { box-shadow: inset 2px 0 var(--blue); }
 .live-transaction-table time { color: #708398; font-family: 'SFMono-Regular',Consolas,monospace; font-size: var(--font-size-min); }
 .live-transaction-table strong { overflow: hidden; color: var(--text-strong); font-size: var(--font-size-min); text-overflow: ellipsis; white-space: nowrap; }
-.transaction-table-summary { display: inline-flex; align-items: center; gap: 3px; color: #8093a7; font-family: 'SFMono-Regular',Consolas,monospace; font-size: var(--font-size-min); white-space: nowrap; }
-.live-transaction-table .transaction-status-badge { max-width: 75px; padding: 3px 5px; font-size: var(--font-size-min); font-style: normal; }
+.live-transaction-table-head > *, .live-transaction-table-body > button > * { min-width: 0; }
+.transaction-table-summary { display: inline-flex; overflow: hidden; align-items: center; gap: 3px; color: #8093a7; font-family: 'SFMono-Regular',Consolas,monospace; font-size: var(--font-size-min); text-overflow: ellipsis; white-space: nowrap; }
+.live-transaction-table .transaction-status-badge { display: block; overflow: hidden; max-width: 86px; padding: 3px 5px; font-size: var(--font-size-min); font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
 .bus-analyzer-detail > .transaction-detail-stack { min-height: 0; margin: 0; padding: 8px; overflow: auto; }
 .bus-analyzer-detail .transaction-hex-grid { grid-template-columns: 1fr; }
 .bus-analyzer-detail .signal-lane { grid-template-columns: 39px minmax(250px,1fr); }
