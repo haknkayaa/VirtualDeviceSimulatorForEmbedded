@@ -625,7 +625,7 @@ select { width: 100%; min-height: 38px; padding: 0 31px 0 10px; color: #dce1e9; 
 .logs-virtual-row:hover { background: color-mix(in srgb,var(--cyan) 5%,var(--panel)); }.logs-table-body code,.logs-table-body time,.logs-table-body strong,.logs-table-body span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.logs-table-body code { color: #88a1b8; font-size: var(--font-size-min); }.logs-table-body strong { color: var(--text-strong); }
 .logs-empty { display: grid; place-items: center; gap: 8px; min-height: 180px; color: var(--muted); }
 .live-transaction-table { display: flex; min-height: 0; flex: 1; flex-direction: column; overflow-x: auto; }
-.live-transaction-table-head,.live-transaction-table-body > button { display: grid; grid-template-columns: 60px 36px minmax(70px,1fr) 65px 58px; align-items: center; gap: 3px; min-width: 315px; }
+.live-transaction-table-head,.live-transaction-table-body > button { display: grid; grid-template-columns: 88px 42px minmax(70px,1fr) 65px 58px; align-items: center; gap: 5px; min-width: 360px; }
 .live-transaction-table-head { min-height: 31px; padding: 0 8px; color: var(--muted); background: rgba(255,255,255,.018); border-bottom: 1px solid var(--border); font-size: var(--font-size-min); text-transform: uppercase; }
 .live-transaction-table-body { min-height: 0; flex: 1; overflow-y: auto; }
 .live-transaction-table-body > button { width: 100%; min-height: 39px; padding: 4px 8px; color: var(--muted); background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer; text-align: left; }
