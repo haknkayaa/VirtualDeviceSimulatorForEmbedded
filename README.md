@@ -138,8 +138,9 @@ cargo run -p vds-cli -- device-package validate ./my-sensor
 
 The package contract supports SPI, I²C, GPIO, Ethernet, UART, CAN, USB, and
 custom buses. The authoritative runtime currently executes
-`spi` + `generic-spi-command`; the other bus families use the same package
-shape and gain execution support through new runtime drivers and adapters.
+`spi` + `generic-spi-command`, `i2c` + `generic-i2c-register`, and `gpio` +
+`generic-gpio-bank`; the other bus families use the same package shape and
+gain execution support through new runtime drivers and adapters.
 See the [Device Package SDK guide](docs/development/device-package-sdk.md).
 Community model authors should also use the
 [Device behavior flow reference](docs/device-models/device-behavior-flow-reference.md)
@@ -308,6 +309,13 @@ The Linux CUSE adapter in `adapters/spi-cuse` creates a real
 `LD_PRELOAD`, including statically linked programs, and forwards the same
 documented spidev ioctl subset to the Unix-socket data plane. It requires the
 CUSE kernel module and root privileges to create the device node.
+
+The Linux GPIO simulator adapter in `adapters/gpio-sim` provisions the
+kernel's `gpio-sim` controller through configfs. The kernel allocates a real
+`/dev/gpiochipX` character device, so `gpiodetect`, `gpioinfo`, `gpioget`,
+`gpioset`, and unmodified libgpiod applications use it exactly like an
+Embedded Linux GPIO controller. Loading the kernel module and creating the
+configfs device require operating-system authorization.
 
 ## Web UI Foundation v1
 

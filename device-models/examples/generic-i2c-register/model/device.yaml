@@ -1,0 +1,17 @@
+schema_version: 1
+
+device:
+  id: generic-i2c-register
+  name: Generic I2C Register Device
+  bus: i2c
+  model: generic-i2c-register
+  i2c:
+    register_address_bytes: 1
+    auto_increment: true
+  commands: []
+  registers:
+    - { name: DEVICE_ID, address: 0x00, width_bits: 8, reset_value: 0x42, access: ro, description: Deterministic device identification register., bitfields: [] }
+    - { name: CONTROL, address: 0x01, width_bits: 8, reset_value: 0x00, access: rw, description: Writable control register used by i2cset tests., bitfields: [] }
+    - { name: STATUS, address: 0x02, width_bits: 8, reset_value: 0x01, access: ro, description: Ready status register., bitfields: [] }
+    - { name: DATA, address: 0x03, width_bits: 8, reset_value: 0xA5, access: rw, description: General-purpose test data register., bitfields: [] }
+  faults: []

@@ -26,10 +26,18 @@ impl AdapterDriver for FakeAdapterDriver {
     }
 
     fn load(&self, adapter: &AdapterSnapshot) -> Result<Vec<u32>, AdapterError> {
-        Ok((2000_u32..)
-            .zip(adapter.bindings.iter())
-            .map(|(pid, _)| pid)
-            .collect())
+        if adapter.bus_type == "gpio" {
+            Ok(vec![3000])
+        } else {
+            Ok((2000_u32..)
+                .zip(adapter.bindings.iter())
+                .map(|(pid, _)| pid)
+                .collect())
+        }
+    }
+
+    fn loaded_device_path(&self, adapter: &AdapterSnapshot) -> Option<String> {
+        (adapter.bus_type == "gpio").then(|| "/dev/gpiochip4".to_owned())
     }
 
     fn attach_endpoint(
@@ -64,15 +72,20 @@ fn config() -> ServerConfig {
         .join("device-models/examples/generic-spi-flash")
         .canonicalize()
         .unwrap();
+    let gpio_package = root
+        .join("device-models/examples/generic-gpio-bank")
+        .canonicalize()
+        .unwrap();
     ServerConfig::from_yaml(&format!(
         r"
 schema_version: 1
 server: {{ control_address: '127.0.0.1:0' }}
 data_plane: {{ unix_socket: /tmp/vds4e-control-test.sock }}
 observability: {{ log_level: info }}
-device_packages: ['{}']
+device_packages: ['{}', '{}']
 ",
-        package.display()
+        package.display(),
+        gpio_package.display()
     ))
     .unwrap()
 }
@@ -513,6 +526,45 @@ async fn adapter_api_manages_spi_bindings_and_lifecycle() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert!(detached["bindings"].as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn adapter_api_creates_a_real_gpiochip_topology() {
+    let app = router(state_with_fake_adapters());
+    let (status, created) = json_request_with_body(
+        app.clone(),
+        "POST",
+        "/api/v1/adapters",
+        serde_json::json!({
+            "id": "gpio0",
+            "name": "GPIO 0",
+            "bus_type": "gpio",
+            "line_count": 32
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(created["driver"], "gpio-sim");
+    assert_eq!(created["line_count"], 32);
+    assert!(created["bindings"].as_array().unwrap().is_empty());
+
+    let (status, attached) = json_request_with_body(
+        app.clone(),
+        "POST",
+        "/api/v1/adapters/gpio0/bindings",
+        serde_json::json!({ "device_id": "generic-gpio-bank-32", "endpoint": 0 }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(attached["bindings"][0]["device_path"], "/dev/gpiochipX");
+    assert_eq!(attached["bindings"][0]["line_names"][0], "GPIO0");
+    assert_eq!(attached["bindings"][0]["line_names"][31], "GPIO31");
+
+    let (status, loaded) = json_request(app, "POST", "/api/v1/adapters/gpio0/load").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(loaded["state"], "loaded");
+    assert_eq!(loaded["device_path"], "/dev/gpiochip4");
+    assert_eq!(loaded["daemon_pids"][0], 3000);
 }
 
 #[tokio::test]

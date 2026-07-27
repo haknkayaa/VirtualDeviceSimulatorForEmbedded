@@ -105,20 +105,27 @@ pub(super) async fn create_device(
             )
         })?;
     model.device.id.clone_from(&request.device_id);
-    let device = model
-        .into_spi_device_with_clock(Arc::clone(&state.clock))
-        .map_err(|error| {
-            ApiError::bad_request(
-                "device_instance_create_failed",
-                format!("device instance could not be created: {error}"),
-            )
-        })?;
+    let device: Arc<dyn Device> = (if model.device.bus == "gpio" {
+        model
+            .into_gpio_device()
+            .map(|device| Arc::new(device) as Arc<dyn Device>)
+    } else {
+        model
+            .into_spi_device_with_clock(Arc::clone(&state.clock))
+            .map(|device| Arc::new(device) as Arc<dyn Device>)
+    })
+    .map_err(|error| {
+        ApiError::bad_request(
+            "device_instance_create_failed",
+            format!("device instance could not be created: {error}"),
+        )
+    })?;
     let snapshot = DeviceDto {
         id: device.id().to_owned(),
         bus: device.bus_type().to_string(),
         state: device.current_state().map_err(ApiError::device)?,
     };
-    state.registry.register(Arc::new(device)).map_err(|error| {
+    state.registry.register(device).map_err(|error| {
         if error.to_string().contains("duplicate device id") {
             ApiError::conflict("device_id_conflict", error.to_string())
         } else {

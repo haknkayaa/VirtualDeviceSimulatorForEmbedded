@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::{self, OpenOptions},
-    io::Read,
+    io::{BufRead, BufReader, Read},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{Arc, Mutex},
@@ -35,6 +35,8 @@ pub struct AdapterBinding {
     pub device_id: String,
     pub endpoint: u16,
     pub device_path: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub line_names: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -46,6 +48,8 @@ pub struct AdapterSnapshot {
     pub state: AdapterState,
     pub readiness: DriverReadiness,
     pub bus_number: u16,
+    pub line_count: Option<u16>,
+    pub device_path: Option<String>,
     pub bindings: Vec<AdapterBinding>,
     pub daemon_pids: Vec<u32>,
     pub error: Option<String>,
@@ -61,6 +65,42 @@ impl AdapterSnapshot {
             state: AdapterState::Unloaded,
             readiness: DriverReadiness::Unavailable,
             bus_number,
+            line_count: None,
+            device_path: None,
+            bindings: Vec::new(),
+            daemon_pids: Vec::new(),
+            error: None,
+        }
+    }
+
+    fn gpio(id: String, name: String, line_count: u16) -> Self {
+        Self {
+            id,
+            name,
+            bus_type: "gpio".to_owned(),
+            driver: "gpio-sim".to_owned(),
+            state: AdapterState::Unloaded,
+            readiness: DriverReadiness::Unavailable,
+            bus_number: 0,
+            line_count: Some(line_count),
+            device_path: None,
+            bindings: Vec::new(),
+            daemon_pids: Vec::new(),
+            error: None,
+        }
+    }
+
+    fn i2c(id: String, name: String, bus_number: u16) -> Self {
+        Self {
+            id,
+            name,
+            bus_type: "i2c".to_owned(),
+            driver: "cuse".to_owned(),
+            state: AdapterState::Unloaded,
+            readiness: DriverReadiness::Unavailable,
+            bus_number,
+            line_count: None,
+            device_path: None,
             bindings: Vec::new(),
             daemon_pids: Vec::new(),
             error: None,
@@ -95,6 +135,12 @@ impl std::fmt::Display for AdapterError {
 
 pub trait AdapterDriver: Send + Sync {
     fn readiness(&self) -> DriverReadiness;
+    fn readiness_for(&self, _adapter: &AdapterSnapshot) -> DriverReadiness {
+        self.readiness()
+    }
+    fn loaded_device_path(&self, _adapter: &AdapterSnapshot) -> Option<String> {
+        None
+    }
     /// Starts all endpoint processes for an adapter.
     ///
     /// # Errors
@@ -131,6 +177,74 @@ pub trait AdapterDriver: Send + Sync {
     fn unload(&self, adapter: &AdapterSnapshot) -> Result<(), AdapterError>;
 }
 
+pub struct SystemAdapterDriver {
+    spi: SystemCuseDriver,
+    i2c: SystemI2cCuseDriver,
+    gpio: SystemGpioSimDriver,
+}
+
+impl SystemAdapterDriver {
+    fn from_config(config: &ServerConfig) -> Self {
+        Self {
+            spi: SystemCuseDriver::from_config(config),
+            i2c: SystemI2cCuseDriver::from_config(config),
+            gpio: SystemGpioSimDriver::from_config(config),
+        }
+    }
+
+    fn driver(&self, adapter: &AdapterSnapshot) -> Result<&dyn AdapterDriver, AdapterError> {
+        match adapter.bus_type.as_str() {
+            "spi" => Ok(&self.spi),
+            "i2c" => Ok(&self.i2c),
+            "gpio" => Ok(&self.gpio),
+            bus => Err(AdapterError::DriverUnavailable(format!(
+                "no host adapter driver is registered for bus '{bus}'"
+            ))),
+        }
+    }
+}
+
+impl AdapterDriver for SystemAdapterDriver {
+    fn readiness(&self) -> DriverReadiness {
+        DriverReadiness::Ready
+    }
+
+    fn readiness_for(&self, adapter: &AdapterSnapshot) -> DriverReadiness {
+        self.driver(adapter)
+            .map_or(DriverReadiness::Unavailable, AdapterDriver::readiness)
+    }
+
+    fn loaded_device_path(&self, adapter: &AdapterSnapshot) -> Option<String> {
+        self.driver(adapter)
+            .ok()
+            .and_then(|driver| driver.loaded_device_path(adapter))
+    }
+
+    fn load(&self, adapter: &AdapterSnapshot) -> Result<Vec<u32>, AdapterError> {
+        self.driver(adapter)?.load(adapter)
+    }
+
+    fn attach_endpoint(
+        &self,
+        adapter: &AdapterSnapshot,
+        binding: &AdapterBinding,
+    ) -> Result<u32, AdapterError> {
+        self.driver(adapter)?.attach_endpoint(adapter, binding)
+    }
+
+    fn detach_endpoint(
+        &self,
+        adapter: &AdapterSnapshot,
+        binding: &AdapterBinding,
+    ) -> Result<u32, AdapterError> {
+        self.driver(adapter)?.detach_endpoint(adapter, binding)
+    }
+
+    fn unload(&self, adapter: &AdapterSnapshot) -> Result<(), AdapterError> {
+        self.driver(adapter)?.unload(adapter)
+    }
+}
+
 pub struct SystemCuseDriver {
     executable: PathBuf,
     socket_path: PathBuf,
@@ -146,9 +260,8 @@ struct ManagedChild {
 impl SystemCuseDriver {
     #[must_use]
     pub fn from_config(config: &ServerConfig) -> Self {
-        let executable = std::env::var_os("VDS4E_SPI_CUSE_EXECUTABLE")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| {
+        let executable = std::env::var_os("VDS4E_SPI_CUSE_EXECUTABLE").map_or_else(
+            || {
                 [
                     PathBuf::from(".vds4e-build/spi-cuse/vds4e-spi-cuse"),
                     PathBuf::from("build/spi-cuse/vds4e-spi-cuse"),
@@ -157,10 +270,10 @@ impl SystemCuseDriver {
                 ]
                 .into_iter()
                 .find(|candidate| candidate.is_file())
-                .unwrap_or_else(|| {
-                    PathBuf::from(".vds4e-build/spi-cuse/vds4e-spi-cuse")
-                })
-            });
+                .unwrap_or_else(|| PathBuf::from(".vds4e-build/spi-cuse/vds4e-spi-cuse"))
+            },
+            PathBuf::from,
+        );
         Self {
             executable,
             socket_path: config.data_plane.unix_socket.clone(),
@@ -538,6 +651,440 @@ impl AdapterDriver for SystemCuseDriver {
     }
 }
 
+pub struct SystemI2cCuseDriver {
+    executable: PathBuf,
+    socket_path: PathBuf,
+    children: Mutex<HashMap<String, Vec<ManagedChild>>>,
+}
+
+impl SystemI2cCuseDriver {
+    fn from_config(config: &ServerConfig) -> Self {
+        let executable = std::env::var_os("VDS4E_I2C_CUSE_EXECUTABLE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                [
+                    PathBuf::from(".vds4e-build/i2c-cuse/vds4e-i2c-cuse"),
+                    PathBuf::from("build/i2c-cuse/vds4e-i2c-cuse"),
+                    PathBuf::from("/usr/local/bin/vds4e-i2c-cuse"),
+                    PathBuf::from("/usr/bin/vds4e-i2c-cuse"),
+                ]
+                .into_iter()
+                .find(|candidate| candidate.is_file())
+                .unwrap_or_else(|| PathBuf::from(".vds4e-build/i2c-cuse/vds4e-i2c-cuse"))
+            });
+        Self {
+            executable,
+            socket_path: config.data_plane.unix_socket.clone(),
+            children: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn bus_path(adapter: &AdapterSnapshot) -> String {
+        format!("/dev/i2c-{}", adapter.bus_number)
+    }
+}
+
+impl AdapterDriver for SystemI2cCuseDriver {
+    fn readiness(&self) -> DriverReadiness {
+        if !self.executable.is_file() {
+            return DriverReadiness::Unavailable;
+        }
+        if !Path::new("/dev/cuse").exists() || !SystemCuseDriver::cuse_accessible() {
+            return DriverReadiness::AuthorizationRequired;
+        }
+        DriverReadiness::Ready
+    }
+
+    fn loaded_device_path(&self, adapter: &AdapterSnapshot) -> Option<String> {
+        Some(Self::bus_path(adapter))
+    }
+
+    fn load(&self, adapter: &AdapterSnapshot) -> Result<Vec<u32>, AdapterError> {
+        if !self.executable.is_file() {
+            return Err(AdapterError::DriverUnavailable(format!(
+                "I2C CUSE executable '{}' is unavailable",
+                self.executable.display()
+            )));
+        }
+        if !Path::new("/dev/cuse").exists() {
+            SystemCuseDriver::authorize_cuse()?;
+        }
+        let privileged = !SystemCuseDriver::cuse_accessible();
+        let executable = self.executable.canonicalize().map_err(|error| {
+            AdapterError::DriverUnavailable(format!(
+                "failed to resolve I2C CUSE executable: {error}"
+            ))
+        })?;
+        let mut command = if privileged {
+            let mut command = Command::new("/usr/bin/pkexec");
+            command.arg(&executable);
+            command
+        } else {
+            Command::new(&executable)
+        };
+        command
+            .arg("--name")
+            .arg(format!("i2c-{}", adapter.bus_number))
+            .arg("--socket")
+            .arg(&self.socket_path)
+            .arg("--parent-pid")
+            .arg(std::process::id().to_string());
+        for binding in &adapter.bindings {
+            command
+                .arg("--binding")
+                .arg(format!("{:#x}={}", binding.endpoint, binding.device_id));
+        }
+        let child = command
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| {
+                AdapterError::Process(format!("failed to start I2C CUSE adapter: {error}"))
+            })?;
+        let mut managed = ManagedChild {
+            child,
+            device_id: adapter.id.clone(),
+            privileged,
+        };
+        let path = Self::bus_path(adapter);
+        let deadline = Instant::now() + Duration::from_secs(120);
+        while !Path::new(&path).exists() {
+            if let Some(status) = managed.child.try_wait().map_err(|error| {
+                AdapterError::Process(format!("failed to inspect I2C CUSE adapter: {error}"))
+            })? {
+                let mut stderr = String::new();
+                if let Some(mut output) = managed.child.stderr.take() {
+                    let _ = output.read_to_string(&mut stderr);
+                }
+                return Err(AdapterError::Process(format!(
+                    "I2C CUSE adapter exited during startup with {status}: {}",
+                    stderr.trim()
+                )));
+            }
+            if Instant::now() >= deadline {
+                let _ = SystemCuseDriver::stop_children(std::slice::from_mut(&mut managed));
+                return Err(AdapterError::Process(format!(
+                    "timed out waiting for '{path}'"
+                )));
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+        let pid = managed.child.id();
+        self.children
+            .lock()
+            .map_err(|_| AdapterError::Process("I2C adapter lock is poisoned".to_owned()))?
+            .insert(adapter.id.clone(), vec![managed]);
+        Ok(vec![pid])
+    }
+
+    fn attach_endpoint(
+        &self,
+        _adapter: &AdapterSnapshot,
+        _binding: &AdapterBinding,
+    ) -> Result<u32, AdapterError> {
+        Err(AdapterError::Conflict(
+            "unload the I2C adapter before changing address bindings".to_owned(),
+        ))
+    }
+
+    fn detach_endpoint(
+        &self,
+        _adapter: &AdapterSnapshot,
+        _binding: &AdapterBinding,
+    ) -> Result<u32, AdapterError> {
+        Err(AdapterError::Conflict(
+            "unload the I2C adapter before changing address bindings".to_owned(),
+        ))
+    }
+
+    fn unload(&self, adapter: &AdapterSnapshot) -> Result<(), AdapterError> {
+        if let Some(mut children) = self
+            .children
+            .lock()
+            .map_err(|_| AdapterError::Process("I2C adapter lock is poisoned".to_owned()))?
+            .remove(&adapter.id)
+        {
+            SystemCuseDriver::stop_children(&mut children)?;
+        }
+        Ok(())
+    }
+}
+
+pub struct SystemGpioSimDriver {
+    executable: PathBuf,
+    configfs_root: PathBuf,
+    socket_path: PathBuf,
+    children: Mutex<HashMap<String, ManagedGpioChip>>,
+}
+
+struct ManagedGpioChip {
+    child: Child,
+    device_path: String,
+    privileged: bool,
+}
+
+impl SystemGpioSimDriver {
+    fn from_config(config: &ServerConfig) -> Self {
+        let executable = std::env::var_os("VDS4E_GPIO_SIM_EXECUTABLE").map_or_else(
+            || {
+                [
+                    PathBuf::from(".vds4e-build/gpio-sim/vds4e-gpio-sim"),
+                    PathBuf::from("build/gpio-sim/vds4e-gpio-sim"),
+                    PathBuf::from("/usr/local/bin/vds4e-gpio-sim"),
+                    PathBuf::from("/usr/bin/vds4e-gpio-sim"),
+                ]
+                .into_iter()
+                .find(|candidate| candidate.is_file())
+                .unwrap_or_else(|| PathBuf::from(".vds4e-build/gpio-sim/vds4e-gpio-sim"))
+            },
+            PathBuf::from,
+        );
+        let configfs_root = std::env::var_os("VDS4E_GPIO_SIM_CONFIGFS").map_or_else(
+            || PathBuf::from("/sys/kernel/config/gpio-sim"),
+            PathBuf::from,
+        );
+        Self {
+            executable,
+            configfs_root,
+            socket_path: config.data_plane.unix_socket.clone(),
+            children: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn configfs_accessible(&self) -> bool {
+        let effective_uid = fs::read_to_string("/proc/self/status")
+            .ok()
+            .and_then(|status| {
+                status
+                    .lines()
+                    .find(|line| line.starts_with("Uid:"))
+                    .and_then(|line| line.split_whitespace().nth(2))
+                    .and_then(|value| value.parse::<u32>().ok())
+            });
+        self.configfs_root.is_dir() && effective_uid == Some(0)
+    }
+
+    fn authorize_gpio_sim(&self) -> Result<(), AdapterError> {
+        if self.configfs_root.exists() {
+            return Ok(());
+        }
+        let modprobe = ["/usr/sbin/modprobe", "/sbin/modprobe"]
+            .into_iter()
+            .find(|candidate| Path::new(candidate).is_file())
+            .ok_or_else(|| {
+                AdapterError::DriverUnavailable(
+                    "modprobe is unavailable; load the gpio-sim kernel module manually".to_owned(),
+                )
+            })?;
+        if !Path::new("/usr/bin/pkexec").is_file() {
+            return Err(AdapterError::AuthorizationRequired(
+                "Polkit pkexec is unavailable; run 'sudo modprobe gpio-sim' first".to_owned(),
+            ));
+        }
+        let status = Command::new("/usr/bin/pkexec")
+            .arg(modprobe)
+            .arg("gpio-sim")
+            .status()
+            .map_err(|error| {
+                AdapterError::Process(format!(
+                    "failed to request gpio-sim module authorization: {error}"
+                ))
+            })?;
+        if !status.success() {
+            return Err(AdapterError::AuthorizationRequired(
+                "operating-system authorization was cancelled while loading gpio-sim".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn stop_chip(managed: &mut ManagedGpioChip) -> Result<(), AdapterError> {
+        if managed
+            .child
+            .try_wait()
+            .map_err(|error| {
+                AdapterError::Process(format!(
+                    "failed to inspect gpio-sim adapter during shutdown: {error}"
+                ))
+            })?
+            .is_some()
+        {
+            return Ok(());
+        }
+        if managed.privileged {
+            let status = Command::new("/usr/bin/pkexec")
+                .arg("/bin/kill")
+                .arg("-TERM")
+                .arg(managed.child.id().to_string())
+                .status()
+                .map_err(|error| {
+                    AdapterError::Process(format!(
+                        "failed to request gpio-sim shutdown authorization: {error}"
+                    ))
+                })?;
+            if !status.success() {
+                return Err(AdapterError::AuthorizationRequired(
+                    "operating-system authorization was cancelled while unloading gpio-sim"
+                        .to_owned(),
+                ));
+            }
+        } else {
+            let status = Command::new("/bin/kill")
+                .arg("-TERM")
+                .arg(managed.child.id().to_string())
+                .status()
+                .map_err(|error| {
+                    AdapterError::Process(format!("failed to signal gpio-sim adapter: {error}"))
+                })?;
+            if !status.success() {
+                return Err(AdapterError::Process(
+                    "gpio-sim adapter rejected SIGTERM".to_owned(),
+                ));
+            }
+        }
+        let _ = managed.child.wait();
+        Ok(())
+    }
+}
+
+impl AdapterDriver for SystemGpioSimDriver {
+    fn readiness(&self) -> DriverReadiness {
+        if !self.executable.is_file() {
+            return DriverReadiness::Unavailable;
+        }
+        if self.configfs_accessible() {
+            DriverReadiness::Ready
+        } else {
+            DriverReadiness::AuthorizationRequired
+        }
+    }
+
+    fn loaded_device_path(&self, adapter: &AdapterSnapshot) -> Option<String> {
+        self.children
+            .lock()
+            .ok()?
+            .get(&adapter.id)
+            .map(|managed| managed.device_path.clone())
+    }
+
+    fn load(&self, adapter: &AdapterSnapshot) -> Result<Vec<u32>, AdapterError> {
+        if !self.executable.is_file() {
+            return Err(AdapterError::DriverUnavailable(format!(
+                "GPIO simulator executable '{}' is unavailable",
+                self.executable.display()
+            )));
+        }
+        self.authorize_gpio_sim()?;
+        let privileged = !self.configfs_accessible();
+        if privileged && !Path::new("/usr/bin/pkexec").is_file() {
+            return Err(AdapterError::AuthorizationRequired(
+                "Polkit pkexec is unavailable; start vds-server with access to gpio-sim configfs"
+                    .to_owned(),
+            ));
+        }
+        let executable = self.executable.canonicalize().map_err(|error| {
+            AdapterError::DriverUnavailable(format!(
+                "failed to resolve GPIO simulator executable '{}': {error}",
+                self.executable.display()
+            ))
+        })?;
+        let line_count = adapter.line_count.ok_or_else(|| {
+            AdapterError::Invalid("GPIO adapter line_count is missing".to_owned())
+        })?;
+        let binding = adapter.bindings.first().ok_or_else(|| {
+            AdapterError::Invalid(
+                "attach one GPIO runtime device before loading the adapter".to_owned(),
+            )
+        })?;
+        let helper_name = format!("vds4e-{}", adapter.id.replace('.', "-"));
+        let mut command = if privileged {
+            let mut command = Command::new("/usr/bin/pkexec");
+            command.arg(&executable);
+            command
+        } else {
+            Command::new(&executable)
+        };
+        command
+            .arg("--name")
+            .arg(helper_name)
+            .arg("--label")
+            .arg(&adapter.name)
+            .arg("--lines")
+            .arg(line_count.to_string())
+            .arg("--configfs-root")
+            .arg(&self.configfs_root)
+            .arg("--device-id")
+            .arg(&binding.device_id)
+            .arg("--socket")
+            .arg(&self.socket_path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit());
+        for line_name in &binding.line_names {
+            command.arg("--line-name").arg(line_name);
+        }
+        let mut child = command.spawn().map_err(|error| {
+            AdapterError::Process(format!("failed to start GPIO simulator: {error}"))
+        })?;
+        let mut device_path = String::new();
+        let stdout = child.stdout.take().ok_or_else(|| {
+            AdapterError::Process("GPIO simulator stdout is unavailable".to_owned())
+        })?;
+        BufReader::new(stdout)
+            .read_line(&mut device_path)
+            .map_err(|error| {
+                AdapterError::Process(format!(
+                    "failed to read GPIO simulator device path: {error}"
+                ))
+            })?;
+        let device_path = device_path.trim().to_owned();
+        if !device_path.starts_with("/dev/gpiochip") {
+            let status = child.wait().map_err(|error| {
+                AdapterError::Process(format!("failed to collect GPIO simulator failure: {error}"))
+            })?;
+            return Err(AdapterError::Process(format!(
+                "GPIO simulator did not create a gpiochip device (status {status})"
+            )));
+        }
+        let pid = child.id();
+        self.children
+            .lock()
+            .map_err(|_| AdapterError::Process("GPIO adapter lock is poisoned".to_owned()))?
+            .insert(
+                adapter.id.clone(),
+                ManagedGpioChip {
+                    child,
+                    device_path,
+                    privileged,
+                },
+            );
+        Ok(vec![pid])
+    }
+
+    fn detach_endpoint(
+        &self,
+        _adapter: &AdapterSnapshot,
+        _binding: &AdapterBinding,
+    ) -> Result<u32, AdapterError> {
+        Err(AdapterError::Invalid(
+            "unload the GPIO adapter before detaching its runtime device".to_owned(),
+        ))
+    }
+
+    fn unload(&self, adapter: &AdapterSnapshot) -> Result<(), AdapterError> {
+        let mut managed = self
+            .children
+            .lock()
+            .map_err(|_| AdapterError::Process("GPIO adapter lock is poisoned".to_owned()))?
+            .remove(&adapter.id);
+        if let Some(managed) = managed.as_mut() {
+            Self::stop_chip(managed)?;
+        }
+        Ok(())
+    }
+}
+
 pub struct AdapterManager {
     adapters: Mutex<HashMap<String, AdapterSnapshot>>,
     driver: Arc<dyn AdapterDriver>,
@@ -546,9 +1093,8 @@ pub struct AdapterManager {
 impl AdapterManager {
     #[must_use]
     pub fn new(driver: Arc<dyn AdapterDriver>) -> Self {
-        let readiness = driver.readiness();
         let mut adapter = AdapterSnapshot::spi("spi0".to_owned(), "SPI 0".to_owned(), 0);
-        adapter.readiness = readiness;
+        adapter.readiness = driver.readiness_for(&adapter);
         Self {
             adapters: Mutex::new(HashMap::from([(adapter.id.clone(), adapter)])),
             driver,
@@ -557,7 +1103,7 @@ impl AdapterManager {
 
     #[must_use]
     pub fn system(config: &ServerConfig) -> Self {
-        Self::new(Arc::new(SystemCuseDriver::from_config(config)))
+        Self::new(Arc::new(SystemAdapterDriver::from_config(config)))
     }
 
     /// Returns deterministic adapter snapshots with current driver readiness.
@@ -565,7 +1111,6 @@ impl AdapterManager {
     /// # Errors
     /// Returns an error when adapter state cannot be locked.
     pub fn list(&self) -> Result<Vec<AdapterSnapshot>, AdapterError> {
-        let readiness = self.driver.readiness();
         let mut snapshots = self
             .adapters
             .lock()
@@ -574,7 +1119,10 @@ impl AdapterManager {
             .cloned()
             .collect::<Vec<_>>();
         for adapter in &mut snapshots {
-            adapter.readiness = readiness;
+            adapter.readiness = self.driver.readiness_for(adapter);
+            if adapter.state == AdapterState::Loaded {
+                adapter.device_path = self.driver.loaded_device_path(adapter);
+            }
         }
         snapshots.sort_by(|left, right| left.id.cmp(&right.id));
         Ok(snapshots)
@@ -613,7 +1161,80 @@ impl AdapterManager {
             )));
         }
         let mut adapter = AdapterSnapshot::spi(id.clone(), name, bus_number);
-        adapter.readiness = self.driver.readiness();
+        adapter.readiness = self.driver.readiness_for(&adapter);
+        adapters.insert(id, adapter.clone());
+        Ok(adapter)
+    }
+
+    /// Creates an unloaded logical GPIO controller backed by kernel gpio-sim.
+    ///
+    /// # Errors
+    /// Returns an error for invalid IDs, duplicate adapters, or invalid line counts.
+    pub fn create_gpio(
+        &self,
+        id: String,
+        name: String,
+        line_count: u16,
+    ) -> Result<AdapterSnapshot, AdapterError> {
+        if !valid_id(&id) {
+            return Err(AdapterError::Invalid(
+                "adapter id must contain 1-64 letters, numbers, '.', '_' or '-' and start with a letter or number".to_owned(),
+            ));
+        }
+        if line_count == 0 || line_count > 1024 {
+            return Err(AdapterError::Invalid(
+                "GPIO line count must be between 1 and 1024".to_owned(),
+            ));
+        }
+        let mut adapters = self
+            .adapters
+            .lock()
+            .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
+        if adapters.contains_key(&id) {
+            return Err(AdapterError::Duplicate(format!(
+                "adapter '{id}' already exists"
+            )));
+        }
+        let mut adapter = AdapterSnapshot::gpio(id.clone(), name, line_count);
+        adapter.readiness = self.driver.readiness_for(&adapter);
+        adapters.insert(id, adapter.clone());
+        Ok(adapter)
+    }
+
+    /// Creates an unloaded logical Linux I2C controller.
+    ///
+    /// # Errors
+    /// Returns an error for invalid IDs or duplicate I2C bus assignments.
+    pub fn create_i2c(
+        &self,
+        id: String,
+        name: String,
+        bus_number: u16,
+    ) -> Result<AdapterSnapshot, AdapterError> {
+        if !valid_id(&id) {
+            return Err(AdapterError::Invalid(
+                "adapter id must contain 1-64 letters, numbers, '.', '_' or '-' and start with a letter or number".to_owned(),
+            ));
+        }
+        let mut adapters = self
+            .adapters
+            .lock()
+            .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
+        if adapters.contains_key(&id) {
+            return Err(AdapterError::Duplicate(format!(
+                "adapter '{id}' already exists"
+            )));
+        }
+        if adapters
+            .values()
+            .any(|adapter| adapter.bus_type == "i2c" && adapter.bus_number == bus_number)
+        {
+            return Err(AdapterError::Conflict(format!(
+                "I2C bus number {bus_number} is already assigned"
+            )));
+        }
+        let mut adapter = AdapterSnapshot::i2c(id.clone(), name, bus_number);
+        adapter.readiness = self.driver.readiness_for(&adapter);
         adapters.insert(id, adapter.clone());
         Ok(adapter)
     }
@@ -627,6 +1248,44 @@ impl AdapterManager {
         adapter_id: &str,
         device_id: String,
         endpoint: u16,
+    ) -> Result<AdapterSnapshot, AdapterError> {
+        self.attach_with_line_names(adapter_id, device_id, endpoint, Vec::new())
+    }
+
+    /// Attaches one declarative GPIO bank and its line metadata.
+    ///
+    /// # Errors
+    /// Returns an error when the GPIO width differs from the adapter.
+    pub fn attach_gpio(
+        &self,
+        adapter_id: &str,
+        device_id: String,
+        line_names: Vec<String>,
+    ) -> Result<AdapterSnapshot, AdapterError> {
+        let expected = self
+            .adapters
+            .lock()
+            .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?
+            .get(adapter_id)
+            .ok_or_else(|| AdapterError::NotFound(format!("adapter '{adapter_id}' was not found")))?
+            .line_count;
+        if expected != u16::try_from(line_names.len()).ok() {
+            return Err(AdapterError::Invalid(format!(
+                "GPIO adapter expects {} lines but device '{}' declares {}",
+                expected.unwrap_or(0),
+                device_id,
+                line_names.len()
+            )));
+        }
+        self.attach_with_line_names(adapter_id, device_id, 0, line_names)
+    }
+
+    fn attach_with_line_names(
+        &self,
+        adapter_id: &str,
+        device_id: String,
+        endpoint: u16,
+        line_names: Vec<String>,
     ) -> Result<AdapterSnapshot, AdapterError> {
         let (snapshot, binding) = {
             let adapters = self
@@ -647,21 +1306,51 @@ impl AdapterManager {
                 AdapterError::NotFound(format!("adapter '{adapter_id}' was not found"))
             })?;
             require_stable_topology(adapter)?;
+            if adapter.bus_type == "i2c" && adapter.state == AdapterState::Loaded {
+                return Err(AdapterError::Conflict(
+                    "unload the I2C adapter before changing address bindings".to_owned(),
+                ));
+            }
+            if adapter.bus_type == "gpio" && adapter.state == AdapterState::Loaded {
+                return Err(AdapterError::Conflict(
+                    "unload the GPIO adapter before changing its runtime binding".to_owned(),
+                ));
+            }
             if adapter
                 .bindings
                 .iter()
                 .any(|binding| binding.endpoint == endpoint)
             {
                 return Err(AdapterError::Conflict(format!(
-                    "chip-select {endpoint} is already occupied"
+                    "{} {endpoint:#x} is already occupied",
+                    if adapter.bus_type == "i2c" {
+                        "I2C address"
+                    } else {
+                        "chip-select"
+                    }
                 )));
+            }
+            if adapter.bus_type == "i2c" && endpoint > 0x3ff {
+                return Err(AdapterError::Invalid(
+                    "I2C addresses must be between 0x00 and 0x3ff".to_owned(),
+                ));
+            }
+            if adapter.bus_type == "gpio" && !adapter.bindings.is_empty() {
+                return Err(AdapterError::Conflict(
+                    "a GPIO adapter can bind exactly one GPIO bank device".to_owned(),
+                ));
             }
             (
                 adapter.clone(),
                 AdapterBinding {
                     device_id,
                     endpoint,
-                    device_path: format!("/dev/spidev{}.{}", adapter.bus_number, endpoint),
+                    device_path: match adapter.bus_type.as_str() {
+                        "gpio" => "/dev/gpiochipX".to_owned(),
+                        "i2c" => format!("/dev/i2c-{}", adapter.bus_number),
+                        _ => format!("/dev/spidev{}.{}", adapter.bus_number, endpoint),
+                    },
+                    line_names,
                 },
             )
         };
@@ -706,6 +1395,16 @@ impl AdapterManager {
                 AdapterError::NotFound(format!("adapter '{adapter_id}' was not found"))
             })?;
             require_stable_topology(adapter)?;
+            if adapter.bus_type == "i2c" && adapter.state == AdapterState::Loaded {
+                return Err(AdapterError::Conflict(
+                    "unload the I2C adapter before changing address bindings".to_owned(),
+                ));
+            }
+            if adapter.bus_type == "gpio" && adapter.state == AdapterState::Loaded {
+                return Err(AdapterError::Conflict(
+                    "unload the GPIO adapter before changing its runtime binding".to_owned(),
+                ));
+            }
             let binding = adapter
                 .bindings
                 .iter()
@@ -757,7 +1456,7 @@ impl AdapterManager {
                 AdapterError::NotFound(format!("adapter '{adapter_id}' was not found"))
             })?;
             require_unloaded(adapter)?;
-            if adapter.bindings.is_empty() {
+            if adapter.bus_type != "gpio" && adapter.bindings.is_empty() {
                 return Err(AdapterError::Conflict(
                     "attach at least one device before loading the adapter".to_owned(),
                 ));
@@ -797,7 +1496,19 @@ impl AdapterManager {
         adapter.state = state;
         adapter.daemon_pids = pids;
         adapter.error = error;
-        adapter.readiness = self.driver.readiness();
+        adapter.readiness = self.driver.readiness_for(adapter);
+        adapter.device_path = if state == AdapterState::Loaded {
+            self.driver.loaded_device_path(adapter)
+        } else {
+            None
+        };
+        if adapter.bus_type == "gpio" {
+            if let (Some(binding), Some(device_path)) =
+                (adapter.bindings.first_mut(), adapter.device_path.as_ref())
+            {
+                binding.device_path.clone_from(device_path);
+            }
+        }
         Ok(adapter.clone())
     }
 
@@ -882,10 +1593,24 @@ mod tests {
         }
 
         fn load(&self, adapter: &AdapterSnapshot) -> Result<Vec<u32>, AdapterError> {
-            Ok((1000_u32..)
-                .zip(adapter.bindings.iter())
-                .map(|(pid, _)| pid)
-                .collect())
+            if adapter.bus_type == "gpio" {
+                Ok(vec![2000])
+            } else if adapter.bus_type == "i2c" {
+                Ok(vec![3000])
+            } else {
+                Ok((1000_u32..)
+                    .zip(adapter.bindings.iter())
+                    .map(|(pid, _)| pid)
+                    .collect())
+            }
+        }
+
+        fn loaded_device_path(&self, adapter: &AdapterSnapshot) -> Option<String> {
+            match adapter.bus_type.as_str() {
+                "gpio" => Some("/dev/gpiochip7".to_owned()),
+                "i2c" => Some(format!("/dev/i2c-{}", adapter.bus_number)),
+                _ => None,
+            }
         }
 
         fn attach_endpoint(
@@ -949,6 +1674,46 @@ mod tests {
         ));
         assert!(matches!(
             manager.attach("spi0", "adc-0".to_owned(), 0),
+            Err(AdapterError::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn loads_gpio_adapter_without_device_bindings() {
+        let manager = AdapterManager::new(Arc::new(FakeDriver));
+        let created = manager
+            .create_gpio("gpio0".to_owned(), "GPIO 0".to_owned(), 32)
+            .unwrap();
+        assert_eq!(created.driver, "gpio-sim");
+        assert_eq!(created.line_count, Some(32));
+        assert!(created.bindings.is_empty());
+
+        manager
+            .attach_gpio(
+                "gpio0",
+                "gpio-bank".to_owned(),
+                (0..32).map(|offset| format!("GPIO{offset}")).collect(),
+            )
+            .unwrap();
+        let loaded = manager.load("gpio0").unwrap();
+        assert_eq!(loaded.state, AdapterState::Loaded);
+        assert_eq!(loaded.daemon_pids, vec![2000]);
+        assert_eq!(loaded.device_path.as_deref(), Some("/dev/gpiochip7"));
+    }
+
+    #[test]
+    fn manages_i2c_address_bindings_as_one_bus_daemon() {
+        let manager = AdapterManager::new(Arc::new(FakeDriver));
+        manager
+            .create_i2c("i2c0".to_owned(), "I2C 0".to_owned(), 0)
+            .unwrap();
+        let attached = manager.attach("i2c0", "sensor".to_owned(), 0x50).unwrap();
+        assert_eq!(attached.bindings[0].device_path, "/dev/i2c-0");
+        let loaded = manager.load("i2c0").unwrap();
+        assert_eq!(loaded.daemon_pids, [3000]);
+        assert_eq!(loaded.device_path.as_deref(), Some("/dev/i2c-0"));
+        assert!(matches!(
+            manager.attach("i2c0", "other".to_owned(), 0x51),
             Err(AdapterError::Conflict(_))
         ));
     }

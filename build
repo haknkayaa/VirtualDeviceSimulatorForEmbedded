@@ -33,6 +33,12 @@ cmake --build "$STATE_DIR/spi-preload" --config Release --parallel
 echo "Building SPI CUSE adapter..."
 cmake --build "$STATE_DIR/spi-cuse" --config Release --parallel
 
+echo "Building I2C CUSE adapter..."
+cmake --build "$STATE_DIR/i2c-cuse" --config Release --parallel
+
+echo "Building GPIO simulator adapter..."
+cmake --build "$STATE_DIR/gpio-sim" --config Release --parallel
+
 echo "Building Micron MT25QL256 Embedded Linux tool..."
 "${CC:-cc}" \
   -O2 -g -Wall -Wextra -Wpedantic -Werror -std=c11 \

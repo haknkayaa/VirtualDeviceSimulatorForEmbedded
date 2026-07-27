@@ -8,6 +8,8 @@ WEB_PORT="${VDS_WEB_PORT:-4174}"
 CONTROL_PORT=8080
 SPI_CUSE_BUILD_DIR="$ROOT_DIR/.vds4e-build/spi-cuse"
 SPI_CUSE_EXECUTABLE="$SPI_CUSE_BUILD_DIR/vds4e-spi-cuse"
+I2C_CUSE_BUILD_DIR="$ROOT_DIR/.vds4e-build/i2c-cuse"
+I2C_CUSE_EXECUTABLE="$I2C_CUSE_BUILD_DIR/vds4e-i2c-cuse"
 LOCK_FILE="${TMPDIR:-/tmp}/vds4e-dev-${UID}.lock"
 SERVER_PID=""
 WEB_PID=""
@@ -63,7 +65,16 @@ cmake \
   -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$SPI_CUSE_BUILD_DIR" --parallel
 
-setsid env VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
+echo "Configuring and building the I2C CUSE adapter..."
+cmake \
+  -S "$ROOT_DIR/adapters/i2c-cuse" \
+  -B "$I2C_CUSE_BUILD_DIR" \
+  -DCMAKE_BUILD_TYPE=Debug
+cmake --build "$I2C_CUSE_BUILD_DIR" --parallel
+
+setsid env \
+  VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
+  VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
   cargo run -p vds-server -- --config config/vds-server.yaml &
 SERVER_PID=$!
 

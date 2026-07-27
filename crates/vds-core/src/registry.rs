@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use crate::device::{Device, DeviceError, DeviceTransfer, SpiWireConfig};
+use crate::device::{Device, DeviceError, DeviceTransfer, I2cMessage, SpiWireConfig};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DeviceSnapshot {
@@ -73,6 +73,41 @@ impl DeviceRegistry {
     ) -> Result<DeviceTransfer, DeviceError> {
         self.device(device_id)?
             .transfer_spi(request, rx_length, wire)
+    }
+
+    /// Routes an atomic I2C message sequence to a registered device.
+    ///
+    /// # Errors
+    /// Returns an error when the device is unknown or rejects the transfer.
+    pub fn transfer_i2c(
+        &self,
+        device_id: &str,
+        messages: &[I2cMessage],
+    ) -> Result<Vec<Vec<u8>>, DeviceError> {
+        self.device(device_id)?.transfer_i2c(messages)
+    }
+
+    /// Exchanges GPIO line levels with a registered GPIO device.
+    ///
+    /// # Errors
+    /// Returns an error when the device is unknown or rejects the line vector.
+    pub fn exchange_gpio(
+        &self,
+        device_id: &str,
+        host_values: &[bool],
+    ) -> Result<Vec<bool>, DeviceError> {
+        self.device(device_id)?.exchange_gpio(host_values)
+    }
+
+    /// Returns declarative GPIO line metadata for adapter provisioning.
+    ///
+    /// # Errors
+    /// Returns an error when the device is unknown or metadata is unavailable.
+    pub fn gpio_lines(
+        &self,
+        device_id: &str,
+    ) -> Result<Vec<crate::device::GpioLineSnapshot>, DeviceError> {
+        self.device(device_id)?.gpio_lines()
     }
 
     /// Resets one registered device.

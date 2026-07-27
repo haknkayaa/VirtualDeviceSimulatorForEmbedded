@@ -8,7 +8,27 @@ message ClientRequest {
 
   oneof payload {
     SpiTransferRequest spi_transfer = 10;
+    GpioExchangeRequest gpio_exchange = 11;
+    I2cTransferRequest i2c_transfer = 12;
   }
+}
+
+message GpioExchangeRequest {
+  string device_id = 1;
+  repeated bool host_values = 2;
+}
+
+message I2cTransferRequest {
+  string device_id = 1;
+  uint32 address = 2;
+  repeated I2cMessage messages = 3;
+}
+
+message I2cMessage {
+  bool read = 1;
+  bytes data = 2;
+  uint32 read_length = 3;
+  uint32 flags = 4;
 }
 
 message SpiTransferRequest {
@@ -52,7 +72,17 @@ message ServerResponse {
   oneof result {
     SpiTransferResponse spi_transfer = 10;
     ErrorResponse error = 11;
+    GpioExchangeResponse gpio_exchange = 12;
+    I2cTransferResponse i2c_transfer = 13;
   }
+}
+
+message GpioExchangeResponse {
+  repeated bool device_values = 1;
+}
+
+message I2cTransferResponse {
+  repeated bytes reads = 1;
 }
 
 message SpiTransferResponse {

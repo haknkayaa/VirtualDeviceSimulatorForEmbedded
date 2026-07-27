@@ -150,6 +150,72 @@ static int parse_spi_response(decoder_t *decoder,
     return 0;
 }
 
+static int parse_gpio_response(decoder_t *decoder,
+                               uint8_t *values,
+                               size_t capacity,
+                               size_t *count) {
+    while (decoder->offset < decoder->length) {
+        uint64_t tag = 0U;
+        if (decode_varint(decoder, &tag) != 0) {
+            return -1;
+        }
+        const uint32_t field = (uint32_t)(tag >> 3U);
+        const uint32_t wire_type = (uint32_t)(tag & 7U);
+        if (field == 1U && wire_type == 2U) {
+            decoder_t packed;
+            if (decode_slice(decoder, &packed) != 0) {
+                return -1;
+            }
+            size_t index = 0U;
+            while (packed.offset < packed.length) {
+                uint64_t value = 0U;
+                if (decode_varint(&packed, &value) != 0) {
+                    return -1;
+                }
+                if (index >= capacity) {
+                    return 1;
+                }
+                values[index++] = value != 0U ? 1U : 0U;
+            }
+            *count = index;
+        } else if (skip_field(decoder, wire_type) != 0) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+static int parse_i2c_response(decoder_t *decoder,
+                              uint8_t *data,
+                              size_t capacity,
+                              size_t *length) {
+    size_t written = 0U;
+    while (decoder->offset < decoder->length) {
+        uint64_t tag = 0U;
+        if (decode_varint(decoder, &tag) != 0) {
+            return -1;
+        }
+        const uint32_t field = (uint32_t)(tag >> 3U);
+        const uint32_t wire_type = (uint32_t)(tag & 7U);
+        if (field == 1U && wire_type == 2U) {
+            decoder_t bytes;
+            if (decode_slice(decoder, &bytes) != 0) {
+                return -1;
+            }
+            if (bytes.length > capacity - written) {
+                *length = written + bytes.length;
+                return 1;
+            }
+            memcpy(data + written, bytes.data, bytes.length);
+            written += bytes.length;
+        } else if (skip_field(decoder, wire_type) != 0) {
+            return -1;
+        }
+    }
+    *length = written;
+    return 0;
+}
+
 static int parse_error_response(decoder_t *decoder, vds_error_t *error) {
     while (decoder->offset < decoder->length) {
         uint64_t tag = 0U;
@@ -360,4 +426,251 @@ vds_status_t vds_spi_transfer(vds_client_t *client,
                               vds_error_t *error) {
     return vds_spi_transfer_configured(client, device_id, tx, tx_length, 0U, NULL,
                                        rx, rx_capacity, rx_length, error);
+}
+
+vds_status_t vds_gpio_exchange(vds_client_t *client,
+                               const char *device_id,
+                               const uint8_t *host_values,
+                               size_t line_count,
+                               uint8_t *device_values,
+                               size_t device_capacity,
+                               size_t *device_count,
+                               vds_error_t *error) {
+    if (client == NULL || client->fd < 0 || device_id == NULL ||
+        host_values == NULL || line_count == 0U || device_values == NULL ||
+        device_count == NULL || error == NULL || line_count > VDS_MAX_REQUEST_SIZE) {
+        return VDS_ERR_ARGUMENT;
+    }
+    memset(error, 0, sizeof(*error));
+    *device_count = 0U;
+
+    uint8_t packed_values[VDS_MAX_REQUEST_SIZE];
+    size_t packed_length = 0U;
+    for (size_t index = 0U; index < line_count; ++index) {
+        if (encode_varint(packed_values, sizeof(packed_values), &packed_length,
+                          host_values[index] != 0U ? 1U : 0U) != 0) {
+            return VDS_ERR_ARGUMENT;
+        }
+    }
+
+    uint8_t gpio[VDS_MAX_REQUEST_SIZE];
+    size_t gpio_length = 0U;
+    if (encode_bytes(gpio, sizeof(gpio), &gpio_length, 1U,
+                     (const uint8_t *)device_id, strlen(device_id)) != 0 ||
+        encode_bytes(gpio, sizeof(gpio), &gpio_length, 2U, packed_values,
+                     packed_length) != 0) {
+        return VDS_ERR_ARGUMENT;
+    }
+
+    uint8_t request[VDS_MAX_REQUEST_SIZE];
+    size_t request_length = 0U;
+    const uint64_t request_id = client->next_request_id++;
+    if (encode_varint(request, sizeof(request), &request_length, 8U) != 0 ||
+        encode_varint(request, sizeof(request), &request_length, request_id) != 0 ||
+        encode_bytes(request, sizeof(request), &request_length, 11U, gpio,
+                     gpio_length) != 0) {
+        return VDS_ERR_ARGUMENT;
+    }
+
+    const uint32_t network_length = htonl((uint32_t)request_length);
+    if (write_all(client->fd, (const uint8_t *)&network_length,
+                  sizeof(network_length)) != 0 ||
+        write_all(client->fd, request, request_length) != 0) {
+        return VDS_ERR_IO;
+    }
+
+    uint32_t response_network_length = 0U;
+    if (read_all(client->fd, (uint8_t *)&response_network_length,
+                 sizeof(response_network_length)) != 0) {
+        return VDS_ERR_IO;
+    }
+    const uint32_t response_length = ntohl(response_network_length);
+    if (response_length > VDS_MAX_FRAME_SIZE) {
+        return VDS_ERR_PROTOCOL;
+    }
+    uint8_t *response = malloc(response_length == 0U ? 1U : response_length);
+    if (response == NULL) {
+        return VDS_ERR_IO;
+    }
+    if (read_all(client->fd, response, response_length) != 0) {
+        free(response);
+        return VDS_ERR_IO;
+    }
+
+    vds_status_t status = VDS_ERR_PROTOCOL;
+    decoder_t decoder = {response, response_length, 0U};
+    uint64_t response_request_id = 0U;
+    while (decoder.offset < decoder.length) {
+        uint64_t tag = 0U;
+        if (decode_varint(&decoder, &tag) != 0) {
+            break;
+        }
+        const uint32_t field = (uint32_t)(tag >> 3U);
+        const uint32_t wire_type = (uint32_t)(tag & 7U);
+        if (field == 1U && wire_type == 0U) {
+            if (decode_varint(&decoder, &response_request_id) != 0) {
+                break;
+            }
+        } else if (field == 12U && wire_type == 2U) {
+            decoder_t gpio_response;
+            if (decode_slice(&decoder, &gpio_response) != 0) {
+                break;
+            }
+            const int parsed = parse_gpio_response(
+                &gpio_response, device_values, device_capacity, device_count);
+            status = parsed == 0 ? VDS_OK
+                                 : (parsed == 1 ? VDS_ERR_BUFFER_TOO_SMALL
+                                                : VDS_ERR_PROTOCOL);
+        } else if (field == 11U && wire_type == 2U) {
+            decoder_t error_response;
+            if (decode_slice(&decoder, &error_response) != 0 ||
+                parse_error_response(&error_response, error) != 0) {
+                break;
+            }
+            status = VDS_ERR_SERVER;
+        } else if (skip_field(&decoder, wire_type) != 0) {
+            break;
+        }
+    }
+    free(response);
+    if (response_request_id != request_id) {
+        return VDS_ERR_PROTOCOL;
+    }
+    return status;
+}
+
+vds_status_t vds_i2c_transfer(vds_client_t *client,
+                              const char *device_id,
+                              uint16_t address,
+                              const vds_i2c_message_t *messages,
+                              size_t message_count,
+                              uint8_t *read_data,
+                              size_t read_capacity,
+                              size_t *read_length,
+                              vds_error_t *error) {
+    if (client == NULL || client->fd < 0 || device_id == NULL ||
+        messages == NULL || message_count == 0U || read_data == NULL ||
+        read_length == NULL || error == NULL || address > 0x3ffU) {
+        return VDS_ERR_ARGUMENT;
+    }
+    memset(error, 0, sizeof(*error));
+    *read_length = 0U;
+
+    uint8_t i2c[VDS_MAX_REQUEST_SIZE];
+    size_t i2c_length = 0U;
+    if (encode_bytes(i2c, sizeof(i2c), &i2c_length, 1U,
+                     (const uint8_t *)device_id, strlen(device_id)) != 0 ||
+        encode_varint(i2c, sizeof(i2c), &i2c_length, 16U) != 0 ||
+        encode_varint(i2c, sizeof(i2c), &i2c_length, address) != 0) {
+        return VDS_ERR_ARGUMENT;
+    }
+    for (size_t index = 0U; index < message_count; ++index) {
+        const vds_i2c_message_t *message = &messages[index];
+        if ((!message->read && message->length > 0U && message->data == NULL) ||
+            message->length > 1024U) {
+            return VDS_ERR_ARGUMENT;
+        }
+        uint8_t encoded[1152];
+        size_t encoded_length = 0U;
+        if (message->read &&
+            (encode_varint(encoded, sizeof(encoded), &encoded_length, 8U) != 0 ||
+             encode_varint(encoded, sizeof(encoded), &encoded_length, 1U) != 0)) {
+            return VDS_ERR_ARGUMENT;
+        }
+        if (!message->read && message->length > 0U &&
+            encode_bytes(encoded, sizeof(encoded), &encoded_length, 2U,
+                         message->data, message->length) != 0) {
+            return VDS_ERR_ARGUMENT;
+        }
+        if (message->read &&
+            (encode_varint(encoded, sizeof(encoded), &encoded_length, 24U) != 0 ||
+             encode_varint(encoded, sizeof(encoded), &encoded_length,
+                           message->length) != 0)) {
+            return VDS_ERR_ARGUMENT;
+        }
+        if (message->flags != 0U &&
+            (encode_varint(encoded, sizeof(encoded), &encoded_length, 32U) != 0 ||
+             encode_varint(encoded, sizeof(encoded), &encoded_length,
+                           message->flags) != 0)) {
+            return VDS_ERR_ARGUMENT;
+        }
+        if (encode_bytes(i2c, sizeof(i2c), &i2c_length, 3U, encoded,
+                         encoded_length) != 0) {
+            return VDS_ERR_ARGUMENT;
+        }
+    }
+
+    uint8_t request[VDS_MAX_REQUEST_SIZE];
+    size_t request_length = 0U;
+    const uint64_t request_id = client->next_request_id++;
+    if (encode_varint(request, sizeof(request), &request_length, 8U) != 0 ||
+        encode_varint(request, sizeof(request), &request_length, request_id) != 0 ||
+        encode_bytes(request, sizeof(request), &request_length, 12U, i2c,
+                     i2c_length) != 0) {
+        return VDS_ERR_ARGUMENT;
+    }
+    const uint32_t network_length = htonl((uint32_t)request_length);
+    if (write_all(client->fd, (const uint8_t *)&network_length,
+                  sizeof(network_length)) != 0 ||
+        write_all(client->fd, request, request_length) != 0) {
+        return VDS_ERR_IO;
+    }
+    uint32_t response_network_length = 0U;
+    if (read_all(client->fd, (uint8_t *)&response_network_length,
+                 sizeof(response_network_length)) != 0) {
+        return VDS_ERR_IO;
+    }
+    const uint32_t response_length = ntohl(response_network_length);
+    if (response_length > VDS_MAX_FRAME_SIZE) {
+        return VDS_ERR_PROTOCOL;
+    }
+    uint8_t *response = malloc(response_length == 0U ? 1U : response_length);
+    if (response == NULL) {
+        return VDS_ERR_IO;
+    }
+    if (read_all(client->fd, response, response_length) != 0) {
+        free(response);
+        return VDS_ERR_IO;
+    }
+
+    vds_status_t status = VDS_ERR_PROTOCOL;
+    decoder_t decoder = {response, response_length, 0U};
+    uint64_t response_request_id = 0U;
+    while (decoder.offset < decoder.length) {
+        uint64_t tag = 0U;
+        if (decode_varint(&decoder, &tag) != 0) {
+            break;
+        }
+        const uint32_t field = (uint32_t)(tag >> 3U);
+        const uint32_t wire_type = (uint32_t)(tag & 7U);
+        if (field == 1U && wire_type == 0U) {
+            if (decode_varint(&decoder, &response_request_id) != 0) {
+                break;
+            }
+        } else if (field == 13U && wire_type == 2U) {
+            decoder_t i2c_response;
+            if (decode_slice(&decoder, &i2c_response) != 0) {
+                break;
+            }
+            const int parsed = parse_i2c_response(
+                &i2c_response, read_data, read_capacity, read_length);
+            status = parsed == 0 ? VDS_OK
+                                 : (parsed == 1 ? VDS_ERR_BUFFER_TOO_SMALL
+                                                : VDS_ERR_PROTOCOL);
+        } else if (field == 11U && wire_type == 2U) {
+            decoder_t error_response;
+            if (decode_slice(&decoder, &error_response) != 0 ||
+                parse_error_response(&error_response, error) != 0) {
+                break;
+            }
+            status = VDS_ERR_SERVER;
+        } else if (skip_field(&decoder, wire_type) != 0) {
+            break;
+        }
+    }
+    free(response);
+    if (response_request_id != request_id) {
+        return VDS_ERR_PROTOCOL;
+    }
+    return status;
 }

@@ -1,10 +1,10 @@
 use super::{
     AccessType, Arc, CommandTimingDefinition, DeviceModel, DeviceState, EventScheduler,
-    FaultEngine, FlashMemory, GenericSpiDevice, HashMap, ModelError, Mutex, Path, RealTimeClock,
-    RegisterEngine, SignalGraph, SimulatorClock, SpiBusDefinition, SpiCommand, SpiCommandBehavior,
-    SpiCommandOperation, StateActionDefinition, StateGuardDefinition, StateMachine,
-    compile_state_machine, fs, initialize_state_machine, uncompiled_state_machine, validate_faults,
-    validate_register_reference,
+    FaultEngine, FlashMemory, GenericGpioDevice, GenericI2cDevice, GenericSpiDevice, HashMap,
+    ModelError, Mutex, Path, RealTimeClock, RegisterEngine, SignalGraph, SimulatorClock,
+    SpiBusDefinition, SpiCommand, SpiCommandBehavior, SpiCommandOperation, StateActionDefinition,
+    StateGuardDefinition, StateMachine, compile_state_machine, fs, initialize_state_machine,
+    uncompiled_state_machine, validate_faults, validate_register_reference,
 };
 use crate::{DEVICE_MODEL_SCHEMA, behavior_flow};
 
@@ -65,6 +65,43 @@ impl DeviceModel {
         }
 
         let model: Self = serde_json::from_value(instance)?;
+        if model.device.bus == "gpio" {
+            let gpio = model.device.gpio.as_ref().ok_or_else(|| {
+                ModelError::Validation("GPIO device is missing device.gpio".to_owned())
+            })?;
+            for (expected, line) in gpio.lines.iter().enumerate() {
+                if usize::from(line.offset) != expected {
+                    return Err(ModelError::Validation(
+                        "GPIO line offsets must be contiguous and start at zero".to_owned(),
+                    ));
+                }
+                if let Some(register) = &line.register {
+                    validate_register_reference(&model.device.registers, register)?;
+                }
+            }
+            RegisterEngine::new(model.device.registers.clone())?;
+            return Ok(model);
+        }
+        if model.device.bus == "i2c" {
+            let i2c = model.device.i2c.as_ref().ok_or_else(|| {
+                ModelError::Validation("I2C device is missing device.i2c".to_owned())
+            })?;
+            if !(1..=4).contains(&i2c.register_address_bytes) {
+                return Err(ModelError::Validation(
+                    "I2C register_address_bytes must be between 1 and 4".to_owned(),
+                ));
+            }
+            if model
+                .device
+                .registers
+                .iter()
+                .any(|register| register.width_bits != 8)
+            {
+                return Err(ModelError::Validation(
+                    "generic I2C register devices currently require 8-bit registers".to_owned(),
+                ));
+            }
+        }
         if model
             .device
             .spi
@@ -237,6 +274,48 @@ impl DeviceModel {
     /// Returns an error if the model is not a generic SPI command device.
     pub fn into_spi_device(self) -> Result<GenericSpiDevice, ModelError> {
         self.into_spi_device_with_clock(Arc::new(RealTimeClock::new()))
+    }
+
+    /// Builds a declarative GPIO bank runtime from this model.
+    ///
+    /// # Errors
+    /// Returns an error unless the model uses the generic GPIO bank driver.
+    pub fn into_gpio_device(self) -> Result<GenericGpioDevice, ModelError> {
+        if self.device.bus != "gpio" || self.device.model != "generic-gpio-bank" {
+            return Err(ModelError::UnsupportedModel {
+                bus: self.device.bus,
+                model: self.device.model,
+            });
+        }
+        let definition = self
+            .device
+            .gpio
+            .ok_or_else(|| ModelError::UnsupportedModel {
+                bus: "gpio".to_owned(),
+                model: "generic-gpio-bank".to_owned(),
+            })?;
+        GenericGpioDevice::new(self.device.id, definition, self.device.registers)
+    }
+
+    /// Builds a declarative I2C register device runtime.
+    ///
+    /// # Errors
+    /// Returns an error unless the model uses the generic I2C register driver.
+    pub fn into_i2c_device(self) -> Result<GenericI2cDevice, ModelError> {
+        if self.device.bus != "i2c" || self.device.model != "generic-i2c-register" {
+            return Err(ModelError::UnsupportedModel {
+                bus: self.device.bus,
+                model: self.device.model,
+            });
+        }
+        let definition = self
+            .device
+            .i2c
+            .ok_or_else(|| ModelError::UnsupportedModel {
+                bus: "i2c".to_owned(),
+                model: "generic-i2c-register".to_owned(),
+            })?;
+        GenericI2cDevice::new(self.device.id, definition, self.device.registers)
     }
 
     /// Builds a device using an injected simulator clock.

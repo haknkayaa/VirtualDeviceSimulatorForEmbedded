@@ -47,13 +47,16 @@ must run without a browser, and applications must not depend on Web code.
 - `crates/vds-core` contains configuration, package loading, clocks, scheduling,
   state machines, faults, devices, and the runtime registry.
 - `crates/vds-device-model` loads and validates declarative models and executes
-  generic SPI commands, registers, memory, state transitions, timing, faults,
-  behavior flows, and typed signal graphs.
+  generic SPI commands, I²C register transfers, GPIO line exchange, registers,
+  memory, state transitions, timing, faults, behavior flows, and typed signal
+  graphs.
 - `crates/vds-registers`, `crates/vds-scenario`, `crates/vds-events`, and
   `crates/vds-protocol` provide focused reusable engines.
 - `client/c` implements the native Unix-socket client.
 - `adapters/spi-preload` maps normal Linux spidev calls into VDS4E without root.
 - `adapters/spi-cuse` provides the privileged CUSE-based spidev integration.
+- `adapters/gpio-sim` provisions real kernel `/dev/gpiochipX` controllers for
+  libgpiod applications.
 
 Host adapters implement standard Linux userspace ABIs so existing distribution
 tools run unchanged against virtual devices. VDS4E does not recreate tools such
@@ -172,7 +175,8 @@ Device packages are untrusted declarative input.
 - Runtime commands validate lengths, addresses, state, and access permissions.
 - The default server, Web application, CLI, C client, and preload adapter do not
   require root.
-- CUSE setup is explicitly privileged and isolated in its adapter.
+- CUSE and gpio-sim setup are explicitly privileged and isolated in their
+  adapters.
 - Company-private protocols, models, test vectors, and device knowledge must
   remain outside the public repository.
 
@@ -188,8 +192,8 @@ Required repository checks are:
 - `cargo test --workspace --locked`
 - server package/config validation
 - Web lint, TypeScript checking, unit tests, and production build
-- clean builds for the C client, SPI preload adapter, SPI CUSE adapter, and
-  Micron Embedded Linux example
+- clean builds for the C client, SPI preload adapter, SPI CUSE adapter, GPIO
+  simulator adapter, and Micron Embedded Linux example
 
 Tests that exercise server loading use complete device-package fixtures.
 Legacy configuration fields and global authoring routes must have explicit

@@ -6,6 +6,22 @@ use crate::event::DeviceEvent;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BusType {
     Spi,
+    I2c,
+    Gpio,
+}
+
+/// One Linux-compatible I2C message within an atomic transfer.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct I2cMessage {
+    pub read: bool,
+    pub data: Vec<u8>,
+    pub read_length: usize,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GpioLineSnapshot {
+    pub offset: u16,
+    pub name: String,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -57,6 +73,8 @@ impl fmt::Display for BusType {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Spi => formatter.write_str("spi"),
+            Self::I2c => formatter.write_str("i2c"),
+            Self::Gpio => formatter.write_str("gpio"),
         }
     }
 }
@@ -200,6 +218,42 @@ pub trait Device: Send + Sync {
         _wire: SpiWireConfig,
     ) -> Result<DeviceTransfer, DeviceError> {
         self.transfer(request)
+    }
+
+    /// Executes an atomic sequence of addressed I2C messages.
+    ///
+    /// Read messages use `read_length`; write messages use `data`. The returned
+    /// vector contains one entry per read message in request order.
+    ///
+    /// # Errors
+    /// Returns a device error when the message sequence is malformed or the
+    /// device rejects a register access.
+    fn transfer_i2c(&self, _messages: &[I2cMessage]) -> Result<Vec<Vec<u8>>, DeviceError> {
+        Err(DeviceError::InvalidRequest(format!(
+            "device '{}' does not support I2C transfers",
+            self.id()
+        )))
+    }
+
+    /// Exchanges host-driven GPIO levels for the device's current output
+    /// levels. Vectors are indexed by GPIO line offset.
+    ///
+    /// # Errors
+    /// Returns a device error when the device is not a GPIO bank or the line
+    /// vector does not match its declared width.
+    fn exchange_gpio(&self, _host_values: &[bool]) -> Result<Vec<bool>, DeviceError> {
+        Err(DeviceError::InvalidRequest(format!(
+            "device '{}' does not support GPIO exchange",
+            self.id()
+        )))
+    }
+
+    /// Returns declarative GPIO line metadata in offset order.
+    ///
+    /// # Errors
+    /// Returns a device error when GPIO metadata cannot be inspected.
+    fn gpio_lines(&self) -> Result<Vec<GpioLineSnapshot>, DeviceError> {
+        Ok(Vec::new())
     }
 
     /// Applies due simulator events without issuing a bus transaction.

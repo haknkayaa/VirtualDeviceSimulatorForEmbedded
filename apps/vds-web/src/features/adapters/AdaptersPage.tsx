@@ -181,7 +181,7 @@ function AdapterCard({ adapter, availableDevices, attachDraft, busy, onAttach, o
       </header>
 
       <dl className="adapter-metadata">
-        <div><dt>Bus</dt><dd>{adapter.bus_type.toUpperCase()}{adapter.bus_number}</dd></div>
+        <div><dt>Bus</dt><dd>{adapter.bus_type === 'gpio' ? `${adapter.line_count ?? 0} GPIO lines` : `${adapter.bus_type.toUpperCase()}${adapter.bus_number}`}</dd></div>
         <div><dt>Driver</dt><dd>{adapter.readiness.replaceAll('_', ' ')}</dd></div>
         <div><dt>Devices</dt><dd>{adapter.bindings.length}</dd></div>
         <div><dt>Daemon</dt><dd>{adapter.daemon_pids.length ? adapter.daemon_pids.map((pid) => `#${pid}`).join(', ') : '—'}</dd></div>
@@ -191,12 +191,48 @@ function AdapterCard({ adapter, availableDevices, attachDraft, busy, onAttach, o
         <div className={`adapter-readiness adapter-readiness-${adapter.readiness}`}>
           <CircleAlert aria-hidden="true" size={16} />
           <span>{adapter.readiness === 'authorization_required'
-            ? 'CUSE needs operating-system authorization.'
-            : 'SPI CUSE driver is unavailable.'}</span>
+            ? `${adapter.driver} needs operating-system authorization.`
+            : `${adapter.driver} is unavailable.`}</span>
         </div>
       )}
 
-      <div className="adapter-device-management">
+      {adapter.bus_type === 'gpio' ? (
+        <div className="adapter-device-management">
+          <section className="adapter-bindings adapter-device-pane">
+            <header><strong>Kernel GPIO controller</strong><span>{adapter.line_count ?? 0} lines</span></header>
+            <div className="adapter-binding-row">
+              <span className="adapter-binding-icon"><Link2 aria-hidden="true" size={15} /></span>
+              <div>
+                <strong>{adapter.device_path ? 'GPIO chip loaded' : 'Waiting for kernel allocation'}</strong>
+                <code>{adapter.device_path ?? '/dev/gpiochipX'}</code>
+              </div>
+              <span>GPIO</span>
+            </div>
+          </section>
+          <section className="adapter-attach-pane">
+            <header><strong>GPIO runtime</strong><span>Bind one declarative GPIO bank before loading.</span></header>
+            {adapter.bindings.length > 0 ? (
+              <div className="adapter-binding-row">
+                <span className="adapter-binding-icon"><Link2 aria-hidden="true" size={15} /></span>
+                <div><strong>{adapter.bindings[0].device_id}</strong><code>{adapter.bindings[0].device_path}</code></div>
+                <button aria-label={`Detach ${adapter.bindings[0].device_id}`} disabled={busy} onClick={() => onDetach(adapter.bindings[0].device_id)} type="button">
+                  <Unlink aria-hidden="true" size={14} />
+                </button>
+              </div>
+            ) : (
+              <div className="adapter-attach-form">
+                <label><span>Device</span><select disabled={busy || availableDevices.length === 0} onChange={(event) => onDraft({ ...attachDraft, deviceId: event.target.value })} value={attachDraft.deviceId}>
+                  {availableDevices.length === 0 && <option value="">No GPIO devices</option>}
+                  {availableDevices.map((device) => <option key={device.id} value={device.id}>{device.id}</option>)}
+                </select></label>
+                <button className="button button-secondary" disabled={busy || !attachDraft.deviceId} onClick={onAttach} type="button">
+                  <Link2 aria-hidden="true" size={14} /> Attach
+                </button>
+              </div>
+            )}
+          </section>
+        </div>
+      ) : <div className="adapter-device-management">
         <section className="adapter-bindings adapter-device-pane">
           <header><strong>Device endpoints</strong><span>{adapter.bindings.length} attached</span></header>
           {adapter.bindings.length === 0 && <p className="adapter-empty">No devices attached to this adapter.</p>}
@@ -204,7 +240,7 @@ function AdapterCard({ adapter, availableDevices, attachDraft, busy, onAttach, o
             <div className="adapter-binding-row" key={binding.device_id}>
               <span className="adapter-binding-icon"><Link2 aria-hidden="true" size={15} /></span>
               <div><strong>{binding.device_id}</strong><code>{binding.device_path}</code></div>
-              <span>CS{binding.endpoint}</span>
+              <span>{adapter.bus_type === 'i2c' ? `0x${binding.endpoint.toString(16).padStart(2, '0')}` : `CS${binding.endpoint}`}</span>
               <button aria-label={`Detach ${binding.device_id}`} disabled={busy} onClick={() => onDetach(binding.device_id)} type="button">
                 <Unlink aria-hidden="true" size={14} />
               </button>
@@ -219,13 +255,13 @@ function AdapterCard({ adapter, availableDevices, attachDraft, busy, onAttach, o
               {availableDevices.length === 0 && <option value="">No unassigned devices</option>}
               {availableDevices.map((device) => <option key={device.id} value={device.id}>{device.id}</option>)}
             </select></label>
-            <label><span>Chip select</span><input disabled={busy} min="0" onChange={(event) => onDraft({ ...attachDraft, endpoint: event.target.value })} type="number" value={attachDraft.endpoint} /></label>
+            <label><span>{adapter.bus_type === 'i2c' ? 'Slave address' : 'Chip select'}</span><input disabled={busy} min="0" onChange={(event) => onDraft({ ...attachDraft, endpoint: event.target.value })} value={attachDraft.endpoint} /></label>
             <button className="button button-secondary" disabled={busy || !attachDraft.deviceId || !attachDraft.endpoint} onClick={onAttach} type="button">
               <Link2 aria-hidden="true" size={14} /> Attach
             </button>
           </div>
         </section>
-      </div>
+      </div>}
 
       <footer>
         {unloadable
@@ -241,20 +277,31 @@ function AdapterCard({ adapter, availableDevices, attachDraft, busy, onAttach, o
 function CreateAdapterPanel({ isPending, onCancel, onCreate }: {
   isPending: boolean
   onCancel: () => void
-  onCreate: (input: { id: string; name: string; bus_type: string; bus_number: number }) => void
+  onCreate: (input: { id: string; name: string; bus_type: string; bus_number?: number; line_count?: number }) => void
 }) {
+  const [busType, setBusType] = useState<'spi' | 'i2c' | 'gpio'>('spi')
   const [id, setId] = useState('spi1')
   const [name, setName] = useState('SPI 1')
   const [busNumber, setBusNumber] = useState('1')
+  const [lineCount, setLineCount] = useState('32')
+  const changeBusType = (next: 'spi' | 'i2c' | 'gpio') => {
+    setBusType(next)
+    setId(next === 'gpio' ? 'gpio0' : next === 'i2c' ? 'i2c0' : 'spi1')
+    setName(next === 'gpio' ? 'GPIO 0' : next === 'i2c' ? 'I2C 0' : 'SPI 1')
+  }
   return (
     <GlassPanel className="adapter-create-panel" eyebrow="Topology" title="New Adapter">
       <div className="adapter-create-fields">
         <label><span>ID</span><input onChange={(event) => setId(event.target.value)} value={id} /></label>
         <label><span>Name</span><input onChange={(event) => setName(event.target.value)} value={name} /></label>
-        <label><span>Bus type</span><select disabled value="spi"><option value="spi">SPI</option></select></label>
-        <label><span>Bus number</span><input min="0" onChange={(event) => setBusNumber(event.target.value)} type="number" value={busNumber} /></label>
+        <label><span>Bus type</span><select onChange={(event) => changeBusType(event.target.value as 'spi' | 'i2c' | 'gpio')} value={busType}><option value="spi">SPI</option><option value="i2c">I2C</option><option value="gpio">GPIO</option></select></label>
+        {busType !== 'gpio'
+          ? <label><span>Bus number</span><input min="0" onChange={(event) => setBusNumber(event.target.value)} type="number" value={busNumber} /></label>
+          : <label><span>Line count</span><input max="1024" min="1" onChange={(event) => setLineCount(event.target.value)} type="number" value={lineCount} /></label>}
       </div>
-      <footer><button className="button button-secondary" onClick={onCancel} type="button">Cancel</button><button className="button button-primary" disabled={isPending || !id || !name} onClick={() => onCreate({ id, name, bus_type: 'spi', bus_number: Number(busNumber) })} type="button">Create Adapter</button></footer>
+      <footer><button className="button button-secondary" onClick={onCancel} type="button">Cancel</button><button className="button button-primary" disabled={isPending || !id || !name} onClick={() => onCreate(busType !== 'gpio'
+        ? { id, name, bus_type: busType, bus_number: Number(busNumber) }
+        : { id, name, bus_type: busType, line_count: Number(lineCount) })} type="button">Create Adapter</button></footer>
     </GlassPanel>
   )
 }
@@ -264,9 +311,9 @@ function AuthorizationDialog({ adapterId, onClose, onRetry }: { adapterId: strin
     <div aria-labelledby="adapter-authorization-title" aria-modal="true" className="dialog-backdrop" role="dialog">
       <section className="glass-panel adapter-authorization-dialog">
         <LockKeyhole aria-hidden="true" size={25} />
-        <div><p>Operating-system authorization</p><h2 id="adapter-authorization-title">CUSE access required</h2></div>
-        <p>VDS4E never accepts or stores your sudo password. Authorize CUSE through the operating system, then retry loading {adapterId}.</p>
-        <code>sudo modprobe cuse</code>
+        <div><p>Operating-system authorization</p><h2 id="adapter-authorization-title">Kernel adapter access required</h2></div>
+        <p>VDS4E never accepts or stores your sudo password. Authorize the required kernel adapter through the operating system, then retry loading {adapterId}.</p>
+        <code>GPIO: sudo modprobe gpio-sim · SPI/I2C: sudo modprobe cuse</code>
         <footer><button className="button button-secondary" onClick={onClose} type="button">Close</button><button className="button button-primary" onClick={onRetry} type="button">Retry</button></footer>
       </section>
     </div>

@@ -50,6 +50,13 @@ typedef struct {
     uint8_t lsb_first;
 } vds_spi_wire_config_t;
 
+typedef struct {
+    uint8_t read;
+    const uint8_t *data;
+    size_t length;
+    uint16_t flags;
+} vds_i2c_message_t;
+
 vds_status_t vds_client_connect(vds_client_t *client, const char *socket_path);
 void vds_client_close(vds_client_t *client);
 
@@ -72,6 +79,25 @@ vds_status_t vds_spi_transfer_configured(vds_client_t *client,
                                          size_t rx_capacity,
                                          size_t *rx_length,
                                          vds_error_t *error);
+
+vds_status_t vds_gpio_exchange(vds_client_t *client,
+                               const char *device_id,
+                               const uint8_t *host_values,
+                               size_t line_count,
+                               uint8_t *device_values,
+                               size_t device_capacity,
+                               size_t *device_count,
+                               vds_error_t *error);
+
+vds_status_t vds_i2c_transfer(vds_client_t *client,
+                              const char *device_id,
+                              uint16_t address,
+                              const vds_i2c_message_t *messages,
+                              size_t message_count,
+                              uint8_t *read_data,
+                              size_t read_capacity,
+                              size_t *read_length,
+                              vds_error_t *error);
 
 #ifdef __cplusplus
 }

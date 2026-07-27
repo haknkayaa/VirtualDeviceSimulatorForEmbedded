@@ -56,7 +56,9 @@ export function AdapterTree({
           const devicePaths = adapter.bindings.map((binding) => binding.device_path)
           const pathLabel = devicePaths.length > 0
             ? devicePaths.join(', ')
-            : `/dev/spidev${adapter.bus_number}.*`
+            : adapter.bus_type === 'gpio'
+              ? adapter.device_path ?? `/dev/gpiochipX · ${adapter.line_count ?? 0} lines`
+              : `/dev/spidev${adapter.bus_number}.*`
           const loaded = adapter.state === 'loaded'
           const transitioning = adapter.state === 'loading' || adapter.state === 'unloading'
           const unloadable = loaded || adapter.state === 'error'
