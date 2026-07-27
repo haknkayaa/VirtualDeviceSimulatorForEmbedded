@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { exampleDeviceBehaviorFlow, genericSpiFlashBehaviorFlow } from '../serialization/deviceBehaviorFlowDocument'
+import { exampleDeviceBehaviorFlow, micronMt25ql256BehaviorFlow } from '../serialization/deviceBehaviorFlowFixtures'
 import { compileDeviceBehaviorFlow, serializeCompiledDeviceBehavior } from './compileDeviceBehaviorFlow'
 
 describe('device behavior compiler', () => {
@@ -29,11 +29,11 @@ describe('device behavior compiler', () => {
     expect(result.errors).toContainEqual(expect.objectContaining({ code: 'behavior-missing-initial' }))
   })
 
-  it('compiles the complete public SPI flash visual reference', () => {
-    const result = compileDeviceBehaviorFlow(genericSpiFlashBehaviorFlow)
+  it('compiles the Micron MT25QL256 visual reference', () => {
+    const result = compileDeviceBehaviorFlow(micronMt25ql256BehaviorFlow)
     expect(result.errors).toEqual([])
     expect(result.document?.state_machine.initial_state).toBe('resetting')
-    expect(Object.keys(result.document?.state_machine.states ?? {})).toHaveLength(8)
+    expect(Object.keys(result.document?.state_machine.states ?? {})).toHaveLength(7)
     expect(result.document?.state_machine.states.programming.transitions).toContainEqual({
       event: 'operation_completed',
       target: 'ready',

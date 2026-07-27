@@ -1,4 +1,4 @@
-import { CheckCircle2, Download, FileCode2, PackageCheck, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import { CheckCircle2, FileCode2, PackageCheck, Plus, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import type { LibraryPackage } from './deviceLibraryCatalog'
@@ -6,19 +6,13 @@ import { libraryKindLabel } from './deviceLibraryCatalog'
 
 interface DevicePackageDetailProps {
   item: LibraryPackage
-  installed: boolean
-  onInstalledChange: (installed: boolean) => void
 }
 
-export function DevicePackageDetail({ installed, item, onInstalledChange }: DevicePackageDetailProps) {
+export function DevicePackageDetail({ item }: DevicePackageDetailProps) {
   return (
     <aside aria-label={`${item.name} package details`} className="library-detail-panel">
       <header className="package-detail-hero">
-        {item.image ? (
-          <img alt={item.image.alt} className="package-detail-image" src={item.image.src} />
-        ) : (
-          <span className={`package-detail-acronym package-kind-${item.kind}`}>{item.acronym}</span>
-        )}
+        <span className={`package-detail-acronym package-kind-${item.kind}`}>{item.acronym}</span>
         <div>
           <p>{libraryKindLabel()}</p>
           <h2>{item.name}</h2>
@@ -28,14 +22,14 @@ export function DevicePackageDetail({ installed, item, onInstalledChange }: Devi
             <b><PackageCheck aria-hidden="true" size={12} /> Bundled</b>
             <b>
               <CheckCircle2 aria-hidden="true" size={12} />
-              {item.readiness === 'runtime_ready' ? 'Runtime ready' : 'Starter template'}
+              Runtime ready
             </b>
           </div>
         </div>
         <div className="package-install-state">
           <strong>
             <CheckCircle2 aria-hidden="true" size={14} />
-            {installed ? 'Installed' : 'Not installed'}
+            Installed
           </strong>
           <span>Version {item.version}</span>
         </div>
@@ -74,20 +68,9 @@ export function DevicePackageDetail({ installed, item, onInstalledChange }: Devi
       </section>
 
       <footer className="package-detail-actions">
-        {installed ? (
-          <>
-            <button className="button button-secondary" onClick={() => onInstalledChange(false)} type="button">
-              <Trash2 aria-hidden="true" size={14} /> Uninstall
-            </button>
-            <Link className="button button-primary" to="/devices">
-              <Plus aria-hidden="true" size={14} /> Add Device
-            </Link>
-          </>
-        ) : (
-          <button className="button button-primary" onClick={() => onInstalledChange(true)} type="button">
-            <Download aria-hidden="true" size={14} /> Install
-          </button>
-        )}
+        <Link className="button button-primary" to="/devices">
+          <Plus aria-hidden="true" size={14} /> Add Device
+        </Link>
       </footer>
     </aside>
   )

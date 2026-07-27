@@ -60,9 +60,6 @@ function installDeviceApi() {
         shortcut: { tx: [159, 170, 85], rx_length: 3, description: 'Test RX and TX.' },
       },
     ])
-    if (url === '/api/v1/devices/spi-flash-0/commands/execute' && init?.method === 'POST') {
-      return jsonResponse({ rx: [239, 64, 24], state: 'ready', registers: [] })
-    }
     if (url === '/api/v1/devices/spi-flash-0/registers/1' && init?.method === 'POST') {
       const body = JSON.parse(String(init.body)) as { value: number }
       return jsonResponse({ name: 'CONTROL', address: 1, width_bits: 8, access: 'rw', reset_value: 0, value: body.value, description: 'Device control register' })
@@ -232,19 +229,15 @@ describe('devices page', () => {
     expect(await screen.findByText('0x13', { selector: '.register-current-value' })).toBeInTheDocument()
   })
 
-  it('lists and executes device commands through the control API', async () => {
+  it('lists device commands without exposing a REST transaction action', async () => {
     installDeviceApi()
     renderRoute(<DevicesPage />, '/devices/spi-flash-0', '/devices/:deviceId')
 
     await screen.findAllByText('CONTROL')
     await userEvent.click(screen.getByRole('tab', { name: 'Commands' }))
     expect((await screen.findAllByText('READ_ID')).length).toBeGreaterThan(0)
-    expect(screen.getByText('TX 9F AA 55 · RX 3')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Use shortcut' }))
-    expect(screen.getByRole('textbox', { name: 'Payload (hex)' })).toHaveValue('AA 55')
-    expect(screen.getByRole('spinbutton', { name: 'RX bytes' })).toHaveValue(3)
-    await userEvent.click(screen.getByRole('button', { name: /Execute command/i }))
-    expect(await screen.findByText('EF 40 18')).toBeInTheDocument()
+    expect(screen.getByText(/Execute hardware transactions through/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Execute command/i })).not.toBeInTheDocument()
   })
 
   it('shows bus-specific SPI adapter settings in Configuration', async () => {

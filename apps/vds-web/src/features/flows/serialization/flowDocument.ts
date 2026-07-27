@@ -1,6 +1,5 @@
 import { FLOW_SCHEMA_VERSION, type FlowDocument, type JsonValue } from '../types/flow'
-import { FlowDocumentError } from './flowDocumentSchema'
-import { migrateFlowDocument } from './migrations'
+import { assertFlowDocument, FlowDocumentError } from './flowDocumentSchema'
 
 function sortJson(value: JsonValue): JsonValue {
   if (Array.isArray(value)) return value.map(sortJson)
@@ -68,5 +67,6 @@ export function deserializeFlowDocument(input: string): FlowDocument {
   } catch (error) {
     throw new FlowDocumentError('invalid_json', `Flow JSON could not be parsed: ${error instanceof Error ? error.message : 'unknown parse error'}`)
   }
-  return migrateFlowDocument(value)
+  assertFlowDocument(value)
+  return structuredClone(value)
 }

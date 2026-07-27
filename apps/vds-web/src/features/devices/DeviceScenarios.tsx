@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 
 import { GlassPanel } from '../../components/GlassPanel'
 import { localFlowRepository } from '../flows/serialization/localFlowRepository'
-import { exampleScenarioFlow } from './scenario-flows/serialization/scenarioFlowDocument'
 import { ScenariosPage } from './scenarios/ScenariosPage'
 
 export function DeviceScenarios({ deviceId }: { deviceId: string }) {
@@ -16,7 +15,6 @@ export function DeviceScenarios({ deviceId }: { deviceId: string }) {
     const metadataDevice = settings && typeof settings === 'object' && !Array.isArray(settings) ? settings.device_id : undefined
     return metadataDevice === deviceId || document.nodes.some((node) => node.data.device_id === deviceId)
   })
-  const exampleTargetsDevice = exampleScenarioFlow.nodes.some((node) => node.data.device_id === deviceId)
 
   return (
     <div className="device-scenarios">
@@ -33,13 +31,6 @@ export function DeviceScenarios({ deviceId }: { deviceId: string }) {
               <div className="flow-list-meta"><span>r{item.revision}</span></div>
             </Link>
           ))}
-          {exampleTargetsDevice ? (
-            <Link className="flow-list-card" to={`${editorBase}/${encodeURIComponent(exampleScenarioFlow.flow.id)}?readonly=1`}>
-              <span className="flow-list-icon"><GitBranch size={18} /></span>
-              <div className="flow-list-copy"><span>example · scenario</span><strong>{exampleScenarioFlow.flow.name}</strong><small>{exampleScenarioFlow.flow.id}</small></div>
-              <div className="flow-list-meta"><span>r1</span></div>
-            </Link>
-          ) : null}
         </div>
       </GlassPanel>
       <ScenariosPage deviceId={deviceId} embedded />

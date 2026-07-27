@@ -11,7 +11,10 @@ describe('device library', () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
       if (url.endsWith('/api/v1/device-packages') && !init?.method) {
-        return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+        return new Response(JSON.stringify([
+          { id: 'micron-mt25ql256aba8esf-0sit', name: 'Micron MT25QL256ABA8ESF-0SIT', version: '0.1.0', bus: 'spi' },
+          { id: 'atmel-at24c256', name: 'Atmel AT24C256', version: '1.0.0', bus: 'i2c' },
+        ]), { status: 200, headers: { 'Content-Type': 'application/json' } })
       }
       if (url.endsWith('/api/v1/device-packages/import')) {
         return new Response(JSON.stringify({
@@ -25,12 +28,12 @@ describe('device library', () => {
     }))
   })
 
-  it('renders the public-safe local package catalog and selected details', () => {
+  it('renders the package-service catalog and selected details', async () => {
     renderRoute(<DeviceLibraryPage />)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Device Library' })).toBeInTheDocument()
-    expect(screen.getByText('Micron MT25QL256ABA8ESF-0SIT', { selector: 'h2' })).toBeInTheDocument()
-    expect(screen.getByText('5 local packages')).toBeInTheDocument()
+    expect(await screen.findByText('Micron MT25QL256ABA8ESF-0SIT', { selector: 'h2' })).toBeInTheDocument()
+    expect(screen.getByText('2 local packages')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Import Package' })).toBeEnabled()
     expect(screen.queryByText(/Packages are installed into/)).not.toBeInTheDocument()
   })
@@ -38,13 +41,13 @@ describe('device library', () => {
   it('filters installed packages and changes the detail selection', async () => {
     renderRoute(<DeviceLibraryPage />)
 
-    expect(screen.getByRole('button', { name: /Installed 5/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByRole('button', { name: /Installed 2/i })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: /Community 0/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /Private Registry 0/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /Updates 0/i })).toBeDisabled()
 
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search device packages' }), 'ethernet')
-    expect(screen.getByRole('button', { name: /Generic Ethernet Device/i })).toBeInTheDocument()
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search device packages' }), 'micron')
+    expect(screen.getByRole('button', { name: /Micron MT25QL256/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Atmel AT24C256/i })).not.toBeInTheDocument()
 
     await userEvent.clear(screen.getByRole('searchbox', { name: 'Search device packages' }))

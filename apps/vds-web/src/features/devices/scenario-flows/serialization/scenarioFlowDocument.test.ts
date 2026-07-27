@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { deserializeFlowDocument, serializeFlowDocument } from '../../../flows/serialization/flowDocument'
 import { localFlowRepository } from '../../../flows/serialization/localFlowRepository'
 import { useFlowStore } from '../../../flows/store/flowStore'
-import { createScenarioFlowDocument, exampleScenarioFlow } from './scenarioFlowDocument'
+import { createScenarioFlowDocument } from './scenarioFlowDocument'
+import { exampleScenarioFlow } from './scenarioFlowFixtures'
 
 describe('scenario flow persistence', () => {
   beforeEach(() => localStorage.clear())

@@ -3,7 +3,7 @@ import type { Viewport, XYPosition } from '@xyflow/react'
 
 import { edgeRegistry } from '../registry/edgeRegistry'
 import { nodeRegistry } from '../registry/nodeRegistry'
-import { createFlowDocument, deserializeFlowDocument, serializeFlowDocument } from '../serialization/flowDocument'
+import { createFlowDocument, deserializeFlowDocument } from '../serialization/flowDocument'
 import type {
   FlowConnection,
   FlowDensity,
@@ -308,5 +308,3 @@ export const useFlowStore = create<FlowStoreState>((set, get) => {
     reset: () => set({ document: initialDocument, savedDocument: initialDocument, past: [], future: [], readOnly: false, isPersisted: false, isDirty: false, ...resetTransient }),
   }
 })
-
-export function currentFlowJson() { return serializeFlowDocument(useFlowStore.getState().document) }
