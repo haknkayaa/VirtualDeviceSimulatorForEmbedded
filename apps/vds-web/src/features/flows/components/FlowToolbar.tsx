@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { AlignHorizontalSpaceAround, AlignVerticalSpaceAround, Copy, Download, Eye, Focus, Import, PanelLeftClose, PanelRightClose, Redo2, Save, Trash2, Undo2 } from 'lucide-react'
 
 import { useFlowStore } from '../store/flowStore'
@@ -9,9 +10,10 @@ interface FlowToolbarProps {
   onSave: () => void
   onExport: () => void
   onImport: (file: File) => void
+  toolbarActions?: ReactNode
 }
 
-export function FlowToolbar({ fitView, autoLayout, onSave, onExport, onImport }: FlowToolbarProps) {
+export function FlowToolbar({ fitView, autoLayout, onSave, onExport, onImport, toolbarActions }: FlowToolbarProps) {
   const state = useFlowStore()
   return (
     <div className="flow-toolbar flow-frosted" role="toolbar" aria-label="Flow editor toolbar">
@@ -30,12 +32,13 @@ export function FlowToolbar({ fitView, autoLayout, onSave, onExport, onImport }:
         <button aria-label="Auto layout left to right" disabled={state.readOnly} onClick={() => autoLayout('LR')} title="Auto layout left to right" type="button"><AlignHorizontalSpaceAround size={16} /></button>
         <button aria-label="Auto layout top to bottom" disabled={state.readOnly} onClick={() => autoLayout('TB')} title="Auto layout top to bottom" type="button"><AlignVerticalSpaceAround size={16} /></button>
       </div>
+      {toolbarActions}
       <div className="flow-tool-group flow-tool-files">
         <button aria-label="Toggle validation panel" onClick={() => state.setValidationVisible(!state.validationVisible)} title="Toggle validation" type="button"><PanelLeftClose size={16} /></button>
         <button aria-label="Toggle inspector" onClick={() => state.setInspectorVisible(!state.inspectorVisible)} title="Toggle inspector" type="button"><PanelRightClose size={16} /></button>
         <label title="Import JSON"><Import size={16} /><span>Import</span><input accept="application/json,.json" disabled={state.readOnly} onChange={(event) => { const file = event.target.files?.[0]; if (file) onImport(file); event.target.value = '' }} type="file" /></label>
         <button onClick={onExport} type="button"><Download size={16} /><span>Export</span></button>
-        <button className="flow-save" disabled={state.readOnly} onClick={onSave} type="button"><Save size={16} /><span>Save</span></button>
+        <button className={`flow-save${state.isDirty ? ' flow-save-dirty' : ''}`} disabled={state.readOnly} onClick={onSave} type="button"><Save size={16} /><span>{state.isDirty ? 'Unsaved changes' : 'Save'}</span></button>
       </div>
     </div>
   )

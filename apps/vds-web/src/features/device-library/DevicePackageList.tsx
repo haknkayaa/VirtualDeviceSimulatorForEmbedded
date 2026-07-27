@@ -5,6 +5,7 @@ import { libraryKindLabel } from './deviceLibraryCatalog'
 
 interface DevicePackageListProps {
   bus: string
+  installedPackages: ReadonlySet<string>
   onBusChange: (bus: string) => void
   onQueryChange: (query: string) => void
   onSelect: (id: string) => void
@@ -15,6 +16,7 @@ interface DevicePackageListProps {
 
 export function DevicePackageList({
   bus,
+  installedPackages,
   onBusChange,
   onQueryChange,
   onSelect,
@@ -58,7 +60,11 @@ export function DevicePackageList({
             onClick={() => onSelect(item.id)}
             type="button"
           >
-            <span className={`package-acronym package-kind-${item.kind}`}>{item.acronym}</span>
+            {item.image ? (
+              <img alt={item.image.alt} className="package-row-image" src={item.image.src} />
+            ) : (
+              <span className={`package-acronym package-kind-${item.kind}`}>{item.acronym}</span>
+            )}
             <span className="package-row-copy">
               <strong>{item.name}</strong>
               <small>{item.source}</small>
@@ -69,7 +75,7 @@ export function DevicePackageList({
               <i>v{item.version}</i>
               <b>
                 <CheckCircle2 aria-hidden="true" size={11} />
-                {item.readiness === 'runtime_ready' ? 'Installed' : 'Template'}
+                {installedPackages.has(item.id) ? 'Installed' : 'Not installed'}
               </b>
             </span>
             <span className="package-row-kind">{libraryKindLabel()}</span>

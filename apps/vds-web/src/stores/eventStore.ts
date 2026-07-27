@@ -11,6 +11,7 @@ interface EventState {
   reconnectAttempt: number
   selectedEventId: number | null
   acceptEvent: (event: DomainEvent) => void
+  acceptEvents: (events: DomainEvent[]) => void
   setConnection: (status: EventConnectionStatus, reconnectAttempt?: number) => void
   selectEvent: (eventId: number | null) => void
   reset: () => void
@@ -26,12 +27,14 @@ const initialState = {
 
 export const useEventStore = create<EventState>((set) => ({
   ...initialState,
-  acceptEvent: (event) =>
+  acceptEvent: (event) => useEventStore.getState().acceptEvents([event]),
+  acceptEvents: (incoming) =>
     set((state) => {
-      if (event.event_id <= state.lastEventId) return state
-      const events = [...state.events, event]
-      if (events.length > MAX_EVENTS) events.splice(0, events.length - MAX_EVENTS)
-      return { events, lastEventId: event.event_id }
+      const accepted = incoming.filter((event) => event.event_id > state.lastEventId)
+      if (accepted.length === 0) return state
+      const combined = [...state.events, ...accepted]
+      const events = combined.length > MAX_EVENTS ? combined.slice(-MAX_EVENTS) : combined
+      return { events, lastEventId: accepted.at(-1)?.event_id ?? state.lastEventId }
     }),
   setConnection: (connectionStatus, reconnectAttempt = 0) =>
     set({ connectionStatus, reconnectAttempt }),

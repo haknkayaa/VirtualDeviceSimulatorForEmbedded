@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import type { Device } from '../../types/api'
 import { humanize } from '../../utils/format'
+import { deviceProductImage } from './deviceProductImage'
 
 interface DeviceInstanceListProps {
   devices: Device[]
@@ -45,6 +46,7 @@ export function DeviceInstanceList({
         )}
         {devices.map((device) => {
           const active = device.id === selectedId
+          const productImage = deviceProductImage(device)
           return (
             <Link
               aria-current={active ? 'page' : undefined}
@@ -52,7 +54,11 @@ export function DeviceInstanceList({
               key={device.id}
               to={`/devices/${encodeURIComponent(device.id)}`}
             >
-              <span className="device-instance-icon"><Cpu aria-hidden="true" size={17} /></span>
+              {productImage ? (
+                <img alt={productImage.alt} className="device-instance-product-image" src={productImage.src} />
+              ) : (
+                <span className="device-instance-icon"><Cpu aria-hidden="true" size={17} /></span>
+              )}
               <span className="device-instance-copy">
                 <strong>{device.name ?? device.id}</strong>
                 <small>{device.id}</small>

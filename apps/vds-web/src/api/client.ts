@@ -1,19 +1,30 @@
 import type {
+  Adapter,
   ApiErrorBody,
+  AttachAdapterDeviceInput,
   BusTelemetryResponse,
+  ClockSnapshot,
+  CreateAdapterInput,
   CreateDeviceInput,
   Device,
+  DeviceCommand,
   DeviceRegister,
   DeviceState,
   DeviceTemplate,
+  ExecuteDeviceCommandInput,
+  ExecuteDeviceCommandResult,
   DownloadArtifact,
   Fault,
   Health,
+  ImportedDevicePackage,
+  ImportDevicePackageFile,
   RunRecord,
   ScenarioDocument,
   ScenarioResult,
   ScenarioSummary,
+  WriteDeviceRegisterInput,
 } from '../types/api'
+import type { FlowDocument } from '../features/flows/types/flow'
 
 const API_ROOT = import.meta.env.VITE_API_ROOT ?? '/api/v1'
 
@@ -60,9 +71,38 @@ async function requestArtifact(path: string): Promise<DownloadArtifact> {
 
 export const api = {
   health: () => request<Health>('/health'),
+  clock: () => request<ClockSnapshot>('/clock'),
   busTelemetry: () => request<BusTelemetryResponse>('/telemetry/buses'),
   devices: () => request<Device[]>('/devices'),
+  adapters: () => request<Adapter[]>('/adapters'),
+  createAdapter: (input: CreateAdapterInput) =>
+    request<Adapter>('/adapters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  loadAdapter: (id: string) =>
+    request<Adapter>(`/adapters/${encodeURIComponent(id)}/load`, { method: 'POST' }),
+  unloadAdapter: (id: string) =>
+    request<Adapter>(`/adapters/${encodeURIComponent(id)}/unload`, { method: 'POST' }),
+  attachAdapterDevice: ({ adapterId, ...input }: AttachAdapterDeviceInput) =>
+    request<Adapter>(`/adapters/${encodeURIComponent(adapterId)}/bindings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  detachAdapterDevice: ({ adapterId, deviceId }: { adapterId: string; deviceId: string }) =>
+    request<Adapter>(`/adapters/${encodeURIComponent(adapterId)}/bindings/${encodeURIComponent(deviceId)}`, {
+      method: 'DELETE',
+    }),
   deviceTemplates: () => request<DeviceTemplate[]>('/device-models'),
+  devicePackages: () => request<ImportedDevicePackage[]>('/device-packages'),
+  importDevicePackage: (files: ImportDevicePackageFile[]) =>
+    request<ImportedDevicePackage>('/device-packages/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files }),
+    }),
   createDevice: (input: CreateDeviceInput) =>
     request<Device>('/devices', {
       method: 'POST',
@@ -70,8 +110,23 @@ export const api = {
       body: JSON.stringify(input),
     }),
   device: (id: string) => request<Device>(`/devices/${encodeURIComponent(id)}`),
+  deviceCommands: (id: string) =>
+    request<DeviceCommand[]>(`/devices/${encodeURIComponent(id)}/commands`),
+  executeDeviceCommand: ({ deviceId, ...input }: ExecuteDeviceCommandInput) =>
+    request<ExecuteDeviceCommandResult>(`/devices/${encodeURIComponent(deviceId)}/commands/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  deviceFlow: (id: string) => request<FlowDocument>(`/devices/${encodeURIComponent(id)}/flow`),
   registers: (id: string) =>
     request<DeviceRegister[]>(`/devices/${encodeURIComponent(id)}/registers`),
+  writeRegister: ({ deviceId, address, value }: WriteDeviceRegisterInput) =>
+    request<DeviceRegister>(`/devices/${encodeURIComponent(deviceId)}/registers/${address}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value }),
+    }),
   state: (id: string) => request<DeviceState>(`/devices/${encodeURIComponent(id)}/state`),
   reset: (id: string) =>
     request<DeviceState>(`/devices/${encodeURIComponent(id)}/reset`, { method: 'POST' }),

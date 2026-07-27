@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
+import { Maximize2, Minimize2, Search } from 'lucide-react'
 
 import { AsyncState } from '../../components/AsyncState'
 import type { DeviceRegister } from '../../types/api'
@@ -12,6 +12,7 @@ interface RegisterMapProps {
 }
 
 type SearchField = 'all' | 'name' | 'address' | 'description'
+const PAGE_SIZE = 8
 
 function accessLabel(access: string) {
   const normalized = access.toLowerCase()
@@ -26,6 +27,8 @@ export function RegisterMap({ registers, selectedAddress, onSelect }: RegisterMa
   const [access, setAccess] = useState('all')
   const [field, setField] = useState<SearchField>('all')
   const [modifiedOnly, setModifiedOnly] = useState(false)
+  const [page, setPage] = useState(1)
+  const [expanded, setExpanded] = useState(false)
 
   const filteredRegisters = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -44,9 +47,12 @@ export function RegisterMap({ registers, selectedAddress, onSelect }: RegisterMa
         : values[field].toLowerCase().includes(term)
     })
   }, [access, field, modifiedOnly, registers, search])
+  const pageCount = Math.max(1, Math.ceil(filteredRegisters.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount)
+  const visibleRegisters = filteredRegisters.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   return (
-    <section className="glass-panel register-map-panel">
+    <section className={`glass-panel register-map-panel${expanded ? ' expanded' : ''}`}>
       <header className="register-map-toolbar">
         <div className="register-map-title">
           <h2>Register Map</h2>
@@ -55,24 +61,32 @@ export function RegisterMap({ registers, selectedAddress, onSelect }: RegisterMa
         <label className="register-search">
           <Search aria-hidden="true" size={14} />
           <span className="sr-only">Search registers</span>
-          <input onChange={(event) => setSearch(event.target.value)} placeholder="Search registers..." type="search" value={search} />
+          <input onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Search registers..." type="search" value={search} />
         </label>
-        <select aria-label="Filter by access" onChange={(event) => setAccess(event.target.value)} value={access}>
+        <select aria-label="Filter by access" onChange={(event) => { setAccess(event.target.value); setPage(1) }} value={access}>
           <option value="all">All Access</option>
           <option value="ro">Read only</option>
           <option value="rw">Read / Write</option>
           <option value="wo">Write only</option>
         </select>
-        <select aria-label="Search field" onChange={(event) => setField(event.target.value as SearchField)} value={field}>
+        <select aria-label="Search field" onChange={(event) => { setField(event.target.value as SearchField); setPage(1) }} value={field}>
           <option value="all">All Fields</option>
           <option value="name">Register Name</option>
           <option value="address">Address</option>
           <option value="description">Description</option>
         </select>
         <label className="modified-filter">
-          <input checked={modifiedOnly} onChange={(event) => setModifiedOnly(event.target.checked)} type="checkbox" />
+          <input checked={modifiedOnly} onChange={(event) => { setModifiedOnly(event.target.checked); setPage(1) }} type="checkbox" />
           <span>Show Modified Only</span>
         </label>
+        <button
+          aria-label={expanded ? 'Collapse register map' : 'Expand register map'}
+          className="icon-button register-expand-button"
+          onClick={() => setExpanded((current) => !current)}
+          type="button"
+        >
+          {expanded ? <Minimize2 aria-hidden="true" size={15} /> : <Maximize2 aria-hidden="true" size={15} />}
+        </button>
       </header>
       {filteredRegisters.length === 0
         ? <AsyncState detail="Adjust the search or filter controls." kind="empty" title="No matching registers" />
@@ -80,7 +94,7 @@ export function RegisterMap({ registers, selectedAddress, onSelect }: RegisterMa
           <div className="table-scroll register-map-scroll">
             <table className="register-map-table">
               <thead><tr><th>Address</th><th>Register Name</th><th>Access</th><th>Reset Value</th><th>Current Value</th><th>Description</th></tr></thead>
-              <tbody>{filteredRegisters.map((register) => (
+              <tbody>{visibleRegisters.map((register) => (
                 <tr
                   aria-selected={register.address === selectedAddress}
                   className={register.address === selectedAddress ? 'selected' : ''}
@@ -98,6 +112,20 @@ export function RegisterMap({ registers, selectedAddress, onSelect }: RegisterMa
             </table>
           </div>
         )}
+      {filteredRegisters.length > PAGE_SIZE && (
+        <nav aria-label="Register pages" className="register-pagination">
+          {Array.from({ length: pageCount }, (_, index) => index + 1).map((number) => (
+            <button
+              aria-current={number === currentPage ? 'page' : undefined}
+              key={number}
+              onClick={() => setPage(number)}
+              type="button"
+            >
+              {number}
+            </button>
+          ))}
+        </nav>
+      )}
     </section>
   )
 }

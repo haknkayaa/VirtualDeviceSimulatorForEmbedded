@@ -54,7 +54,8 @@ export function createEventStream(options: EventStreamOptions): EventStreamContr
     }
     currentSocket.onmessage = (message: MessageEvent<string>) => {
       try {
-        options.onEvent(JSON.parse(message.data) as DomainEvent)
+        const payload = JSON.parse(message.data) as DomainEvent | DomainEvent[]
+        for (const event of Array.isArray(payload) ? payload : [payload]) options.onEvent(event)
       } catch {
         // Malformed events are isolated from the live stream.
       }

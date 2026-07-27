@@ -24,6 +24,18 @@ export function PropertiesInspector({ issues }: { issues: ValidationIssue[] }) {
           <div><dt>Kind</dt><dd>{node?.kind ?? edge?.kind}</dd></div>
           <div><dt>Registry</dt><dd>{definition?.displayName ?? 'Unknown'}</dd></div>
         </dl>
+        {node && state.document.flow.kind === 'device_behavior' && <label className="flow-field flow-property-row">
+          <span>Reusable</span>
+          <select
+            disabled={state.readOnly}
+            onChange={(event) => state.setNodeReusable(node.id, event.target.value === 'true')}
+            title="Linked instances share the same settings."
+            value={typeof node.ui.reusable_id === 'string' ? 'true' : 'false'}
+          >
+            <option value="false">Disabled</option>
+            <option value="true">Enabled</option>
+          </select>
+        </label>}
         {node && NodeInspector && <NodeInspector issues={scopedIssues} node={node} readOnly={state.readOnly} updateData={(patch) => state.updateNodeData(node.id, patch)} />}
         {edge && EdgeInspector && <EdgeInspector edge={edge} issues={scopedIssues} readOnly={state.readOnly} updateData={(patch) => state.updateEdgeData(edge.id, patch)} />}
         <div className="flow-inspector-issues">

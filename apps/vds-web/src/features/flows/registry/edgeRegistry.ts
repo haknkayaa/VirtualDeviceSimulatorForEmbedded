@@ -11,6 +11,11 @@ export class FlowEdgeRegistry implements EdgeRegistryReader {
     return this
   }
 
+  registerOrReplace(entry: EdgeRegistryEntry) {
+    this.entries.set(entry.kind, entry)
+    return this
+  }
+
   get(kind: string) { return this.entries.get(kind) }
   has(kind: string) { return this.entries.has(kind) }
   list() { return [...this.entries.values()] }

@@ -33,4 +33,16 @@ describe('event replay cursor', () => {
       selectedEventId: 42,
     })
   })
+
+  it('commits a high-volume event batch with one store update', () => {
+    useEventStore.getState().reset()
+    let updates = 0
+    const unsubscribe = useEventStore.subscribe(() => { updates += 1 })
+    useEventStore.getState().acceptEvents(Array.from({ length: 1_000 }, (_, index) => event(index + 1)))
+    unsubscribe()
+
+    expect(updates).toBe(1)
+    expect(useEventStore.getState().events).toHaveLength(1_000)
+    expect(useEventStore.getState().lastEventId).toBe(1_000)
+  })
 })

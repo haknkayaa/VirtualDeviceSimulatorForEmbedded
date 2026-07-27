@@ -22,10 +22,51 @@ function installDeviceApi() {
       ])
     }
     if (url === '/api/v1/device-models') {
-      return jsonResponse([{ id: 'spi-flash-0', name: 'Reference Flash', bus: 'spi', model: 'generic-spi-command' }])
+      return jsonResponse([
+        { id: 'spi-flash-0', name: 'Reference Flash', bus: 'spi', model: 'generic-spi-command' },
+        { id: 'i2c-sensor-0', name: 'Temperature Sensor', bus: 'i2c', model: 'generic-i2c-register' },
+      ])
+    }
+    if (url === '/api/v1/adapters') {
+      return jsonResponse([{
+        id: 'spi0',
+        name: 'SPI 0',
+        bus_type: 'spi',
+        driver: 'cuse',
+        state: 'unloaded',
+        readiness: 'ready',
+        bus_number: 0,
+        bindings: [{ device_id: 'spi-flash-0', endpoint: 0, device_path: '/dev/spidev0.0' }],
+        daemon_pids: [],
+      }])
     }
     if (url === '/api/v1/devices/spi-flash-0') return jsonResponse({ id: 'spi-flash-0', name: 'Reference Flash', bus: 'spi', type: 'Flash memory', model: 'generic-spi-command', version: '1.0', state: 'ready' })
     if (url === '/api/v1/devices/spi-flash-1') return jsonResponse({ id: 'spi-flash-1', name: 'Reference Flash', bus: 'spi', type: 'Flash memory', model: 'generic-spi-command', version: '1.0', state: 'resetting' })
+    if (url === '/api/v1/devices/spi-flash-0/flow') return jsonResponse({
+      schema_version: 1,
+      flow: { id: 'spi-flash-0-behavior', kind: 'device_behavior', name: 'Reference behavior', revision: 1, created_at: '', updated_at: '' },
+      nodes: [],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      metadata: { behavior: { device_id: 'spi-flash-0' } },
+    })
+    if (url === '/api/v1/scenarios') return jsonResponse([])
+    if (url === '/api/v1/devices/spi-flash-0/commands' && !init?.method) return jsonResponse([
+      {
+        name: 'READ_ID',
+        opcode: 159,
+        response: [239, 64, 24],
+        allowed_states: ['ready'],
+        shortcut: { tx: [159, 170, 85], rx_length: 3, description: 'Test RX and TX.' },
+      },
+    ])
+    if (url === '/api/v1/devices/spi-flash-0/commands/execute' && init?.method === 'POST') {
+      return jsonResponse({ rx: [239, 64, 24], state: 'ready', registers: [] })
+    }
+    if (url === '/api/v1/devices/spi-flash-0/registers/1' && init?.method === 'POST') {
+      const body = JSON.parse(String(init.body)) as { value: number }
+      return jsonResponse({ name: 'CONTROL', address: 1, width_bits: 8, access: 'rw', reset_value: 0, value: body.value, description: 'Device control register' })
+    }
     if (url.endsWith('/registers')) return jsonResponse([
       { name: 'CONTROL', address: 1, width_bits: 8, access: 'rw', reset_value: 0, value: 18, description: 'Device control register' },
       { name: 'STATUS', address: 2, width_bits: 8, access: 'ro', reset_value: 1, value: 1, description: 'Current device status' },
@@ -58,7 +99,7 @@ describe('devices page', () => {
     expect(screen.getAllByText('Flash memory').length).toBeGreaterThan(0)
     expect(screen.getAllByText('generic-spi-command').length).toBeGreaterThan(0)
     expect(screen.getAllByText('1.0').length).toBeGreaterThan(0)
-    expect(screen.getByRole('tab', { name: 'State Machine' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Flows' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Register Map' })).toBeInTheDocument()
     expect(screen.getByText('2 Registers')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Bitfield Inspector' })).toBeInTheDocument()
@@ -76,8 +117,22 @@ describe('devices page', () => {
     expect(screen.getByRole('button', { name: 'Write & Verify' })).toBeDisabled()
     await userEvent.click(screen.getByRole('button', { name: 'Add Device' }))
     expect(await screen.findByRole('dialog', { name: 'Add Device' })).toBeInTheDocument()
+    const busType = screen.getByRole('combobox', { name: 'Bus type' })
+    expect(busType).toHaveValue('spi')
+    expect(Array.from(busType.querySelectorAll('option')).map((option) => option.value)).toEqual([
+      'gpio',
+      'spi',
+      'i2c',
+      'qspi',
+      'uart',
+      'ethernet',
+    ])
     expect(screen.getByRole('combobox', { name: 'Device model' })).toHaveValue('spi-flash-0')
+    expect(screen.getByRole('option', { name: 'Reference Flash · SPI' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Temperature Sensor · I2C' })).toBeInTheDocument()
     expect(screen.getByLabelText('Device instance ID')).toHaveValue('spi-flash-1')
+    expect(screen.getByLabelText('Suggested device path')).toHaveValue('/dev/spidev0.0')
+    expect(screen.getByText('Created by the SPI CUSE adapter for spi-flash-1.')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Open Device Library' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await userEvent.click(screen.getByRole('tab', { name: 'Faults' }))
@@ -110,6 +165,23 @@ describe('devices page', () => {
     )
   })
 
+  it('keeps the bus and loaded device model selections in sync', async () => {
+    installDeviceApi()
+    renderRoute(<DevicesPage />, '/devices/spi-flash-0', '/devices/:deviceId')
+
+    await screen.findAllByText('CONTROL')
+    await userEvent.click(screen.getByRole('button', { name: 'Add Device' }))
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Bus type' }), 'i2c')
+
+    expect(screen.getByRole('combobox', { name: 'Device model' })).toHaveValue('i2c-sensor-0')
+    expect(screen.getByRole('button', { name: 'Create Instance' })).toBeEnabled()
+    expect(screen.queryByLabelText('Suggested device path')).not.toBeInTheDocument()
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Device model' }), 'spi-flash-0')
+    expect(screen.getByRole('combobox', { name: 'Bus type' })).toHaveValue('spi')
+    expect(screen.getByLabelText('Suggested device path')).toHaveValue('/dev/spidev0.0')
+  })
+
   it('renders recent register events in the device footer without a separate transaction path', async () => {
     installDeviceApi()
     useEventStore.getState().acceptEvent({
@@ -136,7 +208,7 @@ describe('devices page', () => {
     expect(screen.getByText('100%')).toBeInTheDocument()
   })
 
-  it('filters the register map and edits a local bitfield draft without issuing a write', async () => {
+  it('filters the register map and applies a bitfield draft through the control API', async () => {
     const fetchMock = installDeviceApi()
     renderRoute(<DevicesPage />, '/devices/spi-flash-0', '/devices/:deviceId')
 
@@ -152,18 +224,79 @@ describe('devices page', () => {
 
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Set BIT0' }), '1')
     expect(screen.getByText('Draft 0x13')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Apply value' })).toBeDisabled()
-    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/registers/'), expect.objectContaining({ method: 'POST' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Apply value' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/devices/spi-flash-0/registers/1',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ value: 19 }) }),
+    ))
+    expect(await screen.findByText('0x13', { selector: '.register-current-value' })).toBeInTheDocument()
   })
 
-  it('shows explicit placeholders for device data outside the current API contract', async () => {
+  it('lists and executes device commands through the control API', async () => {
     installDeviceApi()
     renderRoute(<DevicesPage />, '/devices/spi-flash-0', '/devices/:deviceId')
 
     await screen.findAllByText('CONTROL')
     await userEvent.click(screen.getByRole('tab', { name: 'Commands' }))
-    expect(screen.getByText('Not exposed yet')).toBeInTheDocument()
-    expect(screen.getByText('Command metadata is not exposed by the current Control API.')).toBeInTheDocument()
+    expect((await screen.findAllByText('READ_ID')).length).toBeGreaterThan(0)
+    expect(screen.getByText('TX 9F AA 55 · RX 3')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Use shortcut' }))
+    expect(screen.getByRole('textbox', { name: 'Payload (hex)' })).toHaveValue('AA 55')
+    expect(screen.getByRole('spinbutton', { name: 'RX bytes' })).toHaveValue(3)
+    await userEvent.click(screen.getByRole('button', { name: /Execute command/i }))
+    expect(await screen.findByText('EF 40 18')).toBeInTheDocument()
+  })
+
+  it('shows bus-specific SPI adapter settings in Configuration', async () => {
+    installDeviceApi()
+    renderRoute(<DevicesPage />, '/devices/spi-flash-0', '/devices/:deviceId')
+
+    await screen.findAllByText('CONTROL')
+    await userEvent.click(screen.getByRole('tab', { name: 'Configuration' }))
+
+    expect(screen.getByRole('heading', { name: 'SPI configuration' })).toBeInTheDocument()
+    expect(screen.getByText('/dev/spidev0.0')).toBeInTheDocument()
+    expect(screen.getByText('sudo build/spi-cuse/vds4e-spi-cuse --name spidev0.0 --device-id spi-flash-0 --socket /tmp/vds4e.sock')).toBeInTheDocument()
+    expect(screen.getAllByText('Chip select').length).toBeGreaterThan(0)
+    expect(screen.getByRole('heading', { name: 'Configuration Inspector' })).toBeInTheDocument()
+    expect(screen.getAllByText('SPI topology').length).toBeGreaterThan(0)
+    expect(screen.queryByText('No adapter assigned')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    const save = screen.getByRole('button', { name: 'Save' })
+    expect(save).toBeDisabled()
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'CPOL' }), '1')
+    expect(save).toBeEnabled()
+    expect(save).toHaveClass('configuration-save-dirty')
+  })
+
+  it('shows an empty state when no SPI adapters exist', async () => {
+    const fetchMock = installDeviceApi()
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === '/api/v1/adapters') return jsonResponse([])
+      return fetchMock(input, init)
+    }))
+    renderRoute(<DevicesPage />, '/devices/spi-flash-0', '/devices/:deviceId')
+
+    await screen.findAllByText('CONTROL')
+    await userEvent.click(screen.getByRole('tab', { name: 'Configuration' }))
+
+    expect(await screen.findByText('No adapters found')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open Adapters' })).toHaveAttribute('href', '/adapters')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
+  it('derives flow and scenario tabs from device-scoped routes', async () => {
+    installDeviceApi()
+    renderRoute(<DevicesPage />, '/devices/spi-flash-0/flows', '/devices/:deviceId/*')
+
+    expect(await screen.findByRole('tab', { name: 'Flows' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('heading', { name: 'Flows' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Scenarios' }))
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Scenarios' })).toHaveAttribute('aria-selected', 'true')
+    })
+    expect(await screen.findByRole('heading', { name: 'Scenario flows' })).toBeInTheDocument()
   })
 
   it('renders a structured error state when the registry is unavailable', async () => {

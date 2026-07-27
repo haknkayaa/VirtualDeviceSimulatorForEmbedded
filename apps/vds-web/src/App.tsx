@@ -6,15 +6,12 @@ import { AppShell } from './layouts/AppShell'
 
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
 const DevicesPage = lazy(() => import('./features/devices/DevicesPage').then((module) => ({ default: module.DevicesPage })))
+const AdaptersPage = lazy(() => import('./features/adapters/AdaptersPage').then((module) => ({ default: module.AdaptersPage })))
 const TransactionsPage = lazy(() => import('./features/transactions/TransactionsPage').then((module) => ({ default: module.TransactionsPage })))
-const ScenariosPage = lazy(() => import('./features/scenarios/ScenariosPage').then((module) => ({ default: module.ScenariosPage })))
 const DeviceLibraryPage = lazy(() => import('./features/device-library/DeviceLibraryPage').then((module) => ({ default: module.DeviceLibraryPage })))
-const FlowsPage = lazy(() => import('./features/flows/routes/FlowsPage').then((module) => ({ default: module.FlowsPage })))
-const FlowEditorPage = lazy(() => import('./features/flows/routes/FlowEditorPage').then((module) => ({ default: module.FlowEditorPage })))
-const ScenarioFlowsPage = lazy(() => import('./features/scenario-flows/routes/ScenarioFlowsPage').then((module) => ({ default: module.ScenarioFlowsPage })))
-const ScenarioFlowEditorPage = lazy(() => import('./features/scenario-flows/routes/ScenarioFlowEditorPage').then((module) => ({ default: module.ScenarioFlowEditorPage })))
-const DeviceBehaviorFlowsPage = lazy(() => import('./features/device-behavior-flows/routes/DeviceBehaviorFlowsPage').then((module) => ({ default: module.DeviceBehaviorFlowsPage })))
-const DeviceBehaviorEditorPage = lazy(() => import('./features/device-behavior-flows/routes/DeviceBehaviorEditorPage').then((module) => ({ default: module.DeviceBehaviorEditorPage })))
+const LogsPage = lazy(() => import('./features/logs/LogsPage').then((module) => ({ default: module.LogsPage })))
+const ScenarioFlowEditorPage = lazy(() => import('./features/devices/scenario-flows/routes/ScenarioFlowEditorPage').then((module) => ({ default: module.ScenarioFlowEditorPage })))
+const DeviceBehaviorEditorPage = lazy(() => import('./features/devices/behavior/routes/DeviceBehaviorEditorPage').then((module) => ({ default: module.DeviceBehaviorEditorPage })))
 
 export function App() {
   return (
@@ -24,18 +21,16 @@ export function App() {
           <Route element={<DashboardPage />} index />
           <Route element={<DevicesPage />} path="devices" />
           <Route element={<DevicesPage />} path="devices/:deviceId" />
+          <Route element={<DevicesPage />} path="devices/:deviceId/flows" />
+          <Route element={<DevicesPage />} path="devices/:deviceId/scenarios" />
+          <Route element={<ScenarioFlowEditorPage />} path="devices/:deviceId/scenarios/new" />
+          <Route element={<ScenarioFlowEditorPage />} path="devices/:deviceId/scenarios/:flowId" />
+          <Route element={<DeviceBehaviorEditorPage />} path="devices/:deviceId/flows/new" />
+          <Route element={<DeviceBehaviorEditorPage />} path="devices/:deviceId/flows/:flowId" />
+          <Route element={<AdaptersPage />} path="adapters" />
           <Route element={<TransactionsPage />} path="transactions" />
-          <Route element={<ScenariosPage />} path="scenarios" />
           <Route element={<DeviceLibraryPage />} path="device-library" />
-          <Route element={<FlowsPage />} path="flows" />
-          <Route element={<ScenarioFlowsPage />} path="flows/scenarios" />
-          <Route element={<ScenarioFlowEditorPage />} path="flows/scenarios/new" />
-          <Route element={<ScenarioFlowEditorPage />} path="flows/scenarios/:flowId" />
-          <Route element={<DeviceBehaviorFlowsPage />} path="flows/devices" />
-          <Route element={<DeviceBehaviorEditorPage />} path="flows/devices/new" />
-          <Route element={<DeviceBehaviorEditorPage />} path="flows/devices/:flowId" />
-          <Route element={<FlowEditorPage />} path="flows/new" />
-          <Route element={<FlowEditorPage />} path="flows/:flowId" />
+          <Route element={<LogsPage />} path="logs" />
           <Route element={<Navigate replace to="/" />} path="*" />
         </Route>
       </Routes>

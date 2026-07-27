@@ -7,6 +7,7 @@ const icons = { play: Play, flag: Flag, workflow: Workflow }
 
 export function BaseFlowNode({ data, selected }: NodeProps<FlowCanvasNode>) {
   const definition = data.definition
+  const isTerminal = data.document.data.terminal === true
   const Icon = icons[(definition?.iconIdentifier ?? 'workflow') as keyof typeof icons] ?? Circle
   const label = typeof data.document.data.label === 'string' ? data.document.data.label : definition?.displayName ?? data.document.kind
   const issueTone = data.issues.some((issue) => issue.severity === 'error')
@@ -18,6 +19,7 @@ export function BaseFlowNode({ data, selected }: NodeProps<FlowCanvasNode>) {
       className={`flow-node flow-node-${issueTone} runtime-${data.runtimeStatus}${selected ? ' selected' : ''}`}
       data-accent={definition?.accentToken ?? 'muted'}
       data-node-kind={data.document.kind}
+      data-reusable={typeof data.document.ui.reusable_id === 'string' || undefined}
       data-runtime-status={data.runtimeStatus}
     >
       {definition?.inputPorts.map((port, index) => (
@@ -39,7 +41,7 @@ export function BaseFlowNode({ data, selected }: NodeProps<FlowCanvasNode>) {
         <span>{definition?.displayName ?? data.document.kind}</span>
       </div>
       <span className="flow-runtime-dot" title={`Runtime: ${data.runtimeStatus}`} />
-      {definition?.outputPorts.map((port, index) => (
+      {!isTerminal && definition?.outputPorts.map((port, index) => (
         <Handle
           aria-label={`${port.label} output`}
           className="flow-handle flow-handle-output"

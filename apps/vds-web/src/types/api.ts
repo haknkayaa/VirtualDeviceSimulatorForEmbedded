@@ -8,6 +8,10 @@ export interface Health {
   system?: SystemMetrics
 }
 
+export interface ClockSnapshot {
+  virtual_time_ns: number
+}
+
 export interface SystemMetrics {
   cpu_percent?: number
   memory_used_bytes?: number
@@ -35,9 +39,56 @@ export interface DeviceTemplate {
   model: string
 }
 
+export interface ImportDevicePackageFile {
+  path: string
+  content_base64: string
+}
+
+export interface ImportedDevicePackage {
+  id: string
+  name: string
+  version: string
+  bus: string
+}
+
 export interface CreateDeviceInput {
   template_id: string
   device_id: string
+}
+
+export type AdapterState = 'unloaded' | 'loading' | 'loaded' | 'unloading' | 'error'
+export type AdapterReadiness = 'ready' | 'authorization_required' | 'unavailable'
+
+export interface AdapterBinding {
+  device_id: string
+  endpoint: number
+  device_path: string
+}
+
+export interface Adapter {
+  id: string
+  name: string
+  bus_type: string
+  driver: string
+  state: AdapterState
+  readiness: AdapterReadiness
+  bus_number: number
+  bindings: AdapterBinding[]
+  daemon_pids: number[]
+  error?: string
+}
+
+export interface CreateAdapterInput {
+  id: string
+  name: string
+  bus_type: string
+  bus_number: number
+}
+
+export interface AttachAdapterDeviceInput {
+  adapterId: string
+  device_id: string
+  endpoint: number
 }
 
 export interface DeviceState {
@@ -53,6 +104,69 @@ export interface DeviceRegister {
   value: number
   reset_value?: number
   description?: string
+  bitfields?: DeviceRegisterBitField[]
+}
+
+export interface WriteDeviceRegisterInput {
+  deviceId: string
+  address: number
+  value: number
+}
+
+export interface DeviceRegisterBitField {
+  name: string
+  lsb: number
+  width: number
+  access: string
+  description?: string
+}
+
+export type SpiLaneWidth = 'single' | 'dual' | 'quad'
+export type SpiTransferRate = 'str' | 'dtr'
+
+export interface DeviceCommand {
+  name: string
+  opcode: number
+  response?: number[]
+  operation?: 'register_read' | 'register_write' | 'memory_read' | 'page_program' | 'sector_erase' | 'chip_erase'
+  address_bytes?: number
+  register?: string
+  allowed_states: string[]
+  shortcut?: {
+    tx: number[]
+    rx_length: number
+    description?: string
+  }
+  wire?: {
+    command_width: SpiLaneWidth
+    address_width: SpiLaneWidth
+    data_width: SpiLaneWidth
+    rate: SpiTransferRate
+    dummy_cycles: number
+  }
+}
+
+export interface ExecuteDeviceCommandInput {
+  deviceId: string
+  tx: number[]
+  rx_length: number
+  wire: {
+    mode: number
+    bits_per_word: number
+    max_speed_hz: number
+    command_width: SpiLaneWidth
+    address_width: SpiLaneWidth
+    data_width: SpiLaneWidth
+    rate: SpiTransferRate
+    dummy_cycles: number
+    lsb_first: boolean
+  }
+}
+
+export interface ExecuteDeviceCommandResult {
+  rx: number[]
+  state: string | null
+  registers: DeviceRegister[]
 }
 
 export type BusHealth = 'idle' | 'healthy' | 'degraded' | 'unhealthy'
@@ -106,6 +220,7 @@ export interface ScenarioSummary {
   name: string
   timeout_ms: number
   steps: number
+  device_ids: string[]
 }
 
 export type ScenarioAction = Record<string, unknown> & { action: string }

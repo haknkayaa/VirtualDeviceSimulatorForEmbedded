@@ -3,6 +3,7 @@ import { Microchip } from 'lucide-react'
 
 import { StatusBadge } from '../../components/StatusBadge'
 import type { Device } from '../../types/api'
+import { deviceProductImage } from './deviceProductImage'
 
 interface DeviceProfileCardProps {
   device: Device
@@ -11,11 +12,16 @@ interface DeviceProfileCardProps {
 }
 
 export function DeviceProfileCard({ device, currentState, actions }: DeviceProfileCardProps) {
+  const productImage = deviceProductImage(device)
   return (
     <section className="glass-panel device-profile-card">
-      <div aria-label={`${device.id} device illustration`} className="device-profile-image" role="img">
-        <Microchip aria-hidden="true" size={38} strokeWidth={1.4} />
-      </div>
+      {productImage ? (
+        <img alt={productImage.alt} className="device-profile-product-image" src={productImage.src} />
+      ) : (
+        <div aria-label={`${device.id} device illustration`} className="device-profile-image" role="img">
+          <Microchip aria-hidden="true" size={38} strokeWidth={1.4} />
+        </div>
+      )}
       <div className="device-profile-content">
         <header className="device-profile-header">
           <div className="device-profile-identity">

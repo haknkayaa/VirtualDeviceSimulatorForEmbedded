@@ -58,6 +58,34 @@ describe('flow store commands and history', () => {
     expect(useFlowStore.getState().isDirty).toBe(false)
   })
 
+  it('creates linked reusable instances and synchronizes their settings', () => {
+    useFlowStore.getState().setNodeReusable('action', true)
+    const reusableId = useFlowStore.getState().document.nodes.find((node) => node.id === 'action')?.ui.reusable_id
+
+    expect(typeof reusableId).toBe('string')
+    expect(useFlowStore.getState().addReusableNode(reusableId as string, { x: 600, y: 80 }, 'action-shadow')).toBe('action-shadow')
+
+    useFlowStore.getState().updateNodeData('action-shadow', { label: 'Shared action', terminal: true })
+    const linked = useFlowStore.getState().document.nodes.filter((node) => node.ui.reusable_id === reusableId)
+    expect(linked).toHaveLength(2)
+    expect(linked.map((node) => node.data.label)).toEqual(['Shared action', 'Shared action'])
+    expect(linked.every((node) => node.data.terminal === true)).toBe(true)
+    expect(linked.map((node) => node.position)).toEqual([{ x: 240, y: 0 }, { x: 600, y: 80 }])
+    expect(useFlowStore.getState().isDirty).toBe(true)
+  })
+
+  it('can detach one reusable instance without changing the others', () => {
+    useFlowStore.getState().setNodeReusable('action', true)
+    const reusableId = useFlowStore.getState().document.nodes.find((node) => node.id === 'action')?.ui.reusable_id as string
+    useFlowStore.getState().addReusableNode(reusableId, { x: 600, y: 80 }, 'action-shadow')
+
+    useFlowStore.getState().setNodeReusable('action-shadow', false)
+    useFlowStore.getState().updateNodeData('action-shadow', { label: 'Detached' })
+
+    expect(useFlowStore.getState().document.nodes.find((node) => node.id === 'action')?.data.label).toBe('Action')
+    expect(useFlowStore.getState().document.nodes.find((node) => node.id === 'action-shadow')?.ui.reusable_id).toBeUndefined()
+  })
+
   it('keeps revision one on the first local save and increments later revisions', () => {
     useFlowStore.getState().newDocument(flowFixture())
     expect(useFlowStore.getState().prepareLocalSave().flow.revision).toBe(1)
