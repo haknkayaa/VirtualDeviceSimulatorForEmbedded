@@ -1,5 +1,6 @@
 //! Declarative, schema-validated VDS4E device models.
 
+mod at24c;
 mod behavior_flow;
 mod command;
 mod error;
@@ -11,6 +12,7 @@ mod model;
 mod runtime;
 mod signal_graph;
 mod validation;
+pub use at24c::At24cEepromDevice;
 use command::{SpiCommand, SpiCommandBehavior};
 pub use error::ModelError;
 pub use gpio::GenericGpioDevice;

@@ -1,10 +1,11 @@
 use super::{
-    AccessType, Arc, CommandTimingDefinition, DeviceModel, DeviceState, EventScheduler,
-    FaultEngine, FlashMemory, GenericGpioDevice, GenericI2cDevice, GenericSpiDevice, HashMap,
-    ModelError, Mutex, Path, RealTimeClock, RegisterEngine, SignalGraph, SimulatorClock,
-    SpiBusDefinition, SpiCommand, SpiCommandBehavior, SpiCommandOperation, StateActionDefinition,
-    StateGuardDefinition, StateMachine, compile_state_machine, fs, initialize_state_machine,
-    uncompiled_state_machine, validate_faults, validate_register_reference,
+    AccessType, Arc, At24cEepromDevice, CommandTimingDefinition, DeviceModel, DeviceState,
+    EventScheduler, FaultEngine, FlashMemory, GenericGpioDevice, GenericI2cDevice,
+    GenericSpiDevice, HashMap, ModelError, Mutex, Path, RealTimeClock, RegisterEngine, SignalGraph,
+    SimulatorClock, SpiBusDefinition, SpiCommand, SpiCommandBehavior, SpiCommandOperation,
+    StateActionDefinition, StateGuardDefinition, StateMachine, compile_state_machine, fs,
+    initialize_state_machine, uncompiled_state_machine, validate_faults,
+    validate_register_reference,
 };
 use crate::{DEVICE_MODEL_SCHEMA, behavior_flow};
 
@@ -246,7 +247,10 @@ impl DeviceModel {
                 || memory.sector_size_bytes % memory.page_size_bytes != 0
                 || usize::try_from(memory.size_bytes).is_err()
             {
-                return Err(ModelError::InvalidMemory);
+                return Err(ModelError::InvalidMemory {
+                    reason: "size, page, and sector geometry must be non-zero and aligned"
+                        .to_owned(),
+                });
             }
         }
         if let Some(machine) = &model.device.state_machine {
@@ -316,6 +320,36 @@ impl DeviceModel {
                 model: "generic-i2c-register".to_owned(),
             })?;
         GenericI2cDevice::new(self.device.id, definition, self.device.registers)
+    }
+
+    /// Builds an AT24C128/AT24C256 EEPROM runtime using an injected clock.
+    ///
+    /// # Errors
+    /// Returns an error unless the model declares valid AT24C memory geometry.
+    pub fn into_at24c_device_with_clock(
+        self,
+        clock: Arc<dyn SimulatorClock>,
+    ) -> Result<At24cEepromDevice, ModelError> {
+        if self.device.bus != "i2c" || self.device.model != "at24c-eeprom" {
+            return Err(ModelError::UnsupportedModel {
+                bus: self.device.bus,
+                model: self.device.model,
+            });
+        }
+        let definition = self
+            .device
+            .i2c
+            .ok_or_else(|| ModelError::UnsupportedModel {
+                bus: "i2c".to_owned(),
+                model: "at24c-eeprom".to_owned(),
+            })?;
+        let memory = self
+            .device
+            .memory
+            .ok_or_else(|| ModelError::InvalidMemory {
+                reason: "AT24C EEPROM model requires memory geometry".to_owned(),
+            })?;
+        At24cEepromDevice::new(self.device.id, definition, memory, clock)
     }
 
     /// Builds a device using an injected simulator clock.

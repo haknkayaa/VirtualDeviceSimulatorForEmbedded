@@ -38,8 +38,8 @@ pub enum ModelError {
     #[error("SPI command '{name}' is invalid: {reason}")]
     InvalidCommand { name: String, reason: String },
 
-    #[error("device memory geometry is invalid")]
-    InvalidMemory,
+    #[error("device memory geometry is invalid: {reason}")]
+    InvalidMemory { reason: String },
 
     #[error("generic SPI command devices currently require mode 0 and 8-bit transfers")]
     InvalidSpiConfiguration,

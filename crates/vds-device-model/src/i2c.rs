@@ -1,16 +1,17 @@
-use std::sync::Mutex;
+use std::{collections::BTreeMap, sync::Mutex};
 
 use vds_core::device::{
     BusType, Device, DeviceError, DeviceTransfer, I2cMessage, RegisterOperation, RegisterSnapshot,
     RegisterTrace,
 };
-use vds_registers::{RegisterDefinition, RegisterEngine};
+use vds_registers::{RegisterDefinition, RegisterEngine, RegisterError};
 
 use crate::{I2cBusDefinition, ModelError, map_access, map_register_error};
 
 struct I2cState {
     pointer: u64,
     registers: RegisterEngine,
+    unmodeled_bytes: BTreeMap<u64, u8>,
 }
 
 /// Declarative byte-register I2C device with Linux combined-transfer semantics.
@@ -32,6 +33,7 @@ impl GenericI2cDevice {
             state: Mutex::new(I2cState {
                 pointer: 0,
                 registers: RegisterEngine::new(registers)?,
+                unmodeled_bytes: BTreeMap::new(),
             }),
         })
     }
@@ -44,7 +46,9 @@ impl GenericI2cDevice {
 
     fn advance(&self, pointer: &mut u64) {
         if self.definition.auto_increment {
-            *pointer = pointer.saturating_add(1);
+            let address_bits = u32::from(self.definition.register_address_bytes) * 8;
+            let address_mask = u64::MAX >> (64 - address_bits);
+            *pointer = pointer.wrapping_add(1) & address_mask;
         }
     }
 
@@ -91,15 +95,23 @@ impl Device for GenericI2cDevice {
                 }
                 let mut response = Vec::with_capacity(message.read_length);
                 for _ in 0..message.read_length {
-                    let read = state.registers.read(state.pointer).map_err(|error| {
-                        map_register_error(&error, RegisterOperation::Read, None)
-                    })?;
-                    response.push(u8::try_from(read.value).map_err(|_| {
-                        DeviceError::InvalidRequest(format!(
-                            "I2C register 0x{:X} does not fit one byte",
-                            state.pointer
-                        ))
-                    })?);
+                    let value = match state.registers.read(state.pointer) {
+                        Ok(read) => u8::try_from(read.value).map_err(|_| {
+                            DeviceError::InvalidRequest(format!(
+                                "I2C register 0x{:X} does not fit one byte",
+                                state.pointer
+                            ))
+                        })?,
+                        Err(RegisterError::UnknownAddress { .. }) => state
+                            .unmodeled_bytes
+                            .get(&state.pointer)
+                            .copied()
+                            .unwrap_or(0),
+                        Err(error) => {
+                            return Err(map_register_error(&error, RegisterOperation::Read, None));
+                        }
+                    };
+                    response.push(value);
                     self.advance(&mut state.pointer);
                 }
                 reads.push(response);
@@ -121,12 +133,19 @@ impl Device for GenericI2cDevice {
             state.pointer = self.pointer_from(&message.data[..address_bytes]);
             for byte in &message.data[address_bytes..] {
                 let pointer = state.pointer;
-                state
-                    .registers
-                    .write(pointer, u64::from(*byte))
-                    .map_err(|error| {
-                        map_register_error(&error, RegisterOperation::Write, Some(u64::from(*byte)))
-                    })?;
+                match state.registers.write(pointer, u64::from(*byte)) {
+                    Ok(_) => {}
+                    Err(RegisterError::UnknownAddress { .. }) => {
+                        state.unmodeled_bytes.insert(pointer, *byte);
+                    }
+                    Err(error) => {
+                        return Err(map_register_error(
+                            &error,
+                            RegisterOperation::Write,
+                            Some(u64::from(*byte)),
+                        ));
+                    }
+                }
                 self.advance(&mut state.pointer);
             }
         }
@@ -137,6 +156,7 @@ impl Device for GenericI2cDevice {
         let mut state = self.lock()?;
         state.pointer = 0;
         state.registers.reset();
+        state.unmodeled_bytes.clear();
         Ok(Vec::new())
     }
 
@@ -211,6 +231,8 @@ mod tests {
             I2cBusDefinition {
                 register_address_bytes: 1,
                 auto_increment: true,
+                write_cycle_us: None,
+                write_protect: false,
             },
             vec![
                 RegisterDefinition {
@@ -249,5 +271,37 @@ mod tests {
             ])
             .unwrap();
         assert_eq!(reads, [vec![0x42, 0x00]]);
+
+        let reads = device
+            .transfer_i2c(&[
+                I2cMessage {
+                    read: false,
+                    data: vec![0xff, 0x5a],
+                    read_length: 0,
+                },
+                I2cMessage {
+                    read: true,
+                    data: Vec::new(),
+                    read_length: 2,
+                },
+            ])
+            .unwrap();
+        assert_eq!(reads, [vec![0x00, 0x00]]);
+
+        let reads = device
+            .transfer_i2c(&[
+                I2cMessage {
+                    read: false,
+                    data: vec![0xff],
+                    read_length: 0,
+                },
+                I2cMessage {
+                    read: true,
+                    data: Vec::new(),
+                    read_length: 1,
+                },
+            ])
+            .unwrap();
+        assert_eq!(reads, [vec![0x5a]]);
     }
 }

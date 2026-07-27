@@ -56,6 +56,10 @@ pub struct I2cBusDefinition {
     pub register_address_bytes: u8,
     #[serde(default = "default_true")]
     pub auto_increment: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub write_cycle_us: Option<u64>,
+    #[serde(default)]
+    pub write_protect: bool,
 }
 
 const fn default_i2c_register_address_bytes() -> u8 {

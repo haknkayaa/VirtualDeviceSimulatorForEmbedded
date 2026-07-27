@@ -6,6 +6,17 @@ use crate::device::RegisterTrace;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Operation {
     SpiTransfer,
+    I2cTransfer,
+}
+
+impl Operation {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SpiTransfer => "spi_transfer",
+            Self::I2cTransfer => "i2c_transfer",
+        }
+    }
 }
 
 /// Result metadata associated with a normalized transaction.
@@ -31,16 +42,22 @@ pub struct Transaction {
 
 impl Transaction {
     #[must_use]
-    pub fn now(id: u64, device_id: String, request: Vec<u8>) -> Self {
+    pub fn now(
+        id: u64,
+        bus_id: String,
+        device_id: String,
+        operation: Operation,
+        request: Vec<u8>,
+    ) -> Self {
         let timestamp_unix_nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_or(0, |duration| duration.as_nanos());
         Self {
             id,
             timestamp_unix_nanos,
-            bus_id: "spi".to_owned(),
+            bus_id,
             device_id,
-            operation: Operation::SpiTransfer,
+            operation,
             request,
             response: Vec::new(),
             register: None,

@@ -20,7 +20,7 @@ use vds_core::{
     device_package::DevicePackage,
     event::DeviceEvent,
     registry::DeviceRegistry,
-    transaction::{Transaction, TransactionResult},
+    transaction::{Operation, Transaction, TransactionResult},
 };
 use vds_device_model::{DeviceModel, ModelError};
 use vds_events::{EventBus, EventDraft, EventPayload};
@@ -58,6 +58,9 @@ pub fn load_registry_with_clock(
         validate_device_package_model(&package, &model).map_err(ServerError::PackageContract)?;
         let device: Arc<dyn vds_core::device::Device> = match model.device.bus.as_str() {
             "gpio" => Arc::new(model.into_gpio_device()?),
+            "i2c" if model.device.model == "at24c-eeprom" => {
+                Arc::new(model.into_at24c_device_with_clock(Arc::clone(&clock))?)
+            }
             "i2c" => Arc::new(model.into_i2c_device()?),
             _ => Arc::new(model.into_spi_device_with_clock(Arc::clone(&clock))?),
         };
@@ -291,33 +294,99 @@ fn handle_request(
             }
         }
         Some(client_request::Payload::I2cTransfer(i2c)) => {
-            let messages = i2c
-                .messages
-                .into_iter()
-                .map(|message| vds_core::device::I2cMessage {
-                    read: message.read,
-                    data: message.data,
-                    read_length: usize::try_from(message.read_length).unwrap_or(usize::MAX),
-                })
-                .collect::<Vec<_>>();
-            match registry.transfer_i2c(&i2c.device_id, &messages) {
-                Ok(reads) => ServerResponse {
-                    request_id,
-                    result: Some(server_response::Result::I2cTransfer(I2cTransferResponse {
-                        reads,
-                    })),
-                },
-                Err(error) => {
-                    let (code, _) = protocol_error_code(&error);
-                    error_response(request_id, code, error.to_string())
-                }
-            }
+            handle_i2c_request(request_id, i2c, registry, transaction_ids, events)
         }
         None => error_response(
             request_id,
             ErrorCode::InvalidRequest,
             "request payload is missing".to_owned(),
         ),
+    }
+}
+
+fn handle_i2c_request(
+    request_id: u64,
+    i2c: vds_protocol::v1::I2cTransferRequest,
+    registry: &DeviceRegistry,
+    transaction_ids: &AtomicU64,
+    events: &EventBus,
+) -> ServerResponse {
+    let request_bytes = i2c
+        .messages
+        .iter()
+        .filter(|message| !message.read)
+        .flat_map(|message| message.data.iter().copied())
+        .collect::<Vec<_>>();
+    let transaction_id = transaction_ids.fetch_add(1, Ordering::Relaxed);
+    let mut transaction = Transaction::now(
+        transaction_id,
+        "i2c".to_owned(),
+        i2c.device_id.clone(),
+        Operation::I2cTransfer,
+        request_bytes.clone(),
+    );
+    let virtual_time_ns = registry.virtual_time_ns(&i2c.device_id).unwrap_or(0);
+    let _ = events.publish(EventDraft {
+        virtual_time_ns,
+        device_id: Some(i2c.device_id.clone()),
+        scenario_run_id: None,
+        payload: EventPayload::TransactionStarted {
+            transaction_id: Some(transaction_id),
+            request: request_bytes,
+        },
+    });
+    let messages = i2c
+        .messages
+        .into_iter()
+        .map(|message| vds_core::device::I2cMessage {
+            read: message.read,
+            data: message.data,
+            read_length: usize::try_from(message.read_length).unwrap_or(usize::MAX),
+        })
+        .collect::<Vec<_>>();
+    match registry.transfer_i2c(&i2c.device_id, &messages) {
+        Ok(reads) => {
+            let response = reads.iter().flatten().copied().collect::<Vec<_>>();
+            transaction.response.clone_from(&response);
+            let _ = events.publish(EventDraft {
+                virtual_time_ns,
+                device_id: Some(i2c.device_id),
+                scenario_run_id: None,
+                payload: EventPayload::TransactionCompleted {
+                    transaction_id: Some(transaction_id),
+                    response,
+                    result: "success".to_owned(),
+                    error_code: None,
+                },
+            });
+            log_transaction(&transaction);
+            ServerResponse {
+                request_id,
+                result: Some(server_response::Result::I2cTransfer(I2cTransferResponse {
+                    reads,
+                })),
+            }
+        }
+        Err(error) => {
+            let (code, code_name) = protocol_error_code(&error);
+            transaction.result = TransactionResult::Error {
+                code: code_name,
+                message: error.to_string(),
+            };
+            let _ = events.publish(EventDraft {
+                virtual_time_ns,
+                device_id: Some(i2c.device_id),
+                scenario_run_id: None,
+                payload: EventPayload::TransactionCompleted {
+                    transaction_id: Some(transaction_id),
+                    response: Vec::new(),
+                    result: "error".to_owned(),
+                    error_code: Some(code_name.to_owned()),
+                },
+            });
+            log_transaction(&transaction);
+            error_response(request_id, code, error.to_string())
+        }
     }
 }
 
@@ -329,7 +398,13 @@ fn handle_spi_request(
     events: &EventBus,
 ) -> ServerResponse {
     let transaction_id = transaction_ids.fetch_add(1, Ordering::Relaxed);
-    let mut transaction = Transaction::now(transaction_id, spi.device_id.clone(), spi.tx.clone());
+    let mut transaction = Transaction::now(
+        transaction_id,
+        "spi".to_owned(),
+        spi.device_id.clone(),
+        Operation::SpiTransfer,
+        spi.tx.clone(),
+    );
     let virtual_time_ns = registry.virtual_time_ns(&spi.device_id).unwrap_or(0);
     let _ = events.publish(EventDraft {
         virtual_time_ns,
@@ -710,6 +785,7 @@ fn error_response(request_id: u64, code: ErrorCode, message: String) -> ServerRe
 fn log_transaction(transaction: &Transaction) {
     let request = format_bytes(&transaction.request);
     let response = format_bytes(&transaction.response);
+    let operation = transaction.operation.as_str();
     if let Some(register) = &transaction.register {
         let name = register.name.as_deref().unwrap_or("");
         let access_type = register
@@ -723,7 +799,7 @@ fn log_transaction(transaction: &Transaction) {
                 transaction_id = transaction.id,
                 bus_id = %transaction.bus_id,
                 device_id = %transaction.device_id,
-                operation = "spi_transfer",
+                operation,
                 request = %request,
                 response = %response,
                 register_name = name,
@@ -740,7 +816,7 @@ fn log_transaction(transaction: &Transaction) {
                 transaction_id = transaction.id,
                 bus_id = %transaction.bus_id,
                 device_id = %transaction.device_id,
-                operation = "spi_transfer",
+                operation,
                 request = %request,
                 response = %response,
                 register_name = name,
@@ -763,7 +839,7 @@ fn log_transaction(transaction: &Transaction) {
             transaction_id = transaction.id,
             bus_id = %transaction.bus_id,
             device_id = %transaction.device_id,
-            operation = "spi_transfer",
+            operation,
             request = %request,
             response = %response,
             result = "success",
@@ -774,7 +850,7 @@ fn log_transaction(transaction: &Transaction) {
             transaction_id = transaction.id,
             bus_id = %transaction.bus_id,
             device_id = %transaction.device_id,
-            operation = "spi_transfer",
+            operation,
             request = %request,
             response = %response,
             result = "error",
@@ -832,6 +908,7 @@ pub enum ServerError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vds_events::EventType;
     use vds_protocol::v1::GpioExchangeRequest;
 
     #[test]
@@ -895,6 +972,7 @@ device:
         registry
             .register(Arc::new(model.into_i2c_device().unwrap()))
             .unwrap();
+        let events = EventBus::default();
         let response = handle_request(
             ClientRequest {
                 request_id: 43,
@@ -921,11 +999,15 @@ device:
             },
             &registry,
             &AtomicU64::new(1),
-            &EventBus::default(),
+            &events,
         );
         let Some(server_response::Result::I2cTransfer(transfer)) = response.result else {
             panic!("I2C transfer response expected");
         };
         assert_eq!(transfer.reads, [vec![0x42]]);
+        let published = events.events_after(0);
+        assert_eq!(published.len(), 2);
+        assert_eq!(published[0].event_type, EventType::TransactionStarted);
+        assert_eq!(published[1].event_type, EventType::TransactionCompleted);
     }
 }

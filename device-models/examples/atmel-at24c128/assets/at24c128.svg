@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+  <title id="title">Atmel AT24C128 serial EEPROM</title>
+  <desc id="desc">Eight-pin integrated circuit package marked AT24C128.</desc>
+  <rect width="640" height="360" rx="28" fill="#07131f"/>
+  <g fill="#a8b7c6">
+    <rect x="95" y="83" width="78" height="18" rx="7"/><rect x="95" y="141" width="78" height="18" rx="7"/>
+    <rect x="95" y="199" width="78" height="18" rx="7"/><rect x="95" y="257" width="78" height="18" rx="7"/>
+    <rect x="467" y="83" width="78" height="18" rx="7"/><rect x="467" y="141" width="78" height="18" rx="7"/>
+    <rect x="467" y="199" width="78" height="18" rx="7"/><rect x="467" y="257" width="78" height="18" rx="7"/>
+  </g>
+  <rect x="165" y="50" width="310" height="260" rx="30" fill="#172635" stroke="#4d6478" stroke-width="5"/>
+  <circle cx="205" cy="88" r="12" fill="#71879a"/>
+  <text x="320" y="155" text-anchor="middle" fill="#e8f1f8" font-family="sans-serif" font-size="28" font-weight="700">ATMEL</text>
+  <text x="320" y="205" text-anchor="middle" fill="#50d5ff" font-family="monospace" font-size="34" font-weight="700">AT24C128</text>
+  <text x="320" y="247" text-anchor="middle" fill="#91a6b8" font-family="sans-serif" font-size="18">128-Kbit I²C EEPROM</text>
+</svg>

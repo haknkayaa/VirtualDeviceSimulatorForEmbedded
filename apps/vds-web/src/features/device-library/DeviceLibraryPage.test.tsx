@@ -30,7 +30,7 @@ describe('device library', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Device Library' })).toBeInTheDocument()
     expect(screen.getByText('Micron MT25QL256ABA8ESF-0SIT', { selector: 'h2' })).toBeInTheDocument()
-    expect(screen.getByText('4 local packages')).toBeInTheDocument()
+    expect(screen.getByText('5 local packages')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Import Package' })).toBeEnabled()
     expect(screen.queryByText(/Packages are installed into/)).not.toBeInTheDocument()
   })
@@ -38,18 +38,18 @@ describe('device library', () => {
   it('filters installed packages and changes the detail selection', async () => {
     renderRoute(<DeviceLibraryPage />)
 
-    expect(screen.getByRole('button', { name: /Installed 4/i })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /Installed 5/i })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: /Community 0/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /Private Registry 0/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /Updates 0/i })).toBeDisabled()
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search device packages' }), 'ethernet')
     expect(screen.getByRole('button', { name: /Generic Ethernet Device/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Generic I2C Device/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Atmel AT24C256/i })).not.toBeInTheDocument()
 
     await userEvent.clear(screen.getByRole('searchbox', { name: 'Search device packages' }))
-    await userEvent.click(screen.getByRole('button', { name: /Generic I2C Device/i }))
-    expect(screen.getByText('Generic I2C Device', { selector: 'h2' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /Atmel AT24C256/i }))
+    expect(screen.getByText('Atmel AT24C256', { selector: 'h2' })).toBeInTheDocument()
     expect(screen.getByText('Installed', { selector: '.package-install-state strong' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Add Device' })).toHaveAttribute('href', '/devices')
   })
