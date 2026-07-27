@@ -45,6 +45,12 @@ echo "Building Micron MT25QL256 Embedded Linux tool..."
   "$ROOT_DIR/examples/micron-mt25ql256-embedded/mt25ql256_tool.c" \
   -o "$STATE_DIR/bin/mt25ql256_tool"
 
+echo "Building Atmel AT24C128/256 Embedded Linux tool..."
+"${CC:-cc}" \
+  -O2 -g -Wall -Wextra -Wpedantic -Werror -std=c11 \
+  "$ROOT_DIR/examples/atmel-at24c256-embedded/at24c256_tool.c" \
+  -o "$STATE_DIR/bin/at24c256_tool"
+
 touch "$STATE_DIR/.built"
 
 echo

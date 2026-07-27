@@ -16,3 +16,6 @@ i2ctransfer -y 0 w2@0x50 0x00 0x10 r1
 ```
 
 Source: Atmel `doc0670.pdf`, document 0670T-SEEPR-3/07, revision T.
+
+For an Embedded Linux C application using `/dev/i2c-N` directly, see
+`examples/atmel-at24c256-embedded/at24c256_tool.c`.
