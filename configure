@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STATE_DIR="$ROOT_DIR/.vds4e-build"
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+for required in cargo cmake npm make cc pkg-config; do
+  require_command "$required"
+done
+
+if ! pkg-config --exists fuse3; then
+  echo "Missing FUSE3 development package (pkg-config module: fuse3)." >&2
+  exit 1
+fi
+
+mkdir -p "$STATE_DIR"
+rm -f "$STATE_DIR/.configured" "$STATE_DIR/.built"
+
+echo "Fetching locked Rust dependencies..."
+cargo fetch --locked --manifest-path "$ROOT_DIR/Cargo.toml"
+
+echo "Installing locked Web dependencies..."
+npm --prefix "$ROOT_DIR/apps/vds-web" ci
+
+echo "Configuring SPI preload adapter..."
+cmake \
+  -S "$ROOT_DIR/adapters/spi-preload" \
+  -B "$STATE_DIR/spi-preload" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DVDS4E_SPI_PRELOAD_BUILD_TESTS=OFF \
+  -DVDS4E_SERVER_EXECUTABLE="$ROOT_DIR/target/release/vds-server"
+
+echo "Configuring SPI CUSE adapter..."
+cmake \
+  -S "$ROOT_DIR/adapters/spi-cuse" \
+  -B "$STATE_DIR/spi-cuse" \
+  -DCMAKE_BUILD_TYPE=Release
+
+printf 'configured_at=%(%Y-%m-%dT%H:%M:%S%z)T\n' -1 \
+  >"$STATE_DIR/configuration"
+touch "$STATE_DIR/.configured"
+
+echo
+echo "Configuration complete."
+echo "Next step: ./build"

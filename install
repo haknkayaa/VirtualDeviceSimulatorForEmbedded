@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STATE_DIR="$ROOT_DIR/.vds4e-build"
+PREFIX="${PREFIX:-/usr/local}"
+DESTDIR="${DESTDIR:-}"
+INSTALL_ROOT="${DESTDIR}${PREFIX}"
+
+if [[ ! -f "$STATE_DIR/.configured" ]]; then
+  echo "The repository has not been configured." >&2
+  echo "Run ./configure and ./build before ./install." >&2
+  exit 1
+fi
+
+if [[ ! -f "$STATE_DIR/.built" ]]; then
+  echo "The repository has not been built successfully." >&2
+  echo "Run ./build before ./install." >&2
+  exit 1
+fi
+
+required_outputs=(
+  "$ROOT_DIR/target/release/vds-server"
+  "$ROOT_DIR/target/release/vds-cli"
+  "$ROOT_DIR/apps/vds-web/dist/index.html"
+  "$ROOT_DIR/client/c/build/libvds4e.a"
+  "$STATE_DIR/spi-preload/libvds4e-spi-preload.so"
+  "$STATE_DIR/spi-cuse/vds4e-spi-cuse"
+  "$STATE_DIR/bin/mt25ql256_tool"
+)
+
+for output in "${required_outputs[@]}"; do
+  if [[ ! -e "$output" ]]; then
+    echo "Required build output is missing: $output" >&2
+    echo "Run ./build again." >&2
+    exit 1
+  fi
+done
+
+install_file() {
+  local mode="$1"
+  local source="$2"
+  local destination="$3"
+  command install -D -m "$mode" "$source" "$destination"
+}
+
+install_tree() {
+  local source="$1"
+  local destination="$2"
+  command install -d "$destination"
+  cp -a "$source/." "$destination/"
+}
+
+echo "Installing into $INSTALL_ROOT..."
+
+install_file 0755 "$ROOT_DIR/target/release/vds-server" \
+  "$INSTALL_ROOT/bin/vds-server"
+install_file 0755 "$ROOT_DIR/target/release/vds-cli" \
+  "$INSTALL_ROOT/bin/vds-cli"
+install_file 0755 "$STATE_DIR/spi-cuse/vds4e-spi-cuse" \
+  "$INSTALL_ROOT/bin/vds4e-spi-cuse"
+install_file 0755 "$STATE_DIR/bin/mt25ql256_tool" \
+  "$INSTALL_ROOT/bin/mt25ql256_tool"
+
+install_file 0644 "$STATE_DIR/spi-preload/libvds4e-spi-preload.so" \
+  "$INSTALL_ROOT/lib/libvds4e-spi-preload.so"
+install_file 0644 "$ROOT_DIR/client/c/build/libvds4e.a" \
+  "$INSTALL_ROOT/lib/libvds4e.a"
+install_file 0644 "$ROOT_DIR/client/c/include/vds4e/client.h" \
+  "$INSTALL_ROOT/include/vds4e/client.h"
+
+install_tree "$ROOT_DIR/apps/vds-web/dist" \
+  "$INSTALL_ROOT/share/vds4e/web"
+install_tree "$ROOT_DIR/device-models/examples" \
+  "$INSTALL_ROOT/share/vds4e/device-models"
+install_tree "$ROOT_DIR/schemas" \
+  "$INSTALL_ROOT/share/vds4e/schemas"
+
+command install -d "$INSTALL_ROOT/share/vds4e"
+sed \
+  "s#device-models/examples/#$PREFIX/share/vds4e/device-models/#g" \
+  "$ROOT_DIR/config/vds-server.yaml" \
+  >"$INSTALL_ROOT/share/vds4e/vds-server.example.yaml"
+chmod 0644 "$INSTALL_ROOT/share/vds4e/vds-server.example.yaml"
+
+echo
+echo "Installation complete: $INSTALL_ROOT"

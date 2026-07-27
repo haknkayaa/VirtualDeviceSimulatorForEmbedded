@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+STATE_DIR="$ROOT_DIR/.vds4e-build"
+
+if [[ ! -f "$STATE_DIR/.configured" ]]; then
+  echo "The repository has not been configured." >&2
+  echo "Run ./configure before ./build." >&2
+  exit 1
+fi
+
+rm -f "$STATE_DIR/.built"
+mkdir -p "$STATE_DIR/bin"
+
+echo "Building Rust workspace..."
+cargo build \
+  --locked \
+  --release \
+  --workspace \
+  --manifest-path "$ROOT_DIR/Cargo.toml"
+
+echo "Building Web application..."
+npm --prefix "$ROOT_DIR/apps/vds-web" run build
+
+echo "Building C client..."
+make -C "$ROOT_DIR/client/c" all
+
+echo "Building SPI preload adapter..."
+cmake --build "$STATE_DIR/spi-preload" --config Release --parallel
+
+echo "Building SPI CUSE adapter..."
+cmake --build "$STATE_DIR/spi-cuse" --config Release --parallel
+
+echo "Building Micron MT25QL256 Embedded Linux tool..."
+"${CC:-cc}" \
+  -O2 -g -Wall -Wextra -Wpedantic -Werror -std=c11 \
+  "$ROOT_DIR/examples/micron-mt25ql256-embedded/mt25ql256_tool.c" \
+  -o "$STATE_DIR/bin/mt25ql256_tool"
+
+touch "$STATE_DIR/.built"
+
+echo
+echo "Build complete."
+echo "Next step: ./install"

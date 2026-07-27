@@ -1,5 +1,7 @@
 /target/
+/.vds4e-build/
 /client/c/build/
+/examples/micron-mt25ql256-embedded/mt25ql256_tool
 *.db
 *.db-shm
 *.db-wal
@@ -9,6 +11,8 @@
 .vscode/
 node_modules/
 dist/
+device-models/**/runtime-data/*
+!device-models/**/runtime-data/README.md
 
 # Company know-how and private extension work must live outside the public tree.
 private/
