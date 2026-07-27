@@ -120,7 +120,7 @@ pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
     let registry = Arc::new(load_registry_with_clock(&config, Arc::clone(&clock))?);
     let event_store_path = std::env::var_os("HOME")
         .map_or_else(|| PathBuf::from("."), PathBuf::from)
-        .join(".vsd4e/events.sqlite3");
+        .join(".vds4e/events.sqlite3");
     if let Some(parent) = event_store_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -498,22 +498,22 @@ fn handle_spi_request(
 fn decode_spi_wire(
     wire: Option<&vds_protocol::v1::SpiWireConfig>,
 ) -> Result<SpiWireConfig, String> {
-    let Some(wire) = wire else {
-        return Ok(SpiWireConfig::default());
-    };
+    let wire = wire.ok_or_else(|| "SPI wire configuration is required".to_owned())?;
     let lane = |value| match vds_protocol::v1::SpiLaneWidth::try_from(value) {
-        Ok(
-            vds_protocol::v1::SpiLaneWidth::Unspecified | vds_protocol::v1::SpiLaneWidth::Single,
-        ) => Ok(SpiLaneWidth::Single),
+        Ok(vds_protocol::v1::SpiLaneWidth::Single) => Ok(SpiLaneWidth::Single),
         Ok(vds_protocol::v1::SpiLaneWidth::Dual) => Ok(SpiLaneWidth::Dual),
         Ok(vds_protocol::v1::SpiLaneWidth::Quad) => Ok(SpiLaneWidth::Quad),
+        Ok(vds_protocol::v1::SpiLaneWidth::Unspecified) => {
+            Err("SPI lane width must be specified".to_owned())
+        }
         Err(_) => Err(format!("invalid SPI lane width {value}")),
     };
     let rate = match vds_protocol::v1::SpiTransferRate::try_from(wire.rate) {
-        Ok(
-            vds_protocol::v1::SpiTransferRate::Unspecified | vds_protocol::v1::SpiTransferRate::Str,
-        ) => SpiTransferRate::Str,
+        Ok(vds_protocol::v1::SpiTransferRate::Str) => SpiTransferRate::Str,
         Ok(vds_protocol::v1::SpiTransferRate::Dtr) => SpiTransferRate::Dtr,
+        Ok(vds_protocol::v1::SpiTransferRate::Unspecified) => {
+            return Err("SPI transfer rate must be specified".to_owned());
+        }
         Err(_) => return Err(format!("invalid SPI transfer rate {}", wire.rate)),
     };
     Ok(SpiWireConfig {

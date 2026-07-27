@@ -65,7 +65,10 @@ mod tests {
     use tokio::io::duplex;
 
     use super::{read_message, write_message};
-    use crate::v1::{ClientRequest, GpioExchangeRequest, SpiTransferRequest, client_request};
+    use crate::v1::{
+        ClientRequest, GpioExchangeRequest, SpiLaneWidth, SpiTransferRate, SpiTransferRequest,
+        SpiWireConfig, client_request,
+    };
 
     #[tokio::test]
     async fn round_trips_a_framed_message() {
@@ -75,7 +78,17 @@ mod tests {
             payload: Some(client_request::Payload::SpiTransfer(SpiTransferRequest {
                 device_id: "spi-flash-0".to_owned(),
                 tx: vec![0x9f],
-                wire: None,
+                wire: Some(SpiWireConfig {
+                    mode: 0,
+                    bits_per_word: 8,
+                    max_speed_hz: 0,
+                    command_width: SpiLaneWidth::Single as i32,
+                    address_width: SpiLaneWidth::Single as i32,
+                    data_width: SpiLaneWidth::Single as i32,
+                    rate: SpiTransferRate::Str as i32,
+                    dummy_cycles: 0,
+                    lsb_first: false,
+                }),
                 rx_length: 0,
             })),
         };

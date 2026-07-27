@@ -158,7 +158,7 @@ data_plane:
 observability:
   log_level: info
 device_packages:
-  - device-models/examples/generic-spi-flash
+  - device-models/examples/micron-mt25ql256aba8esf-0sit
 ";
 
     #[test]
@@ -174,7 +174,9 @@ device_packages:
         assert_eq!(config.observability.log_level, "info");
         assert_eq!(
             config.device_packages,
-            vec![PathBuf::from("device-models/examples/generic-spi-flash")]
+            vec![PathBuf::from(
+                "device-models/examples/micron-mt25ql256aba8esf-0sit"
+            )]
         );
         assert_eq!(config.event_store, EventStoreSettings::default());
     }
@@ -195,8 +197,8 @@ device_packages:
     #[test]
     fn rejects_legacy_device_models() {
         let invalid = VALID_CONFIG.replace(
-            "device_packages:\n  - device-models/examples/generic-spi-flash",
-            "device_models:\n  - device-models/examples/generic-spi-flash/model/device.yaml",
+            "device_packages:\n  - device-models/examples/micron-mt25ql256aba8esf-0sit",
+            "device_models:\n  - device-models/examples/micron-mt25ql256aba8esf-0sit/model/device.yaml",
         );
         let error = ServerConfig::from_yaml(&invalid).expect_err("legacy models must be rejected");
         assert!(matches!(error, Error::ConfigValidation { .. }));

@@ -1,6 +1,0 @@
-schema_version: 1
-scenario: { id: generic-flash-program-without-wel, name: Program rejected without WEL, timeout_ms: 100 }
-steps:
-  - { id: settle_reset, action: advance_time, duration_ms: 5 }
-  - { id: program, action: send_spi, device: generic-spi-flash-128m, tx: "02 00 00 20 AA", save_as: rejected }
-  - { id: assert_rejected, action: assert_error, source: rejected, expected_code: state_command_rejected }

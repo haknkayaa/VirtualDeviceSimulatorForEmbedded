@@ -583,13 +583,13 @@ mod tests {
             &config,
             format!(
                 "schema_version: 1\nserver: {{ control_address: '127.0.0.1:0' }}\ndata_plane: {{ unix_socket: /tmp/vds4e-cli-test.sock }}\nobservability: {{ log_level: info }}\ndevice_packages: ['{}']\n",
-                root.join("device-models/examples/generic-spi-flash").display()
+                root.join("device-models/examples/micron-mt25ql256aba8esf-0sit").display()
             ),
         )
         .unwrap();
         let status = run_scenario(&ScenarioRunArguments {
             scenario: root
-                .join("device-models/examples/generic-spi-flash/scenarios/01-read-id.yaml"),
+                .join("device-models/examples/micron-mt25ql256aba8esf-0sit/scenarios/01-read-jedec-id.yaml"),
             config,
             json_output: Some(json.clone()),
             junit_output: Some(junit.clone()),

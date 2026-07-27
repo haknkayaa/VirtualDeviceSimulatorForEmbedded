@@ -205,8 +205,6 @@ pub trait Device: Send + Sync {
     /// unsupported command.
     fn transfer(&self, request: &[u8]) -> Result<DeviceTransfer, DeviceError>;
 
-    /// Executes an SPI transaction with explicit wire attributes. The default
-    /// keeps legacy devices source-compatible and accepts only the byte stream.
     /// Executes a configured SPI transfer.
     ///
     /// # Errors
@@ -214,11 +212,9 @@ pub trait Device: Send + Sync {
     fn transfer_spi(
         &self,
         request: &[u8],
-        _rx_length: usize,
-        _wire: SpiWireConfig,
-    ) -> Result<DeviceTransfer, DeviceError> {
-        self.transfer(request)
-    }
+        rx_length: usize,
+        wire: SpiWireConfig,
+    ) -> Result<DeviceTransfer, DeviceError>;
 
     /// Executes an atomic sequence of addressed I2C messages.
     ///

@@ -2,7 +2,7 @@ schema_version: 1
 
 device:
   id: spi-flash-0
-  name: Example Generic SPI Flash
+  name: Example SPI Test Device
   bus: spi
   model: generic-spi-command
   commands:

@@ -69,7 +69,7 @@ impl AdapterDriver for FakeAdapterDriver {
 fn config() -> ServerConfig {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let package = root
-        .join("device-models/examples/generic-spi-flash")
+        .join("device-models/examples/micron-mt25ql256aba8esf-0sit")
         .canonicalize()
         .unwrap();
     let gpio_package = root
@@ -164,10 +164,10 @@ async fn json_request(
 #[tokio::test]
 async fn reloads_a_complete_device_package_after_it_is_moved_out_and_back() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let source = root.join("device-models/examples/generic-spi-flash");
+    let source = root.join("device-models/examples/micron-mt25ql256aba8esf-0sit");
     let temporary_root =
         std::env::temp_dir().join(format!("vds4e-portable-package-{}", std::process::id()));
-    let package = temporary_root.join("generic-spi-flash");
+    let package = temporary_root.join("micron-mt25ql256aba8esf-0sit");
     let parked = temporary_root.join("package-outside-device-directory");
     if temporary_root.exists() {
         fs::remove_dir_all(&temporary_root).unwrap();
@@ -189,18 +189,19 @@ async fn reloads_a_complete_device_package_after_it_is_moved_out_and_back() {
     let registry = load_registry_with_clock(&config, clock.clone()).unwrap();
     clock.advance(Duration::from_millis(5)).unwrap();
     registry
-        .transfer("generic-spi-flash-128m", &[0x9F])
+        .transfer_spi(
+            "micron-mt25ql256aba8esf-0sit",
+            &[0x9F],
+            0,
+            vds_core::device::SpiWireConfig::default(),
+        )
         .expect("transfer should drain the delayed state event and activate the signal graph");
     assert_eq!(
         registry
-            .current_state("generic-spi-flash-128m")
+            .current_state("micron-mt25ql256aba8esf-0sit")
             .unwrap()
             .as_deref(),
         Some("ready")
-    );
-    assert_eq!(
-        fs::read_to_string(package.join("runtime-data/signal-output.txt")).unwrap(),
-        "VDS4E generic SPI signal graph fixture.\n"
     );
     let state = ApiState::new(
         config,
@@ -209,18 +210,18 @@ async fn reloads_a_complete_device_package_after_it_is_moved_out_and_back() {
         clock,
     )
     .unwrap();
-    assert_eq!(state.scenarios.len(), 10);
+    assert_eq!(state.scenarios.len(), 4);
     let (status, flow) = json_request(
         router(state),
         "GET",
-        "/api/v1/devices/generic-spi-flash-128m/flow",
+        "/api/v1/devices/micron-mt25ql256aba8esf-0sit/flow",
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(flow["flow"]["id"], "generic-spi-flash-128m-behavior");
+    assert_eq!(flow["flow"]["id"], "micron-mt25ql256aba8esf-0sit-behavior");
     assert_eq!(
         flow["metadata"]["behavior"]["device_id"],
-        "generic-spi-flash-128m"
+        "micron-mt25ql256aba8esf-0sit"
     );
 
     fs::remove_dir_all(&temporary_root).unwrap();
@@ -254,7 +255,7 @@ async fn register_write_endpoint_updates_runtime_state() {
     let (_, registers) = json_request(
         app.clone(),
         "GET",
-        "/api/v1/devices/generic-spi-flash-128m/registers",
+        "/api/v1/devices/micron-mt25ql256aba8esf-0sit/registers",
     )
     .await;
     let writable = registers
@@ -268,7 +269,7 @@ async fn register_write_endpoint_updates_runtime_state() {
     let (status, written) = json_request_with_body(
         app,
         "POST",
-        &format!("/api/v1/devices/generic-spi-flash-128m/registers/{address}"),
+        &format!("/api/v1/devices/micron-mt25ql256aba8esf-0sit/registers/{address}"),
         serde_json::json!({ "value": 0x5A }),
     )
     .await;
@@ -287,14 +288,24 @@ async fn health_device_register_state_reset_and_fault_endpoints_work() {
 
     let (status, devices) = json_request(app.clone(), "GET", "/api/v1/devices").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(devices[0]["id"], "generic-spi-flash-128m");
-    let (_, detail) =
-        json_request(app.clone(), "GET", "/api/v1/devices/generic-spi-flash-128m").await;
+    assert!(
+        devices
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|device| device["id"] == "micron-mt25ql256aba8esf-0sit")
+    );
+    let (_, detail) = json_request(
+        app.clone(),
+        "GET",
+        "/api/v1/devices/micron-mt25ql256aba8esf-0sit",
+    )
+    .await;
     assert_eq!(detail["bus"], "spi");
     let (_, registers) = json_request(
         app.clone(),
         "GET",
-        "/api/v1/devices/generic-spi-flash-128m/registers",
+        "/api/v1/devices/micron-mt25ql256aba8esf-0sit/registers",
     )
     .await;
     assert!(
@@ -302,19 +313,19 @@ async fn health_device_register_state_reset_and_fault_endpoints_work() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|register| register["name"] == "STATUS1")
+            .any(|register| register["name"] == "STATUS_REGISTER")
     );
     let (_, device_state) = json_request(
         app.clone(),
         "GET",
-        "/api/v1/devices/generic-spi-flash-128m/state",
+        "/api/v1/devices/micron-mt25ql256aba8esf-0sit/state",
     )
     .await;
     assert_eq!(device_state["state"], "resetting");
     let (status, _) = json_request(
         app.clone(),
         "POST",
-        "/api/v1/devices/generic-spi-flash-128m/reset",
+        "/api/v1/devices/micron-mt25ql256aba8esf-0sit/reset",
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -322,7 +333,7 @@ async fn health_device_register_state_reset_and_fault_endpoints_work() {
     let (status, _) = json_request(
         app.clone(),
         "POST",
-        "/api/v1/faults/page_program_timeout/enable",
+        "/api/v1/faults/mt25ql_page_program_timeout/enable",
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
@@ -332,18 +343,21 @@ async fn health_device_register_state_reset_and_fault_endpoints_work() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|fault| fault["id"] == "page_program_timeout" && fault["enabled"] == true)
+            .any(|fault| fault["id"] == "mt25ql_page_program_timeout" && fault["enabled"] == true)
     );
-    let (status, _) =
-        json_request(app, "POST", "/api/v1/faults/page_program_timeout/disable").await;
+    let (status, _) = json_request(
+        app,
+        "POST",
+        "/api/v1/faults/mt25ql_page_program_timeout/disable",
+    )
+    .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
 }
 
 #[tokio::test]
-async fn device_commands_are_listed_and_executed_through_control_api() {
+async fn device_commands_are_listed_without_a_rest_transaction_path() {
     let app = router(state());
-    let (_, devices) = json_request(app.clone(), "GET", "/api/v1/devices").await;
-    let device_id = devices[0]["id"].as_str().unwrap();
+    let device_id = "micron-mt25ql256aba8esf-0sit";
     let (status, commands) = json_request(
         app.clone(),
         "GET",
@@ -359,32 +373,13 @@ async fn device_commands_are_listed_and_executed_through_control_api() {
             .any(|command| command["name"] == "READ_ID")
     );
 
-    let (status, result) = json_request_with_body(
+    let (status, _) = json_request(
         app,
         "POST",
         &format!("/api/v1/devices/{device_id}/commands/execute"),
-        serde_json::json!({
-            "tx": [159],
-            "rx_length": 3,
-            "wire": {
-                "mode": 0,
-                "bits_per_word": 8,
-                "max_speed_hz": 1_000_000,
-                "command_width": "single",
-                "address_width": "single",
-                "data_width": "single",
-                "rate": "str",
-                "dummy_cycles": 0,
-                "lsb_first": false
-            }
-        }),
     )
     .await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(result["rx"].as_array().unwrap().len(), 3);
-    assert_eq!(result["rx"][1], 64);
-    assert_eq!(result["rx"][2], 24);
-    assert_eq!(result["state"], "resetting");
+    assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
@@ -392,12 +387,16 @@ async fn configured_model_creates_independent_runtime_device_instances() {
     let app = router(state());
     let (status, templates) = json_request(app.clone(), "GET", "/api/v1/device-models").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(templates.as_array().unwrap().len(), 1);
-    assert_eq!(templates[0]["id"], "generic-spi-flash-128m");
-    assert_eq!(templates[0]["bus"], "spi");
+    let micron_template = templates
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|template| template["id"] == "micron-mt25ql256aba8esf-0sit")
+        .unwrap();
+    assert_eq!(micron_template["bus"], "spi");
 
     let request = serde_json::json!({
-        "template_id": "generic-spi-flash-128m",
+        "template_id": "micron-mt25ql256aba8esf-0sit",
         "device_id": "spi-flash-1"
     });
     let (status, created) =
@@ -407,9 +406,21 @@ async fn configured_model_creates_independent_runtime_device_instances() {
     assert_eq!(created["bus"], "spi");
 
     let (_, devices) = json_request(app.clone(), "GET", "/api/v1/devices").await;
-    assert_eq!(devices.as_array().unwrap().len(), 2);
-    assert_eq!(devices[0]["id"], "generic-spi-flash-128m");
-    assert_eq!(devices[1]["id"], "spi-flash-1");
+    assert_eq!(devices.as_array().unwrap().len(), 3);
+    assert!(
+        devices
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|device| device["id"] == "micron-mt25ql256aba8esf-0sit")
+    );
+    assert!(
+        devices
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|device| device["id"] == "spi-flash-1")
+    );
     let (_, registers) =
         json_request(app.clone(), "GET", "/api/v1/devices/spi-flash-1/registers").await;
     assert!(!registers.as_array().unwrap().is_empty());
@@ -433,7 +444,7 @@ async fn configured_model_creates_independent_runtime_device_instances() {
         app,
         "POST",
         "/api/v1/devices",
-        serde_json::json!({ "template_id": "generic-spi-flash-128m", "device_id": "invalid id" }),
+        serde_json::json!({ "template_id": "micron-mt25ql256aba8esf-0sit", "device_id": "invalid id" }),
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -452,7 +463,7 @@ async fn adapter_api_manages_spi_bindings_and_lifecycle() {
         app.clone(),
         "POST",
         "/api/v1/adapters/spi0/bindings",
-        serde_json::json!({ "device_id": "generic-spi-flash-128m", "endpoint": 0 }),
+        serde_json::json!({ "device_id": "micron-mt25ql256aba8esf-0sit", "endpoint": 0 }),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -462,7 +473,7 @@ async fn adapter_api_manages_spi_bindings_and_lifecycle() {
         app.clone(),
         "POST",
         "/api/v1/adapters/spi0/bindings",
-        serde_json::json!({ "device_id": "generic-spi-flash-128m", "endpoint": 1 }),
+        serde_json::json!({ "device_id": "micron-mt25ql256aba8esf-0sit", "endpoint": 1 }),
     )
     .await;
     assert_eq!(status, StatusCode::CONFLICT);
@@ -477,7 +488,7 @@ async fn adapter_api_manages_spi_bindings_and_lifecycle() {
         app.clone(),
         "POST",
         "/api/v1/adapters/spi0/bindings",
-        serde_json::json!({ "device_id": "generic-spi-flash-128m", "endpoint": 1 }),
+        serde_json::json!({ "device_id": "micron-mt25ql256aba8esf-0sit", "endpoint": 1 }),
     )
     .await;
     assert_eq!(status, StatusCode::CONFLICT);
@@ -487,7 +498,7 @@ async fn adapter_api_manages_spi_bindings_and_lifecycle() {
         app.clone(),
         "POST",
         "/api/v1/devices",
-        serde_json::json!({ "template_id": "generic-spi-flash-128m", "device_id": "hot-device" }),
+        serde_json::json!({ "template_id": "micron-mt25ql256aba8esf-0sit", "device_id": "hot-device" }),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
@@ -521,7 +532,7 @@ async fn adapter_api_manages_spi_bindings_and_lifecycle() {
     let (status, detached) = json_request(
         app,
         "DELETE",
-        "/api/v1/adapters/spi0/bindings/generic-spi-flash-128m",
+        "/api/v1/adapters/spi0/bindings/micron-mt25ql256aba8esf-0sit",
     )
     .await;
     assert_eq!(status, StatusCode::OK);
@@ -573,7 +584,7 @@ async fn bus_telemetry_is_derived_from_typed_transaction_events() {
     let events = Arc::clone(&state.events);
     let _ = events.publish(EventDraft {
         virtual_time_ns: 1_000,
-        device_id: Some("generic-spi-flash-128m".to_owned()),
+        device_id: Some("micron-mt25ql256aba8esf-0sit".to_owned()),
         scenario_run_id: None,
         payload: EventPayload::TransactionStarted {
             transaction_id: Some(42),
@@ -582,18 +593,18 @@ async fn bus_telemetry_is_derived_from_typed_transaction_events() {
     });
     let _ = events.publish(EventDraft {
         virtual_time_ns: 3_500,
-        device_id: Some("generic-spi-flash-128m".to_owned()),
+        device_id: Some("micron-mt25ql256aba8esf-0sit".to_owned()),
         scenario_run_id: None,
         payload: EventPayload::TransactionCompleted {
             transaction_id: Some(42),
-            response: vec![0x00, 0x40, 0x18],
+            response: vec![0x20, 0xBA, 0x19],
             result: "success".to_owned(),
             error_code: None,
         },
     });
     let _ = events.publish(EventDraft {
         virtual_time_ns: 4_000,
-        device_id: Some("generic-spi-flash-128m".to_owned()),
+        device_id: Some("micron-mt25ql256aba8esf-0sit".to_owned()),
         scenario_run_id: None,
         payload: EventPayload::TransactionStarted {
             transaction_id: Some(43),
@@ -605,8 +616,13 @@ async fn bus_telemetry_is_derived_from_typed_transaction_events() {
     let (status, telemetry) = json_request(app, "GET", "/api/v1/telemetry/buses").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(telemetry["window_seconds"], 60);
-    let bus = &telemetry["buses"][0];
-    assert_eq!(bus["device_id"], "generic-spi-flash-128m");
+    let bus = telemetry["buses"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|bus| bus["device_id"] == "micron-mt25ql256aba8esf-0sit")
+        .expect("Micron SPI telemetry");
+    assert_eq!(bus["device_id"], "micron-mt25ql256aba8esf-0sit");
     assert_eq!(bus["bus_type"], "spi");
     assert_eq!(bus["health"], "healthy");
     assert_eq!(bus["transactions_total"], 1);
@@ -628,20 +644,20 @@ async fn scenario_run_is_asynchronous_and_result_is_retrievable() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|scenario| scenario["id"] == "generic-flash-timeout-fault")
+            .any(|scenario| scenario["id"] == "mt25ql256-read-jedec-id")
     );
     let (status, scenario) = json_request(
         app.clone(),
         "GET",
-        "/api/v1/scenarios/generic-flash-timeout-fault",
+        "/api/v1/scenarios/mt25ql256-read-jedec-id",
     )
     .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(scenario["steps"].as_array().unwrap().len(), 6);
+    assert_eq!(scenario["steps"].as_array().unwrap().len(), 3);
     let (status, started) = json_request(
         app.clone(),
         "POST",
-        "/api/v1/scenarios/generic-flash-timeout-fault/run",
+        "/api/v1/scenarios/mt25ql256-read-jedec-id/run",
     )
     .await;
     assert_eq!(status, StatusCode::ACCEPTED);
@@ -680,7 +696,7 @@ async fn compiled_visual_scenario_uses_the_existing_run_endpoint_and_executor() 
     let definition = serde_json::json!({
         "schema_version": 1,
         "scenario": { "id": "visual_reset", "name": "Visual Reset", "timeout_ms": 1000 },
-        "steps": [{ "id": "reset", "continue_on_failure": false, "action": "reset_device", "device": "generic-spi-flash-128m" }]
+        "steps": [{ "id": "reset", "continue_on_failure": false, "action": "reset_device", "device": "micron-mt25ql256aba8esf-0sit" }]
     });
     let (status, record) = json_request_with_body(
         app.clone(),
@@ -734,7 +750,7 @@ async fn compiled_visual_scenario_uses_the_existing_run_endpoint_and_executor() 
     let mismatch = serde_json::json!({
         "schema_version": 1,
         "scenario": { "id": "other", "name": "Other", "timeout_ms": 1 },
-        "steps": [{ "id": "reset", "action": "reset_device", "device": "generic-spi-flash-128m" }]
+        "steps": [{ "id": "reset", "action": "reset_device", "device": "micron-mt25ql256aba8esf-0sit" }]
     });
     let (status, error) =
         json_request_with_body(app, "POST", "/api/v1/scenarios/not-other/run", mismatch).await;

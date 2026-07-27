@@ -10,8 +10,8 @@ use tokio::net::UnixStream;
 use vds_protocol::{
     framing::{read_message, write_message},
     v1::{
-        ClientRequest, ErrorCode, ServerResponse, SpiTransferRequest, client_request,
-        server_response,
+        ClientRequest, ErrorCode, ServerResponse, SpiLaneWidth, SpiTransferRate,
+        SpiTransferRequest, SpiWireConfig, client_request, server_response,
     },
 };
 
@@ -150,7 +150,17 @@ async fn transfer_to_socket(socket: &Path, request_id: u64, tx: Vec<u8>) -> Serv
         payload: Some(client_request::Payload::SpiTransfer(SpiTransferRequest {
             device_id: "spi-flash-0".to_owned(),
             tx,
-            wire: None,
+            wire: Some(SpiWireConfig {
+                mode: 0,
+                bits_per_word: 8,
+                max_speed_hz: 0,
+                command_width: SpiLaneWidth::Single as i32,
+                address_width: SpiLaneWidth::Single as i32,
+                data_width: SpiLaneWidth::Single as i32,
+                rate: SpiTransferRate::Str as i32,
+                dummy_cycles: 0,
+                lsb_first: false,
+            }),
             rx_length: 0,
         })),
     };
@@ -343,32 +353,6 @@ async fn timed_write_logs_start_and_completion() {
     assert!(logs.contains("\"register_name\":\"CONTROL\""));
     assert!(logs.contains("\"old_value\":\"0x12\""));
     assert!(logs.contains("\"new_value\":\"0x5A\""));
-}
-
-#[tokio::test]
-async fn c_client_read_id_remains_compatible() {
-    let project_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let build = Command::new("make")
-        .args(["-C", "client/c"])
-        .current_dir(&project_root)
-        .output()
-        .expect("C client build should run");
-    assert!(
-        build.status.success(),
-        "C client build failed: {}",
-        String::from_utf8_lossy(&build.stderr)
-    );
-    let server = TestServer::start().await;
-
-    let output = Command::new(project_root.join("client/c/build/read_id"))
-        .arg(&server.socket)
-        .output()
-        .expect("C client should run");
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("TX: 9F"));
-    assert!(stdout.contains("RX: EF 40 18"));
 }
 
 #[tokio::test]

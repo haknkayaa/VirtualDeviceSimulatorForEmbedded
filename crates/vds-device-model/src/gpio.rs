@@ -82,6 +82,17 @@ impl Device for GenericGpioDevice {
         ))
     }
 
+    fn transfer_spi(
+        &self,
+        _request: &[u8],
+        _rx_length: usize,
+        _wire: vds_core::device::SpiWireConfig,
+    ) -> Result<DeviceTransfer, DeviceError> {
+        Err(DeviceError::InvalidRequest(
+            "GPIO devices do not support SPI transfers".to_owned(),
+        ))
+    }
+
     fn exchange_gpio(&self, host_values: &[bool]) -> Result<Vec<bool>, DeviceError> {
         if host_values.len() != self.lines.len() {
             return Err(DeviceError::InvalidRequest(format!(
