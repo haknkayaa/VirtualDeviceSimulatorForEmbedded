@@ -1,0 +1,6 @@
+schema_version: 1
+scenario: { id: mt25ql256-read-jedec-id, name: MT25QL256 JEDEC identification, timeout_ms: 20 }
+steps:
+  - { id: complete_reset, action: advance_time, duration_ms: 1 }
+  - { id: read_id, action: send_spi, device: micron-mt25ql256aba8esf-0sit, tx: "9F", save_as: id }
+  - { id: assert_id, action: assert_response, source: id, expected: "20 BA 19" }

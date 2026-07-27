@@ -1,0 +1,111 @@
+schema_version: 1
+flow:
+  id: micron-mt25ql256aba8esf-0sit-behavior
+  name: Micron MT25QL256ABA8ESF-0SIT
+  kind: device_behavior
+  revision: 1
+  created_at: "2026-07-27T00:00:00.000Z"
+  updated_at: "2026-07-27T00:00:00.000Z"
+nodes:
+  - id: state-resetting
+    kind: device_behavior.initial_state
+    position: { x: 40, y: 200 }
+    data:
+      label: resetting
+      state_name: resetting
+      description: Software reset recovery
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS_REGISTER, value: "0x01", mask: "0x03", allow_read_only_internal: true }
+        - { kind: set_register, register: FLAG_STATUS_REGISTER, value: "0x00", mask: "0x80", allow_read_only_internal: true }
+      exit_actions: []
+    ui: {}
+  - id: state-ready
+    kind: device_behavior.state
+    position: { x: 340, y: 200 }
+    data:
+      label: ready
+      state_name: ready
+      description: Array reads and control commands accepted
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS_REGISTER, value: "0x00", mask: "0x03", allow_read_only_internal: true }
+        - { kind: set_register, register: FLAG_STATUS_REGISTER, value: "0x80", mask: "0x80", allow_read_only_internal: true }
+      exit_actions: []
+    ui: {}
+  - id: state-write-enabled
+    kind: device_behavior.state
+    position: { x: 650, y: 200 }
+    data:
+      label: write enabled
+      state_name: write_enabled
+      description: WEL is set
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS_REGISTER, value: "0x02", mask: "0x03", allow_read_only_internal: true }
+        - { kind: set_register, register: FLAG_STATUS_REGISTER, value: "0x80", mask: "0x80", allow_read_only_internal: true }
+      exit_actions:
+        - { kind: set_register, register: STATUS_REGISTER, value: "0x00", mask: "0x02", allow_read_only_internal: true }
+    ui: {}
+  - id: state-programming
+    kind: device_behavior.state
+    position: { x: 950, y: 40 }
+    data:
+      label: programming
+      state_name: programming
+      description: Nominal page program time 120 us
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS_REGISTER, value: "0x01", mask: "0x03", allow_read_only_internal: true }
+        - { kind: set_register, register: FLAG_STATUS_REGISTER, value: "0x00", mask: "0x80", allow_read_only_internal: true }
+      exit_actions: []
+    ui: {}
+  - id: state-erasing
+    kind: device_behavior.state
+    position: { x: 950, y: 360 }
+    data:
+      label: erasing
+      state_name: erasing
+      description: 4 KiB or bulk erase in progress
+      terminal: false
+      entry_actions:
+        - { kind: set_register, register: STATUS_REGISTER, value: "0x01", mask: "0x03", allow_read_only_internal: true }
+        - { kind: set_register, register: FLAG_STATUS_REGISTER, value: "0x00", mask: "0x80", allow_read_only_internal: true }
+      exit_actions: []
+    ui: {}
+  - id: state-deep-power-down
+    kind: device_behavior.state
+    position: { x: 340, y: 500 }
+    data: { label: deep power down, state_name: deep_power_down, description: Only release/reset commands accepted, terminal: false, entry_actions: [], exit_actions: [] }
+    ui: {}
+  - id: state-error
+    kind: device_behavior.state
+    position: { x: 650, y: 500 }
+    data: { label: error, state_name: error, description: Fault-injected terminal behavior until reset, terminal: false, entry_actions: [], exit_actions: [] }
+    ui: {}
+edges:
+  - { id: reset-complete, kind: device_behavior.transition, source: state-resetting, sourceHandle: out, target: state-ready, targetHandle: in, data: { trigger_type: event, trigger: reset_complete, priority: 0, guard_enabled: false, delay_value: 1, delay_unit: us }, ui: {} }
+  - { id: write-enable, kind: device_behavior.transition, source: state-ready, sourceHandle: out, target: state-write-enabled, targetHandle: in, data: { trigger_type: command, trigger: write_enable, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: write-disable, kind: device_behavior.transition, source: state-write-enabled, sourceHandle: out, target: state-ready, targetHandle: in, data: { trigger_type: command, trigger: write_disable, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: page-program, kind: device_behavior.transition, source: state-write-enabled, sourceHandle: out, target: state-programming, targetHandle: in, data: { trigger_type: command, trigger: page_program, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: program-complete, kind: device_behavior.transition, source: state-programming, sourceHandle: out, target: state-ready, targetHandle: in, data: { trigger_type: event, trigger: operation_completed, priority: 0, guard_enabled: false, delay_value: null, delay_unit: us }, ui: {} }
+  - { id: subsector-erase, kind: device_behavior.transition, source: state-write-enabled, sourceHandle: out, target: state-erasing, targetHandle: in, data: { trigger_type: command, trigger: subsector_erase, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: erase-complete, kind: device_behavior.transition, source: state-erasing, sourceHandle: out, target: state-ready, targetHandle: in, data: { trigger_type: event, trigger: operation_completed, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: enter-deep-power-down, kind: device_behavior.transition, source: state-ready, sourceHandle: out, target: state-deep-power-down, targetHandle: in, data: { trigger_type: command, trigger: deep_power_down, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: release-deep-power-down, kind: device_behavior.transition, source: state-deep-power-down, sourceHandle: out, target: state-ready, targetHandle: in, data: { trigger_type: command, trigger: release_power_down, priority: 0, guard_enabled: false, delay_value: null, delay_unit: us }, ui: {} }
+  - { id: reset-from-resetting, kind: device_behavior.transition, source: state-resetting, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: reset-from-ready, kind: device_behavior.transition, source: state-ready, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: reset-from-write-enabled, kind: device_behavior.transition, source: state-write-enabled, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: reset-from-programming, kind: device_behavior.transition, source: state-programming, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: reset-from-erasing, kind: device_behavior.transition, source: state-erasing, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: reset-from-deep-power-down, kind: device_behavior.transition, source: state-deep-power-down, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+  - { id: reset-from-error, kind: device_behavior.transition, source: state-error, sourceHandle: out, target: state-resetting, targetHandle: in, data: { trigger_type: command, trigger: reset, priority: 0, guard_enabled: false, delay_value: null, delay_unit: ms }, ui: {} }
+viewport: { x: 0, y: 0, zoom: 0.7 }
+metadata:
+  allow_cycles: true
+  default_edge_kind: device_behavior.transition
+  source_model: model/device.yaml
+  behavior:
+    device_id: micron-mt25ql256aba8esf-0sit
+    description: Datasheet-derived MT25QL256ABA runtime subset.
+    revision: 1

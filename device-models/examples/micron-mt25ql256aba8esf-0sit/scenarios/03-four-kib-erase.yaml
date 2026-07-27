@@ -1,0 +1,12 @@
+schema_version: 1
+scenario: { id: mt25ql256-four-kib-erase, name: MT25QL256 4KiB subsector erase, timeout_ms: 100 }
+steps:
+  - { id: complete_reset, action: advance_time, duration_ms: 1 }
+  - { id: enable_program, action: send_spi, device: micron-mt25ql256aba8esf-0sit, tx: "06", save_as: enabled_program }
+  - { id: program, action: send_spi, device: micron-mt25ql256aba8esf-0sit, tx: "12 01 00 10 00 00", save_as: programmed }
+  - { id: complete_program, action: advance_time, duration_ms: 1 }
+  - { id: enable_erase, action: send_spi, device: micron-mt25ql256aba8esf-0sit, tx: "06", save_as: enabled_erase }
+  - { id: erase, action: send_spi, device: micron-mt25ql256aba8esf-0sit, tx: "21 01 00 10 00", save_as: erased }
+  - { id: complete_erase, action: advance_time, duration_ms: 50 }
+  - { id: read, action: send_spi, device: micron-mt25ql256aba8esf-0sit, tx: "13 01 00 10 00 00", save_as: data }
+  - { id: assert_erased, action: assert_response, source: data, expected: "FF" }
