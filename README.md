@@ -5,6 +5,8 @@
 VDS4E is a deterministic and observable virtual embedded hardware laboratory.
 Its architecture is defined by
 [`VDS4E_ARCHITECTURE.md`](VDS4E_ARCHITECTURE.md).
+Planned, unimplemented capabilities are tracked separately in
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 The repository currently implements the first headless vertical slice plus the
 register, virtual-time, state-machine, fault, scenario, control API, and live
@@ -15,7 +17,8 @@ C or Rust client -> length-prefixed Protobuf -> Unix socket -> vds-server
                 -> generic SPI device -> transaction log -> response
 ```
 
-The example device implements `READ_ID` (`0x9F`) and returns `EF 40 18`.
+The bundled package implements a generic 128 Mbit SPI flash. Its `READ_ID`
+command (`0x9F`) returns `00 40 18`.
 
 ## Prerequisites
 
@@ -37,6 +40,26 @@ Open `http://127.0.0.1:4174`. Keep the terminal open while developing and press
 dependencies when `apps/vds-web/node_modules` is missing. Override the UI port
 when needed with `VDS_WEB_PORT=4200 ./dev.sh`.
 
+For a staged production build and installation, use the ordered root pipeline:
+
+```shell
+./configure
+./build
+sudo ./install
+```
+
+`./build` refuses to run before a successful `./configure`, and `./install`
+refuses to run before a successful `./build`. Intermediate adapter and example
+outputs are kept under `.vds4e-build/`.
+
+The default installation prefix is `/usr/local`. Use `PREFIX` for a user or
+custom installation, or `DESTDIR` when assembling a package:
+
+```shell
+PREFIX="$HOME/.local" ./install
+DESTDIR="$PWD/package-root" PREFIX=/usr ./install
+```
+
 The individual commands remain available for focused server or client work.
 
 Validate the example configuration:
@@ -56,14 +79,14 @@ In a second terminal, send `READ_ID` with the Rust CLI:
 ```shell
 cargo run -p vds-cli -- spi-transfer \
   --socket /tmp/vds4e.sock \
-  --device spi-flash-0 \
+  --device generic-spi-flash-128m \
   --tx 9F
 ```
 
 Expected output:
 
 ```text
-RX: EF 40 18
+RX: 00 40 18
 ```
 
 An unknown opcode returns a structured protocol error:
@@ -71,14 +94,35 @@ An unknown opcode returns a structured protocol error:
 ```shell
 cargo run -p vds-cli -- spi-transfer \
   --socket /tmp/vds4e.sock \
-  --device spi-flash-0 \
+  --device generic-spi-flash-128m \
   --tx 00
 ```
+
+## Device Package SDK
+
+Devices live in self-contained, versioned directories. A package carries its
+manifest, runtime model, editable flow, scenarios, fixtures, documentation,
+and assets, and can be moved or restored as a single unit.
+
+```shell
+cargo run -p vds-cli -- device-package new ./my-sensor \
+  --id my-sensor --name "My Sensor" --bus i2c
+cargo run -p vds-cli -- device-package validate ./my-sensor
+```
+
+The package contract supports SPI, I²C, GPIO, Ethernet, UART, CAN, USB, and
+custom buses. The authoritative runtime currently executes
+`spi` + `generic-spi-command`; the other bus families use the same package
+shape and gain execution support through new runtime drivers and adapters.
+See the [Device Package SDK guide](docs/development/device-package-sdk.md).
+Community model authors should also use the
+[Device behavior flow reference](docs/device-models/device-behavior-flow-reference.md)
+for the complete node, port, transition, and parameter contract.
 
 ## Register Engine v1
 
 The example SPI model declares three 8-bit registers in
-`device-models/examples/spi-flash.yaml`:
+`device-models/examples/generic-spi-flash/model/device.yaml`:
 
 - `CONTROL` at `0x01` (`rw`, reset `0x12`)
 - `STATUS` at `0x00` (`ro`, reset `0x00`; bit 0 is `BUSY`)
@@ -205,7 +249,8 @@ first failed step stops execution and marks remaining steps skipped unless that
 step declares `continue_on_failure: true`. Scenario and step results contain
 only virtual timestamps and serialize directly to JSON, so replay with the same
 models and starting clock is deterministic. See
-`scenarios/examples/delayed-write-with-timeout.yaml` for a complete example.
+`device-models/examples/generic-spi-flash/scenarios/09-program-timeout-fault.yaml`
+for a complete example.
 
 ## Control API and live events v1
 
@@ -232,13 +277,20 @@ The optional Linux SPI ABI adapter in `adapters/spi-preload` lets dynamically
 linked applications use mapped `/dev/spidevX.Y` paths through `LD_PRELOAD`.
 See its README for the supported ioctl subset, build commands, and limitations.
 
+The Linux CUSE adapter in `adapters/spi-cuse` creates a real
+`/dev/spidevX.Y` character device. It supports applications that cannot use
+`LD_PRELOAD`, including statically linked programs, and forwards the same
+documented spidev ioctl subset to the Unix-socket data plane. It requires the
+CUSE kernel module and root privileges to create the device node.
+
 ## Web UI Foundation v1
 
 The React control plane lives in `apps/vds-web`. It reads authoritative
 snapshots from REST and keeps live events, its in-memory replay cursor, and
 connection status in a separate WebSocket store. The UI includes Dashboard,
-Devices, Transactions, and Scenarios routes; it never sends hardware
-transactions over REST.
+Devices, and Transactions routes. Scenario authoring and execution live inside
+the selected device rather than in the main navigation. The UI never sends
+hardware transactions over REST.
 
 With `vds-server` running on the default control address, start the Vite
 development server:
@@ -301,8 +353,8 @@ make -C client/c
 - The Web UI is a control-plane client; it never implements device behavior.
 - High-frequency hardware transactions use Unix domain sockets and Protobuf,
   not REST.
-- Generic buses remain independent of device-specific plugins.
+- Generic buses remain independent of device-specific packages.
 - Device behavior is loaded from versioned, schema-validated YAML.
-- The first slice uses statically linked generic behavior; no dynamic plugins
+- The first slice uses statically linked generic behavior; no dynamic libraries
   or arbitrary scripting are loaded.
 - The default build and test path does not require root privileges.

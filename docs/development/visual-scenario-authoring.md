@@ -2,6 +2,12 @@
 
 The Visual Scenario Editor is an offline-capable authoring surface built on the generic flow editor. It does not execute simulator behavior. A scenario flow is validated and compiled to the existing `schema_version: 1` scenario document, then submitted through the existing control-plane run endpoint. `vds-scenario` remains the only executor.
 
+Scenario authoring, saved flow discovery, and configured runtime scenarios are
+device-scoped UI features. They are available from the selected device's
+Scenarios tab. There is no global Scenarios navigation item or compatibility
+route; new scenario flow documents record their owning device ID and configured
+runtime scenarios are listed only for devices referenced by their actions.
+
 ## Document and compiler behavior
 
 Scenario flows use the generic versioned flow document with `flow.kind = "scenario"`. Node positions, viewport data, validation metadata, and runtime highlights are authoring concerns and are not emitted into the compiled scenario. Start Scenario and End Scenario establish visual boundaries and are omitted from executable steps.
