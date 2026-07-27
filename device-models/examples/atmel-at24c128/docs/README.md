@@ -19,3 +19,6 @@ i2ctransfer -y 0 w2@0x50 0x00 0x10 r1
 ```
 
 Source: Atmel `doc0670.pdf`, document 0670T-SEEPR-3/07, revision T.
+
+The shared Embedded Linux example supports this model with `-m 128`; see
+`examples/atmel-at24c256-embedded/at24c256_tool.c`.
