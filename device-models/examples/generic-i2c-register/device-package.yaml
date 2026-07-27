@@ -1,0 +1,22 @@
+api_version: vds4e.dev/v1alpha1
+kind: DevicePackage
+
+metadata:
+  id: generic-i2c-register
+  display_name: Generic I2C Register Device
+  version: 1.0.0
+  description: Byte-register I2C target for i2c-tools and application testing.
+  license: Apache-2.0
+  authors: [VDS4E Contributors]
+  tags: [i2c, i2c-dev, registers, test]
+
+spec:
+  bus:
+    type: i2c
+    profile: i2c.standard
+    options:
+      default_address: 0x50
+  runtime:
+    driver: generic-i2c-register
+    model: model/device.yaml
+  documentation: docs

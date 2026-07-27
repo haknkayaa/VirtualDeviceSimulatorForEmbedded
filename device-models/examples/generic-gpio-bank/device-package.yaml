@@ -1,0 +1,20 @@
+api_version: vds4e.dev/v1alpha1
+kind: DevicePackage
+metadata:
+  id: generic-gpio-bank-32
+  display_name: Generic 32-line GPIO Bank
+  version: 1.0.0
+  description: Declarative GPIO bank for Linux gpio-sim and libgpiod development.
+  license: Apache-2.0
+  authors: [VDS4E Community]
+  tags: [gpio, libgpiod, gpio-sim, embedded-linux]
+spec:
+  bus:
+    type: gpio
+    profile: linux-gpio-v2
+    options: {}
+  runtime:
+    driver: generic-gpio-bank
+    model: model/device.yaml
+  documentation: docs
+  extensions: {}

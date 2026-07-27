@@ -3,6 +3,8 @@
 mod behavior_flow;
 mod command;
 mod error;
+mod gpio;
+mod i2c;
 mod loading;
 mod memory;
 mod model;
@@ -11,6 +13,8 @@ mod signal_graph;
 mod validation;
 use command::{SpiCommand, SpiCommandBehavior};
 pub use error::ModelError;
+pub use gpio::GenericGpioDevice;
+pub use i2c::GenericI2cDevice;
 pub use model::*;
 pub use runtime::GenericSpiDevice;
 use runtime::{DeviceAction, DeviceGuard, DeviceState, FlashMemory, PendingOperation};

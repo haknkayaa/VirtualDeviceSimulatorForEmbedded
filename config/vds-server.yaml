@@ -23,3 +23,5 @@ device_packages:
   # Repository examples are installed into ~/vsd4e/devices/ before loading.
   - device-models/examples/generic-spidev
   - device-models/examples/micron-mt25ql256aba8esf-0sit
+  - device-models/examples/generic-gpio-bank
+  - device-models/examples/generic-i2c-register

@@ -6,7 +6,6 @@ implementation and ADR are accepted.
 
 ## Additional host adapters and buses
 
-- GPIO line exposure and edge injection.
 - I²C register-device host integration.
 - UART PTY endpoints.
 - Ethernet TAP or socket endpoints and PCAP export.

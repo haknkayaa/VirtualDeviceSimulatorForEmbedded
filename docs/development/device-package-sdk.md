@@ -110,8 +110,9 @@ layout:
 
 The package layer, schema, validator, and scaffold support every row today.
 The authoritative execution engine currently implements
-`spi` + `generic-spi-command`. Adding another bus requires a runtime driver and
-adapter implementation, but does not require another package format.
+`spi` + `generic-spi-command`, `i2c` + `generic-i2c-register`, and `gpio` +
+`generic-gpio-bank`. Adding another bus requires a runtime driver and adapter
+implementation, but does not require another package format.
 
 ## Author workflow
 

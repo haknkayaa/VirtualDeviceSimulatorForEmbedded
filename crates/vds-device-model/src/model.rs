@@ -25,6 +25,11 @@ pub struct DeviceDefinition {
     pub model: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spi: Option<SpiBusDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub i2c: Option<I2cBusDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gpio: Option<GpioBusDefinition>,
+    #[serde(default)]
     pub commands: Vec<SpiCommandDefinition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub memory: Option<MemoryDefinition>,
@@ -36,6 +41,50 @@ pub struct DeviceDefinition {
     pub state_machine: Option<DeviceStateMachineDefinition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub faults: Vec<FaultDefinition>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct GpioBusDefinition {
+    pub lines: Vec<GpioLineDefinition>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct I2cBusDefinition {
+    #[serde(default = "default_i2c_register_address_bytes")]
+    pub register_address_bytes: u8,
+    #[serde(default = "default_true")]
+    pub auto_increment: bool,
+}
+
+const fn default_i2c_register_address_bytes() -> u8 {
+    1
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct GpioLineDefinition {
+    pub offset: u16,
+    pub name: String,
+    pub direction: GpioLineDirection,
+    #[serde(default)]
+    pub initial_value: bool,
+    #[serde(default)]
+    pub active_low: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub register: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GpioLineDirection {
+    Input,
+    Output,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

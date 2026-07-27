@@ -1,0 +1,74 @@
+schema_version: 1
+device:
+  id: generic-gpio-bank-32
+  name: Generic 32-line GPIO Bank
+  bus: gpio
+  model: generic-gpio-bank
+  gpio:
+    lines:
+      - { offset: 0, name: GPIO0, direction: input, register: GPIO0_STATE }
+      - { offset: 1, name: GPIO1, direction: input, register: GPIO1_STATE }
+      - { offset: 2, name: GPIO2, direction: input, register: GPIO2_STATE }
+      - { offset: 3, name: GPIO3, direction: input, register: GPIO3_STATE }
+      - { offset: 4, name: GPIO4, direction: input, register: GPIO4_STATE }
+      - { offset: 5, name: GPIO5, direction: input, register: GPIO5_STATE }
+      - { offset: 6, name: GPIO6, direction: input, register: GPIO6_STATE }
+      - { offset: 7, name: GPIO7, direction: input, register: GPIO7_STATE }
+      - { offset: 8, name: GPIO8, direction: input, register: GPIO8_STATE }
+      - { offset: 9, name: GPIO9, direction: input, register: GPIO9_STATE }
+      - { offset: 10, name: GPIO10, direction: input, register: GPIO10_STATE }
+      - { offset: 11, name: GPIO11, direction: input, register: GPIO11_STATE }
+      - { offset: 12, name: GPIO12, direction: input, register: GPIO12_STATE }
+      - { offset: 13, name: GPIO13, direction: input, register: GPIO13_STATE }
+      - { offset: 14, name: GPIO14, direction: input, register: GPIO14_STATE }
+      - { offset: 15, name: GPIO15, direction: input, register: GPIO15_STATE }
+      - { offset: 16, name: GPIO16, direction: output, initial_value: false, register: GPIO16_STATE }
+      - { offset: 17, name: GPIO17, direction: output, initial_value: false, register: GPIO17_STATE }
+      - { offset: 18, name: GPIO18, direction: output, initial_value: false, register: GPIO18_STATE }
+      - { offset: 19, name: GPIO19, direction: output, initial_value: false, register: GPIO19_STATE }
+      - { offset: 20, name: GPIO20, direction: output, initial_value: false, register: GPIO20_STATE }
+      - { offset: 21, name: GPIO21, direction: output, initial_value: false, register: GPIO21_STATE }
+      - { offset: 22, name: GPIO22, direction: output, initial_value: false, register: GPIO22_STATE }
+      - { offset: 23, name: GPIO23, direction: output, initial_value: false, register: GPIO23_STATE }
+      - { offset: 24, name: GPIO24, direction: output, initial_value: false, register: GPIO24_STATE }
+      - { offset: 25, name: GPIO25, direction: output, initial_value: false, register: GPIO25_STATE }
+      - { offset: 26, name: GPIO26, direction: output, initial_value: false, register: GPIO26_STATE }
+      - { offset: 27, name: GPIO27, direction: output, initial_value: false, register: GPIO27_STATE }
+      - { offset: 28, name: GPIO28, direction: output, initial_value: false, register: GPIO28_STATE }
+      - { offset: 29, name: GPIO29, direction: output, initial_value: false, register: GPIO29_STATE }
+      - { offset: 30, name: GPIO30, direction: output, initial_value: false, register: GPIO30_STATE }
+      - { offset: 31, name: GPIO31, direction: output, initial_value: false, register: GPIO31_STATE }
+  commands: []
+  registers:
+    - { name: GPIO0_STATE, address: 0, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO1_STATE, address: 1, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO2_STATE, address: 2, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO3_STATE, address: 3, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO4_STATE, address: 4, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO5_STATE, address: 5, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO6_STATE, address: 6, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO7_STATE, address: 7, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO8_STATE, address: 8, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO9_STATE, address: 9, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO10_STATE, address: 10, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO11_STATE, address: 11, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO12_STATE, address: 12, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO13_STATE, address: 13, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO14_STATE, address: 14, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO15_STATE, address: 15, width_bits: 1, reset_value: 0, access: ro }
+    - { name: GPIO16_STATE, address: 16, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO17_STATE, address: 17, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO18_STATE, address: 18, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO19_STATE, address: 19, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO20_STATE, address: 20, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO21_STATE, address: 21, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO22_STATE, address: 22, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO23_STATE, address: 23, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO24_STATE, address: 24, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO25_STATE, address: 25, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO26_STATE, address: 26, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO27_STATE, address: 27, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO28_STATE, address: 28, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO29_STATE, address: 29, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO30_STATE, address: 30, width_bits: 1, reset_value: 0, access: rw }
+    - { name: GPIO31_STATE, address: 31, width_bits: 1, reset_value: 0, access: rw }

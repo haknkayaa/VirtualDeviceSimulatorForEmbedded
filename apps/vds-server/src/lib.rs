@@ -27,8 +27,8 @@ use vds_events::{EventBus, EventDraft, EventPayload};
 use vds_protocol::{
     framing::{read_message, write_message},
     v1::{
-        ClientRequest, ErrorCode, ErrorResponse, ServerResponse, SpiTransferResponse,
-        client_request, server_response,
+        ClientRequest, ErrorCode, ErrorResponse, GpioExchangeResponse, I2cTransferResponse,
+        ServerResponse, SpiTransferResponse, client_request, server_response,
     },
 };
 
@@ -56,8 +56,12 @@ pub fn load_registry_with_clock(
     for package in config.resolved_device_packages()? {
         let model = load_package_runtime_model(&package)?;
         validate_device_package_model(&package, &model).map_err(ServerError::PackageContract)?;
-        let device = model.into_spi_device_with_clock(Arc::clone(&clock))?;
-        registry.register(Arc::new(device))?;
+        let device: Arc<dyn vds_core::device::Device> = match model.device.bus.as_str() {
+            "gpio" => Arc::new(model.into_gpio_device()?),
+            "i2c" => Arc::new(model.into_i2c_device()?),
+            _ => Arc::new(model.into_spi_device_with_clock(Arc::clone(&clock))?),
+        };
+        registry.register(device)?;
     }
     drop(clock);
     Ok(registry)
@@ -268,14 +272,62 @@ fn handle_request(
     events: &EventBus,
 ) -> ServerResponse {
     let request_id = request.request_id;
-    let Some(client_request::Payload::SpiTransfer(spi)) = request.payload else {
-        return error_response(
+    match request.payload {
+        Some(client_request::Payload::SpiTransfer(spi)) => {
+            handle_spi_request(request_id, spi, registry, transaction_ids, events)
+        }
+        Some(client_request::Payload::GpioExchange(gpio)) => {
+            match registry.exchange_gpio(&gpio.device_id, &gpio.host_values) {
+                Ok(device_values) => ServerResponse {
+                    request_id,
+                    result: Some(server_response::Result::GpioExchange(
+                        GpioExchangeResponse { device_values },
+                    )),
+                },
+                Err(error) => {
+                    let (code, _) = protocol_error_code(&error);
+                    error_response(request_id, code, error.to_string())
+                }
+            }
+        }
+        Some(client_request::Payload::I2cTransfer(i2c)) => {
+            let messages = i2c
+                .messages
+                .into_iter()
+                .map(|message| vds_core::device::I2cMessage {
+                    read: message.read,
+                    data: message.data,
+                    read_length: usize::try_from(message.read_length).unwrap_or(usize::MAX),
+                })
+                .collect::<Vec<_>>();
+            match registry.transfer_i2c(&i2c.device_id, &messages) {
+                Ok(reads) => ServerResponse {
+                    request_id,
+                    result: Some(server_response::Result::I2cTransfer(I2cTransferResponse {
+                        reads,
+                    })),
+                },
+                Err(error) => {
+                    let (code, _) = protocol_error_code(&error);
+                    error_response(request_id, code, error.to_string())
+                }
+            }
+        }
+        None => error_response(
             request_id,
             ErrorCode::InvalidRequest,
             "request payload is missing".to_owned(),
-        );
-    };
+        ),
+    }
+}
 
+fn handle_spi_request(
+    request_id: u64,
+    spi: vds_protocol::v1::SpiTransferRequest,
+    registry: &DeviceRegistry,
+    transaction_ids: &AtomicU64,
+    events: &EventBus,
+) -> ServerResponse {
     let transaction_id = transaction_ids.fetch_add(1, Ordering::Relaxed);
     let mut transaction = Transaction::now(transaction_id, spi.device_id.clone(), spi.tx.clone());
     let virtual_time_ns = registry.virtual_time_ns(&spi.device_id).unwrap_or(0);
@@ -775,4 +827,105 @@ pub enum ServerError {
 
     #[error("device package contract failed: {0}")]
     PackageContract(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use vds_protocol::v1::GpioExchangeRequest;
+
+    #[test]
+    fn gpio_exchange_routes_through_the_runtime_registry() {
+        let model = DeviceModel::from_yaml(
+            r"
+schema_version: 1
+device:
+  id: gpio-bank
+  name: GPIO Bank
+  bus: gpio
+  model: generic-gpio-bank
+  gpio:
+    lines:
+      - { offset: 0, name: INPUT, direction: input }
+      - { offset: 1, name: OUTPUT, direction: output, initial_value: true }
+  commands: []
+",
+        )
+        .unwrap();
+        let registry = DeviceRegistry::new();
+        registry
+            .register(Arc::new(model.into_gpio_device().unwrap()))
+            .unwrap();
+        let response = handle_request(
+            ClientRequest {
+                request_id: 42,
+                payload: Some(client_request::Payload::GpioExchange(GpioExchangeRequest {
+                    device_id: "gpio-bank".to_owned(),
+                    host_values: vec![true, false],
+                })),
+            },
+            &registry,
+            &AtomicU64::new(1),
+            &EventBus::default(),
+        );
+        let Some(server_response::Result::GpioExchange(exchange)) = response.result else {
+            panic!("GPIO exchange response expected");
+        };
+        assert_eq!(exchange.device_values, [true, true]);
+    }
+
+    #[test]
+    fn i2c_combined_transfer_routes_through_the_runtime_registry() {
+        let model = DeviceModel::from_yaml(
+            r"
+schema_version: 1
+device:
+  id: sensor
+  name: I2C Sensor
+  bus: i2c
+  model: generic-i2c-register
+  i2c: { register_address_bytes: 1, auto_increment: true }
+  commands: []
+  registers:
+    - { name: ID, address: 15, width_bits: 8, reset_value: 66, access: ro }
+",
+        )
+        .unwrap();
+        let registry = DeviceRegistry::new();
+        registry
+            .register(Arc::new(model.into_i2c_device().unwrap()))
+            .unwrap();
+        let response = handle_request(
+            ClientRequest {
+                request_id: 43,
+                payload: Some(client_request::Payload::I2cTransfer(
+                    vds_protocol::v1::I2cTransferRequest {
+                        device_id: "sensor".to_owned(),
+                        address: 0x50,
+                        messages: vec![
+                            vds_protocol::v1::I2cMessage {
+                                read: false,
+                                data: vec![0x0f],
+                                read_length: 0,
+                                flags: 0,
+                            },
+                            vds_protocol::v1::I2cMessage {
+                                read: true,
+                                data: Vec::new(),
+                                read_length: 1,
+                                flags: 1,
+                            },
+                        ],
+                    },
+                )),
+            },
+            &registry,
+            &AtomicU64::new(1),
+            &EventBus::default(),
+        );
+        let Some(server_response::Result::I2cTransfer(transfer)) = response.result else {
+            panic!("I2C transfer response expected");
+        };
+        assert_eq!(transfer.reads, [vec![0x42]]);
+    }
 }

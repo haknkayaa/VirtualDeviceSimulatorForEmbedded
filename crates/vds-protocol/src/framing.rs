@@ -65,7 +65,7 @@ mod tests {
     use tokio::io::duplex;
 
     use super::{read_message, write_message};
-    use crate::v1::{ClientRequest, SpiTransferRequest, client_request};
+    use crate::v1::{ClientRequest, GpioExchangeRequest, SpiTransferRequest, client_request};
 
     #[tokio::test]
     async fn round_trips_a_framed_message() {
@@ -87,6 +87,22 @@ mod tests {
             .await
             .expect("frame should be decoded");
 
+        assert_eq!(decoded, request);
+    }
+
+    #[tokio::test]
+    async fn round_trips_gpio_line_vectors() {
+        let (mut client, mut server) = duplex(1024);
+        let request = ClientRequest {
+            request_id: 8,
+            payload: Some(client_request::Payload::GpioExchange(GpioExchangeRequest {
+                device_id: "generic-gpio-bank-32".to_owned(),
+                host_values: vec![true, false, true],
+            })),
+        };
+
+        write_message(&mut client, &request).await.unwrap();
+        let decoded: ClientRequest = read_message(&mut server).await.unwrap();
         assert_eq!(decoded, request);
     }
 }

@@ -63,6 +63,7 @@ export interface AdapterBinding {
   device_id: string
   endpoint: number
   device_path: string
+  line_names?: string[]
 }
 
 export interface Adapter {
@@ -73,6 +74,8 @@ export interface Adapter {
   state: AdapterState
   readiness: AdapterReadiness
   bus_number: number
+  line_count?: number | null
+  device_path?: string | null
   bindings: AdapterBinding[]
   daemon_pids: number[]
   error?: string
@@ -82,7 +85,8 @@ export interface CreateAdapterInput {
   id: string
   name: string
   bus_type: string
-  bus_number: number
+  bus_number?: number
+  line_count?: number
 }
 
 export interface AttachAdapterDeviceInput {

@@ -79,8 +79,65 @@ describe('adapters page', () => {
 
     await screen.findAllByText('/dev/spidev0.0')
     await userEvent.click(screen.getByRole('button', { name: 'Load Adapter' }))
-    expect(await screen.findByRole('dialog', { name: 'CUSE access required' })).toBeInTheDocument()
-    expect(screen.getByText('sudo modprobe cuse')).toBeInTheDocument()
+    expect(await screen.findByRole('dialog', { name: 'Kernel adapter access required' })).toBeInTheDocument()
+    expect(screen.getByText(/sudo modprobe gpio-sim/)).toBeInTheDocument()
     expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument()
+  })
+
+  it('creates and loads a kernel GPIO controller', async () => {
+    let current = [adapter()]
+    let createBody: unknown
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url === '/api/v1/adapters' && !init?.method) return jsonResponse(current)
+      if (url === '/api/v1/devices') return jsonResponse([{ id: 'generic-gpio-bank-32', bus: 'gpio', state: null }])
+      if (url === '/api/v1/adapters' && init?.method === 'POST') {
+        createBody = JSON.parse(String(init.body))
+        const gpio = adapter({
+          id: 'gpio0',
+          name: 'GPIO 0',
+          bus_type: 'gpio',
+          driver: 'gpio-sim',
+          line_count: 32,
+          readiness: 'ready',
+        })
+        current = [...current, gpio]
+        return jsonResponse(gpio, { status: 201 })
+      }
+      if (url === '/api/v1/adapters/gpio0/load' && init?.method === 'POST') {
+        const gpio = { ...current[1], state: 'loaded' as const, device_path: '/dev/gpiochip4', daemon_pids: [4567] }
+        current = [current[0], gpio]
+        return jsonResponse(gpio)
+      }
+      if (url === '/api/v1/adapters/gpio0/bindings' && init?.method === 'POST') {
+        const gpio = {
+          ...current[1],
+          bindings: [{ device_id: 'generic-gpio-bank-32', endpoint: 0, device_path: '/dev/gpiochipX' }],
+        }
+        current = [current[0], gpio]
+        return jsonResponse(gpio)
+      }
+      throw new Error(`Unexpected request ${init?.method ?? 'GET'} ${url}`)
+    }))
+    renderRoute(<AdaptersPage />, '/adapters', '/adapters')
+
+    await screen.findByRole('heading', { name: 'SPI 0' })
+    await userEvent.click(screen.getByRole('button', { name: 'New Adapter' }))
+    await userEvent.selectOptions(screen.getByLabelText('Bus type'), 'gpio')
+    await userEvent.click(screen.getByRole('button', { name: 'Create Adapter' }))
+
+    await screen.findByRole('heading', { name: 'GPIO 0' })
+    expect(createBody).toEqual({
+      id: 'gpio0',
+      name: 'GPIO 0',
+      bus_type: 'gpio',
+      line_count: 32,
+    })
+    expect(screen.getAllByText('/dev/gpiochipX').length).toBeGreaterThan(0)
+    await userEvent.click(screen.getByRole('button', { name: 'Attach' }))
+    const loadButton = screen.getByRole('button', { name: 'Load Adapter' })
+    await waitFor(() => expect(loadButton).toBeEnabled())
+    await userEvent.click(loadButton)
+    expect((await screen.findAllByText('/dev/gpiochip4')).length).toBeGreaterThan(0)
   })
 })

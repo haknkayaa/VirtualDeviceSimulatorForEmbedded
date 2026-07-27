@@ -26,6 +26,8 @@ The Phase 0 and first vertical-slice Cargo workspace members are:
   `device-package.yaml` manifest plus its model, flows, scenarios, fixtures,
   documentation, and assets.
 - `schemas/device-package.schema.json`: public, versioned DevicePackage contract
+- `adapters/gpio-sim`: privileged kernel gpio-sim lifecycle helper that exposes
+  real `/dev/gpiochipX` devices to libgpiod applications
 
 Directories are added only with working source. Future components stay in the
 roadmap until implementation begins; placeholder directories are not kept.
