@@ -34,7 +34,7 @@ may require the ASan runtime to appear first in `LD_PRELOAD`.
 ## Run a native application
 
 ```sh
-VDS4E_SPI_MAP='/dev/spidev0.0=spi-flash-0' \
+VDS4E_SPI_MAP='/dev/spidev0.0=micron-mt25ql256aba8esf-0sit' \
 VDS4E_SOCKET=/tmp/vds4e.sock \
 LD_PRELOAD="$PWD/build/spi-preload/libvds4e-spi-preload.so" \
 ./ordinary-linux-application
@@ -43,7 +43,7 @@ LD_PRELOAD="$PWD/build/spi-preload/libvds4e-spi-preload.so" \
 `VDS4E_SPI_MAP` is a semicolon-separated list of exact mappings:
 
 ```text
-/dev/spidev0.0=spi-flash-0;/dev/spidev0.1=adc-0
+/dev/spidev0.0=micron-mt25ql256aba8esf-0sit;/dev/spidev0.1=adc-0
 ```
 
 Paths must have the canonical `/dev/spidev<bus>.<chip-select>` form. Duplicate
@@ -82,8 +82,8 @@ retaining the first `len` bytes. For example:
 
 ```text
 TX: 9F 00 00 00
-runtime payload: EF 40 18
-RX: 00 EF 40 18
+runtime payload: 20 BA 19
+RX: 00 20 BA 19
 ```
 
 This is a deterministic compatibility convention, not an electrical SPI

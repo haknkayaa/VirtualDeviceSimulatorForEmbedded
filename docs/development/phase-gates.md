@@ -44,8 +44,8 @@ passes in the same workspace test run.
 | Write completes after configured latency | `delayed_write_observes_busy_lifecycle` |
 | Busy clears after completion | `delayed_write_observes_busy_lifecycle` |
 | Reset cancels pending operations | `reset_cancels_pending_operations` |
-| READ_ID remains backward compatible | `read_id_round_trips_over_the_unix_socket` |
-| C client wire format remains compatible | `c_client_read_id_remains_compatible` |
+| READ_ID still passes through configured SPI | `read_id_round_trips_over_the_unix_socket` |
+| SPI requests require explicit wire configuration | `read_id_round_trips_over_the_unix_socket` |
 | Transaction logs include timing start/completion | `timed_write_logs_start_and_completion` |
 
 ## Device State Machine v1
@@ -67,8 +67,8 @@ machine gate below passes in the same workspace test run.
 | Reset returns to initial state and cancels pending work | `state_machine_reset_cancels_operations_and_reenters_initial_state` |
 | Busy command rejection is state-aware | `delayed_transition_and_state_actions_execute_at_exact_deadline` |
 | State transitions are structured logs | `timed_write_logs_start_and_completion` |
-| Existing timing behavior remains compatible | `delayed_write_observes_busy_lifecycle` |
-| READ_ID remains compatible | `read_id_round_trips_over_the_unix_socket` |
+| Timing behavior remains deterministic | `delayed_write_observes_busy_lifecycle` |
+| READ_ID uses the configured SPI path | `read_id_round_trips_over_the_unix_socket` |
 
 ## Fault Injection Engine v1
 
@@ -87,7 +87,7 @@ the same workspace test run.
 | Stuck-at constrains normal writes | `delay_uses_virtual_scheduler_and_stuck_at_blocks_writes` |
 | Reset honors transient/persistent behavior | `reset_clears_transient_counters_but_preserves_persistent_counters` |
 | Fault activation is structured in protocol and logs | `timeout_fault_is_structured_and_logged` |
-| Existing state, timing, register, READ_ID and C client behavior remains compatible | `cargo test --workspace` |
+| State, timing, register and configured SPI behavior pass together | `cargo test --workspace` |
 
 ## Scenario Engine v1
 
@@ -103,7 +103,7 @@ the same workspace test run.
 | JSON result export | `executes_sequential_actions_and_exports_json` |
 | Deterministic replay | `replay_is_deterministic` |
 | Structured scenario and step logs | `emits_structured_scenario_and_step_logs` |
-| Existing fault, state, timing, register, READ_ID and C client behavior remains compatible | `cargo test --workspace` |
+| Fault, state, timing, register and configured SPI behavior pass together | `cargo test --workspace` |
 
 ## Control API and Live Event Stream v1
 
@@ -117,7 +117,7 @@ the same workspace test run.
 | Scenario execution emits typed domain events | `scenario_run_is_asynchronous_and_result_is_retrievable` |
 | Structured API errors and no REST SPI data plane | `structured_errors_and_data_plane_separation_are_enforced` |
 | WebSocket ordered replay and live delivery | `websocket_delivers_ordered_replay_after_event_id` |
-| Existing scenario, fault, state, timing, register, READ_ID, and C client behavior remains compatible | `cargo test --workspace` |
+| Scenario, fault, state, timing, register and configured SPI behavior pass together | `cargo test --workspace` |
 
 ## Web UI Foundation v1
 
@@ -144,7 +144,7 @@ the same workspace test run.
 | Branches, cycles, disconnected nodes, invalid parameters, and forward result references are rejected | `scenario flow validation`, `scenario flow compiler` |
 | Runtime events map to external highlights without changing document history | `scenario runtime mapping` |
 | Browser-compiled definitions use the existing run manager and executor | `compiled_visual_scenario_uses_the_existing_run_endpoint_and_executor` |
-| Empty-body configured scenario runs remain backward compatible | `scenario_run_is_asynchronous_and_result_is_retrievable` |
+| Empty-body configured scenario runs use package definitions | `scenario_run_is_asynchronous_and_result_is_retrievable` |
 | No REST hardware transaction route is introduced | `structured_errors_and_data_plane_separation_are_enforced` |
 
 ## Visual Device Behavior Editor v1
@@ -158,7 +158,7 @@ the same workspace test run.
 | REST snapshot and WebSocket replay map to transient runtime highlights without changing history | `behavior runtime mapping` |
 | Local save and deterministic import/export preserve semantic data | `device behavior persistence` |
 | No new runtime or REST hardware transaction route is introduced | architecture review and API client review |
-| Complete public Generic SPI Flash 128 Mbit example loads, compiles, and runs all ten conformance scenarios | `generic_spi_flash_reference`, `device behavior compiler`, `device behavior persistence` |
+| The Micron MT25QL256 package loads, compiles, and runs all four package scenarios | `micron_mt25ql256_reference`, `device behavior compiler`, `device behavior persistence` |
 
 Topology Editor work has not started. Passing this gate does not authorize that phase.
 
@@ -173,4 +173,4 @@ Topology Editor work has not started. Passing this gate does not authorize that 
 | CLI writes JSON and JUnit artifacts through the existing executor | `scenario_command_writes_json_and_junit_files` |
 | API returns JUnit body and artifact headers | `compiled_visual_scenario_uses_the_existing_run_endpoint_and_executor` |
 | Visual Scenario Editor delegates XML creation to the API | `ScenarioResultPanel`, `REST API mapping` |
-| Existing scenario runtime semantics remain compatible | `cargo test --workspace` |
+| Scenario runtime semantics remain deterministic | `cargo test --workspace` |

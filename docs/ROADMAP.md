@@ -6,7 +6,6 @@ implementation and ADR are accepted.
 
 ## Additional host adapters and buses
 
-- I²C register-device host integration.
 - UART PTY endpoints.
 - Ethernet TAP or socket endpoints and PCAP export.
 - QSPI multi-lane/DTR host integration beyond the current SPI subset.
@@ -32,17 +31,15 @@ baseline until these capabilities ship.
 
 ## Runtime and observability
 
-- Persistent event/transaction storage.
 - Metrics export and distributed traces.
-- Additional runtime drivers for I²C, GPIO, UART, Ethernet, CAN, and USB
-  package profiles.
+- Additional runtime drivers for UART, Ethernet, CAN, and USB package profiles.
 - Storage images, snapshot/restore, wear simulation, and power-loss recovery.
 - Expanded conformance suites and cross-version compatibility testing.
 
 ## Delivery order
 
-1. Stabilize package-only SPI runtime, CUSE/preload adapters, device-scoped
-   authoring, scenarios, and CI.
+1. Stabilize the package-only SPI, I²C, and GPIO runtimes, their Linux host
+   adapters, device-scoped authoring, scenarios, persistence, and CI.
 2. Add one runtime driver and host adapter at a time with an ADR, schema,
    package example, and end-to-end test.
 3. Add registry and publishing features only after package compatibility and
