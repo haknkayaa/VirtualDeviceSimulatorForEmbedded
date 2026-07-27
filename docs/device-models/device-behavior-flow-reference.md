@@ -337,7 +337,7 @@ produces:
 ## Community authoring workflow
 
 1. Start from
-   [`device-models/examples/generic-spi-flash/flows/behavior.yaml`](../../device-models/examples/generic-spi-flash/flows/behavior.yaml).
+   [`device-models/examples/micron-mt25ql256aba8esf-0sit/flows/behavior.yaml`](../../device-models/examples/micron-mt25ql256aba8esf-0sit/flows/behavior.yaml).
 2. Give every node and edge a stable unique ID.
 3. Define exactly one Initial State and add regular State nodes.
 4. Add state entry/exit register actions using register names from the device

@@ -125,7 +125,7 @@ implementation, but does not require another package format.
 ## Operating-system package store
 
 At load time, packages referenced from `device-models/examples/` are copied to
-`~/vsd4e/devices/<package-id>/`. Validation, scenarios, behavior flows, assets,
+`~/vds4e/devices/<package-id>/`. Validation, scenarios, behavior flows, assets,
 and runtime models are then loaded from that installed copy rather than from
 the repository tree.
 

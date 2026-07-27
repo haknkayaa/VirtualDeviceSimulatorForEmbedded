@@ -28,7 +28,7 @@ Start `vds-server`, then in a second terminal:
 sudo modprobe cuse
 sudo build/spi-cuse/vds4e-spi-cuse \
   --name spidev0.0 \
-  --device-id spi-flash-0 \
+  --device-id micron-mt25ql256aba8esf-0sit \
   --socket /tmp/vds4e.sock
 ```
 

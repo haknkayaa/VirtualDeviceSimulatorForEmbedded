@@ -2,34 +2,62 @@
 
 [![Build and Test](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/ci.yml)
 
-VDS4E is a deterministic and observable virtual embedded hardware laboratory.
-Its architecture is defined by
-[`VDS4E_ARCHITECTURE.md`](VDS4E_ARCHITECTURE.md).
-Planned, unimplemented capabilities are tracked separately in
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
+VDS4E is a deterministic, observable virtual hardware laboratory for Embedded
+Linux development. It lets native applications, standard Linux bus tools,
+headless scenarios, and the Web control plane interact with the same
+declarative device runtime without requiring a physical board.
 
-The repository currently implements the first headless vertical slice plus the
-register, virtual-time, state-machine, fault, scenario, control API, and live
-domain-event layers:
+The authoritative system design is
+[VDS4E_ARCHITECTURE.md](VDS4E_ARCHITECTURE.md). Planned work is kept separately
+in [docs/ROADMAP.md](docs/ROADMAP.md).
 
-```text
-C or Rust client -> length-prefixed Protobuf -> Unix socket -> vds-server
-                -> generic SPI device -> transaction log -> response
-```
+## What works today
 
-The bundled package implements a generic 128 Mbit SPI flash. Its `READ_ID`
-command (`0x9F`) returns `00 40 18`.
+| Area | Implemented support |
+| --- | --- |
+| Device packages | Versioned package manifest, runtime model, behavior flow, scenarios, fixtures, documentation, and assets |
+| Runtime drivers | `generic-spi-command`, `generic-i2c-register`, `generic-gpio-bank` |
+| Device behavior | Registers, bitfields, memory, state machines, virtual time, scheduled operations, faults, reset |
+| Automation | CLI package validation/scaffolding, SPI transfer, scenario execution, JSON and JUnit results |
+| Control plane | REST API, WebSocket replay/live events, React Web UI |
+| Native data plane | Length-prefixed Protobuf over `/tmp/vds4e.sock`, Rust CLI, static C client |
+| Linux SPI | Rootless `LD_PRELOAD` adapter and privileged CUSE `/dev/spidevX.Y` adapter |
+| Linux I²C | Privileged CUSE `/dev/i2c-N` adapter with `I2C_RDWR` and common SMBus operations |
+| Linux GPIO | Kernel `gpio-sim` integration exposing a real `/dev/gpiochipX` |
+| Observability | Transactions, registers, state, faults, runs, telemetry, bounded replay, optional SQLite persistence |
+
+## Interface support
+
+| Interface | Runtime | Linux host interface | Compatible clients | Status |
+| --- | --- | --- | --- | --- |
+| SPI / spidev | `generic-spi-command` | `/dev/spidevX.Y` through CUSE, or `LD_PRELOAD` | Normal spidev applications, `spi-tools`, `spidev_test`-style programs | Supported |
+| I²C / i2c-dev | `generic-i2c-register` | `/dev/i2c-N` through CUSE | `i2cdetect`, `i2cget`, `i2cset`, `i2ctransfer`, libi2c applications | Supported |
+| GPIO | `generic-gpio-bank` | Real `/dev/gpiochipX` through kernel `gpio-sim` | `gpiodetect`, `gpioinfo`, `gpioget`, `gpioset`, `gpiomon`, libgpiod applications | Supported |
+| QSPI multi-lane / DTR | SPI command and wire-setting validation | No dedicated host adapter | VDS4E native transaction clients | Runtime only |
+| UART | None | No `/dev/tty*` endpoint | — | Not implemented |
+| Ethernet | None | No TAP or socket endpoint | — | Not implemented |
+| CAN | None | No SocketCAN endpoint | — | Not implemented |
+| USB | None | No USB gadget or host endpoint | — | Not implemented |
+
+`generic-spidev` is a transport-test device for spidev compatibility. It does
+not model flash memory, JEDEC identity, registers, erase/program operations, or
+vendor-specific behavior. Use a concrete package such as the bundled Micron
+MT25QL256 model when device-specific flash behavior is required.
+
+VDS4E provides functional simulation. It does not simulate electrical
+characteristics, controller DMA/IRQ timing, CPU execution, or a complete target
+board, and it does not replace real-target or hardware-in-the-loop testing.
 
 ## Prerequisites
 
-- Rust 1.91.1 (installed automatically by rustup through `rust-toolchain.toml`)
+- Rust 1.91.1, selected by `rust-toolchain.toml`
+- Node.js and npm
 - Protocol Buffers compiler (`protoc`)
-- A C11 compiler and `make` for the C client example
+- C11 compiler, Make, CMake, and pkg-config
+- FUSE3 development files for CUSE adapters
+- optional host compatibility tools: `i2c-tools`, `gpiod`, and `spi-tools`
 
-## Installation
-
-On Ubuntu/Debian, install the build dependencies and the real Linux bus tools
-before configuring VDS4E:
+Ubuntu/Debian:
 
 ```shell
 sudo apt-get update
@@ -40,33 +68,36 @@ sudo apt-get install -y \
   spi-tools
 ```
 
-These distribution tools are also host-adapter compatibility clients:
-`i2cdetect`, `i2cget`, `i2cset`, and `i2ctransfer` exercise I2C;
-`gpiodetect`, `gpioinfo`, `gpioget`, `gpioset`, and `gpiomon` exercise GPIO;
-and `spi-config`/`spi-pipe` exercise spidev. Ubuntu does not package the Linux
-kernel's `tools/spi/spidev_test.c` utility separately. When that exact utility
-is needed, build the upstream Linux source for the x86_64 host instead of
-maintaining a VDS4E-specific replacement.
+Kernel-backed adapters additionally require the host's `cuse` or `gpio-sim`
+module and operating-system authorization.
 
-VDS4E does not reimplement these utilities. Its host adapters provide the
-standard Linux device nodes and ioctl behavior required to run the real tools
-unchanged.
+## Start the development workspace
 
-## Quick start
-
-Start the simulator server and hot-reloading Web UI together from the repository
-root:
+From the repository root:
 
 ```shell
 ./dev.sh
 ```
 
-Open `http://127.0.0.1:4174`. Keep the terminal open while developing and press
-`Ctrl+C` to stop both processes. On the first run, the script installs Web
-dependencies when `apps/vds-web/node_modules` is missing. Override the UI port
-when needed with `VDS_WEB_PORT=4200 ./dev.sh`.
+The script starts:
 
-For a staged production build and installation, use the ordered root pipeline:
+- Web UI: `http://127.0.0.1:4174`
+- Control API: `http://127.0.0.1:8080/api/v1/health`
+- Transaction data plane: `/tmp/vds4e.sock`
+
+Keep the terminal open and press `Ctrl+C` to stop both processes. If port 4174
+is occupied, either stop the existing workspace or select another UI port:
+
+```shell
+VDS_WEB_PORT=4200 ./dev.sh
+```
+
+`dev.sh` installs missing Web dependencies and prepares the development SPI and
+I²C CUSE helpers. It is not the staged production build.
+
+## Staged build and installation
+
+The root pipeline is deliberately ordered:
 
 ```shell
 ./configure
@@ -74,321 +105,513 @@ For a staged production build and installation, use the ordered root pipeline:
 sudo ./install
 ```
 
-`./build` refuses to run before a successful `./configure`, and `./install`
-refuses to run before a successful `./build`. Intermediate adapter and example
-outputs are kept under `.vds4e-build/`.
+- `./build` refuses to run before a successful `./configure`.
+- `./install` refuses to run before a successful `./build`.
+- native intermediate output is stored under `.vds4e-build/`.
+- `PREFIX` selects the installation prefix.
+- `DESTDIR` stages a filesystem package.
 
-The default installation prefix is `/usr/local`. Use `PREFIX` for a user or
-custom installation, or `DESTDIR` when assembling a package:
+Examples:
 
 ```shell
 PREFIX="$HOME/.local" ./install
 DESTDIR="$PWD/package-root" PREFIX=/usr ./install
 ```
 
-The individual commands remain available for focused server or client work.
+Focused module builds remain available during development; the full root
+pipeline does not need to run after every isolated change.
 
-Validate the example configuration:
+## Create `/dev/spidevX.Y`
+
+Start VDS4E:
 
 ```shell
-cargo run -p vds-server -- --config config/vds-server.yaml --check-config
+./dev.sh
 ```
 
-Start the server:
+Open the Web UI and create the Linux SPI endpoint:
+
+1. Open **Adapters** and select **New Adapter**.
+2. Select **SPI**, use bus number `0`, and create the adapter.
+3. Attach `generic-spidev` to endpoint/chip-select `0`.
+4. Select **Load Adapter** and approve the operating-system authorization.
+
+VDS4E starts the SPI CUSE adapter and creates a real Linux character device:
 
 ```shell
-cargo run -p vds-server -- --config config/vds-server.yaml
+$ stat -c '%F %n' /dev/spidev0.0
+character special file /dev/spidev0.0
 ```
 
-In a second terminal, send `READ_ID` with the Rust CLI:
+The application opens `/dev/spidev0.0`; it does not include a VDS4E header,
+call a simulator-specific API, or send REST requests. The CUSE adapter forwards
+supported spidev ioctls to the runtime over `/tmp/vds4e.sock`.
+
+The bus and chip-select numbers come from the adapter configuration. For
+example, SPI bus `2` and endpoint `1` produce `/dev/spidev2.1`.
+
+## Access `/dev/spidevX.Y` from C
+
+The following is a normal Embedded Linux spidev program. It sends the
+`generic-spidev` `PING` command (`0xA0`) and reads its deterministic response.
+
+```c
+#include <errno.h>
+#include <fcntl.h>
+#include <linux/spi/spidev.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+
+int main(int argc, char **argv) {
+    const char *path = argc > 1 ? argv[1] : "/dev/spidev0.0";
+    int fd = open(path, O_RDWR);
+    if (fd < 0) {
+        fprintf(stderr, "open(%s): %s\n", path, strerror(errno));
+        return 1;
+    }
+
+    uint8_t mode = SPI_MODE_0;
+    uint8_t bits = 8;
+    uint32_t speed_hz = 1000000;
+    if (ioctl(fd, SPI_IOC_WR_MODE, &mode) < 0 ||
+        ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits) < 0 ||
+        ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed_hz) < 0) {
+        fprintf(stderr, "SPI configuration: %s\n", strerror(errno));
+        close(fd);
+        return 1;
+    }
+
+    uint8_t tx[] = {0xA0, 0x00, 0x00, 0x00};
+    uint8_t rx[sizeof(tx)] = {0};
+    struct spi_ioc_transfer transfer = {
+        .tx_buf = (uintptr_t)tx,
+        .rx_buf = (uintptr_t)rx,
+        .len = sizeof(tx),
+        .speed_hz = speed_hz,
+        .bits_per_word = bits,
+    };
+
+    int transferred = ioctl(fd, SPI_IOC_MESSAGE(1), &transfer);
+    if (transferred != (int)sizeof(tx)) {
+        fprintf(stderr, "SPI_IOC_MESSAGE: %s\n", strerror(errno));
+        close(fd);
+        return 1;
+    }
+
+    printf("Device: %s\n", path);
+    printf("TX: %02X %02X %02X %02X\n",
+           tx[0], tx[1], tx[2], tx[3]);
+    printf("RX: %02X %02X %02X %02X\n",
+           rx[0], rx[1], rx[2], rx[3]);
+    close(fd);
+    return 0;
+}
+```
+
+Save it as `spidev_ping.c`, then compile and run it like an ordinary target
+application:
 
 ```shell
-cargo run -p vds-cli -- spi-transfer \
-  --socket /tmp/vds4e.sock \
-  --device generic-spi-flash-128m \
-  --tx 9F
+cc -O2 -Wall -Wextra -Werror spidev_ping.c -o spidev_ping
+sudo ./spidev_ping /dev/spidev0.0
 ```
 
 Expected output:
 
 ```text
-RX: 00 40 18
+Device: /dev/spidev0.0
+TX: A0 00 00 00
+RX: DE AD BE EF
 ```
 
-An unknown opcode returns a structured protocol error:
+Use the host's normal udev/group policy to grant non-root access instead of
+making the device node world-writable.
+
+### Run the Micron Embedded Linux example
+
+To exercise flash behavior instead of the generic transport endpoint, attach
+`micron-mt25ql256aba8esf-0sit` to the SPI adapter and load it as
+`/dev/spidev0.0`. Build and run the bundled application:
 
 ```shell
-cargo run -p vds-cli -- spi-transfer \
-  --socket /tmp/vds4e.sock \
-  --device generic-spi-flash-128m \
-  --tx 00
+cc -O2 -Wall -Wextra -Werror -std=c11 \
+  examples/micron-mt25ql256-embedded/mt25ql256_tool.c \
+  -o mt25ql256_tool
+
+sudo ./mt25ql256_tool -d /dev/spidev0.0 id
 ```
 
-## Device Package SDK
+The identification portion of the output is:
 
-Devices live in self-contained, versioned directories. A package carries its
-manifest, runtime model, editable flow, scenarios, fixtures, documentation,
-and assets, and can be moved or restored as a single unit.
+```text
+SPI device : /dev/spidev0.0
+SPI config : mode=0 bits=8 speed=20000000 Hz
+JEDEC ID   : 20 BA 19
+Device     : Micron MT25QL256ABA
+Geometry   : 32 MiB, page=256 B, erase=4 KiB/64 KiB
+```
+
+The Micron package models status registers, write enable, timed program/erase,
+four-byte reads, deep power-down, reset, and package-local scenarios. See
+[the package documentation](device-models/examples/micron-mt25ql256aba8esf-0sit/docs/README.md).
+
+### Run the AT24C Embedded Linux example
+
+This example uses only the standard Linux `i2c-dev` ABI, so the same source
+runs against VDS4E and physical AT24C128/AT24C256 devices:
+
+```shell
+cc -O2 -Wall -Wextra -Wpedantic -Werror -std=c11 \
+  examples/atmel-at24c256-embedded/at24c256_tool.c \
+  -o at24c256_tool
+
+./at24c256_tool -d /dev/i2c-0 -a 0x50 -m 256 info
+./at24c256_tool -d /dev/i2c-0 -a 0x50 -m 256 write 0x0010 0x5a 0xa5
+./at24c256_tool -d /dev/i2c-0 -a 0x50 -m 256 read 0x0010 2
+./at24c256_tool -d /dev/i2c-0 -a 0x50 -m 256 test 0x0020
+```
+
+The tool splits writes at 64-byte page boundaries and performs write-cycle
+ACK polling through `I2C_SMBUS`.
+
+## Device packages
+
+Every device lives in a self-contained package:
+
+```text
+device-package.yaml
+model/device.yaml
+flows/behavior.yaml
+scenarios/*.yaml
+fixtures/
+docs/
+assets/
+```
+
+Only resources declared in the manifest are required. Package paths must stay
+inside the package root, and the package ID must match its runtime model.
+
+Create and validate a package:
 
 ```shell
 cargo run -p vds-cli -- device-package new ./my-sensor \
-  --id my-sensor --name "My Sensor" --bus i2c
+  --id my-sensor \
+  --name "My Sensor" \
+  --bus i2c
+
 cargo run -p vds-cli -- device-package validate ./my-sensor
 ```
 
-The package contract supports SPI, I²C, GPIO, Ethernet, UART, CAN, USB, and
-custom buses. The authoritative runtime currently executes
-`spi` + `generic-spi-command`, `i2c` + `generic-i2c-register`, and `gpio` +
-`generic-gpio-bank`; the other bus families use the same package shape and
-gain execution support through new runtime drivers and adapters.
-See the [Device Package SDK guide](docs/development/device-package-sdk.md).
-Community model authors should also use the
-[Device behavior flow reference](docs/device-models/device-behavior-flow-reference.md)
-for the complete node, port, transition, and parameter contract.
+The scaffold creates the portable structure; the author must complete the
+bus-specific model before it can execute. The package schema accepts SPI, I²C,
+GPIO, Ethernet, UART, CAN, USB, and custom buses. The currently executable
+generic drivers are SPI, I²C register, and GPIO bank.
 
-## Register Engine v1
+See:
 
-The example SPI model declares three 8-bit registers in
-`device-models/examples/generic-spi-flash/model/device.yaml`:
+- [Device Package SDK](docs/development/device-package-sdk.md)
+- [Device behavior flow reference](docs/device-models/device-behavior-flow-reference.md)
+- [Package schema](schemas/device-package.schema.json)
+- [Model schema](schemas/device-model.schema.json)
 
-- `CONTROL` at `0x01` (`rw`, reset `0x12`)
-- `STATUS` at `0x00` (`ro`, reset `0x00`; bit 0 is `BUSY`)
-- `COMMAND` at `0x03` (`wo`, reset `0x00`)
+## Run package-local scenarios
 
-Opcode `0x03` reads a register and opcode `0x02` writes a register. Addresses
-are one byte and values use the byte width derived from `width_bits`.
-
-Read the initial `CONTROL` value:
+Scenarios execute headlessly against the same runtime registry used by native
+clients:
 
 ```shell
-cargo run -p vds-cli -- spi-transfer \
-  --socket /tmp/vds4e.sock \
-  --device spi-flash-0 \
-  --tx "03 01"
+cargo run -p vds-cli -- scenario run \
+  device-models/examples/micron-mt25ql256aba8esf-0sit/scenarios/01-read-jedec-id.yaml \
+  --config config/vds-server.yaml \
+  --json-output /tmp/mt25ql256-result.json \
+  --junit-output /tmp/mt25ql256-result.xml
 ```
 
-Expected output:
+Scenario steps can reset a device, advance virtual time, send SPI requests,
+toggle faults, assert state/register/response/error values, and wait for typed
+events. Scenario authoring in the Web UI remains inside the selected device.
+
+## Linux host adapters
+
+Host adapters expose standard Linux userspace ABIs and forward operations to
+the Unix-socket runtime. They contain no device opcodes or register behavior.
+
+### SPI example
+
+- [SPI preload adapter](adapters/spi-preload/README.md): rootless integration
+  for compatible dynamically linked applications.
+- [SPI CUSE adapter](adapters/spi-cuse/README.md): real `/dev/spidevX.Y` nodes
+  for supported spidev ioctls, including static applications.
+
+After loading SPI bus `0`, endpoint `0`:
+
+```shell
+$ stat -c '%F %n' /dev/spidev0.0
+character special file /dev/spidev0.0
+
+$ sudo ./spidev_ping /dev/spidev0.0
+Device: /dev/spidev0.0
+TX: A0 00 00 00
+RX: DE AD BE EF
+```
+
+The complete C source for `spidev_ping` is shown in
+[Access `/dev/spidevX.Y` from C](#access-devspidevxy-from-c).
+
+### I²C example
+
+The [I²C CUSE adapter](adapters/i2c-cuse/README.md) creates a real
+`/dev/i2c-N` bus and maps unique slave addresses to runtime device IDs.
+
+In **Adapters**, create I²C bus `0`, attach `generic-i2c-register` at slave
+address `80` (`0x50`), and load the adapter:
+
+```shell
+$ stat -c '%F %n' /dev/i2c-0
+character special file /dev/i2c-0
+
+$ sudo i2cdetect -y 0
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+50: 50 -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+```
+
+Register `0x00` is the read-only device ID:
+
+```shell
+$ sudo i2cget -y 0 0x50 0x00 b
+0x42
+```
+
+Register `0x01` is writable. Write it and read the four-register block:
+
+```shell
+$ sudo i2cset -y 0 0x50 0x01 0x7f b
+$ sudo i2cget -y 0 0x50 0x01 b
+0x7f
+
+$ sudo i2ctransfer -y 0 w1@0x50 0x00 r4
+0x42 0x7f 0x01 0xa5
+```
+
+The bus number is configured by the adapter. If the adapter is I²C bus `4`,
+the endpoint and commands use `/dev/i2c-4` and `-y 4`.
+
+For EEPROM behavior, use the bundled `atmel-at24c128` or
+`atmel-at24c256` package instead of the generic register fixture. These
+datasheet-derived models provide 16/32 KiB memory, two-byte word addresses,
+64-byte page-write rollover, current/random/sequential reads, capacity
+rollover, hardware write protection, and the self-timed write-cycle NACK used
+by ACK polling:
+
+```shell
+# AT24C256 at 0x50: write 0x5a to word address 0x0010
+i2ctransfer -y 0 w3@0x50 0x00 0x10 0x5a
+sleep 0.01
+i2ctransfer -y 0 w2@0x50 0x00 0x10 r1
+```
+
+### GPIO example
+
+The [GPIO simulator adapter](adapters/gpio-sim/README.md) provisions the
+kernel's `gpio-sim` controller. Build the helper for focused development if the
+root pipeline has not already built it:
+
+```shell
+cmake -S adapters/gpio-sim -B .vds4e-build/gpio-sim
+cmake --build .vds4e-build/gpio-sim
+```
+
+Create a 32-line GPIO adapter in the Web UI, attach
+`generic-gpio-bank-32`, and load it. The kernel-assigned `/dev/gpiochipX` path
+appears in the adapter view. This example assumes the kernel assigned
+`gpiochip2`:
+
+```shell
+$ stat -c '%F %n' /dev/gpiochip2
+character special file /dev/gpiochip2
+
+$ gpiodetect
+gpiochip2 [GPIO 0] (32 lines)
+```
+
+`gpioinfo` shows every kernel line and the package-defined line name:
 
 ```text
-RX: 12
+$ gpioinfo gpiochip2
+gpiochip2 - 32 lines:
+        line   0:      "GPIO0"       unused   input  active-high
+        line   1:      "GPIO1"       unused   input  active-high
+        line   2:      "GPIO2"       unused   input  active-high
+        line   3:      "GPIO3"       unused   input  active-high
+        line   4:      "GPIO4"       unused   input  active-high
+        line   5:      "GPIO5"       unused   input  active-high
+        line   6:      "GPIO6"       unused   input  active-high
+        line   7:      "GPIO7"       unused   input  active-high
+        line   8:      "GPIO8"       unused   input  active-high
+        line   9:      "GPIO9"       unused   input  active-high
+        line  10:     "GPIO10"       unused   input  active-high
+        line  11:     "GPIO11"       unused   input  active-high
+        line  12:     "GPIO12"       unused   input  active-high
+        line  13:     "GPIO13"       unused   input  active-high
+        line  14:     "GPIO14"       unused   input  active-high
+        line  15:     "GPIO15"       unused   input  active-high
+        line  16:     "GPIO16"       unused   input  active-high
+        line  17:     "GPIO17"       unused   input  active-high
+        line  18:     "GPIO18"       unused   input  active-high
+        line  19:     "GPIO19"       unused   input  active-high
+        line  20:     "GPIO20"       unused   input  active-high
+        line  21:     "GPIO21"       unused   input  active-high
+        line  22:     "GPIO22"       unused   input  active-high
+        line  23:     "GPIO23"       unused   input  active-high
+        line  24:     "GPIO24"       unused   input  active-high
+        line  25:     "GPIO25"       unused   input  active-high
+        line  26:     "GPIO26"       unused   input  active-high
+        line  27:     "GPIO27"       unused   input  active-high
+        line  28:     "GPIO28"       unused   input  active-high
+        line  29:     "GPIO29"       unused   input  active-high
+        line  30:     "GPIO30"       unused   input  active-high
+        line  31:     "GPIO31"       unused   input  active-high
 ```
 
-Write `0x5A`. The command is accepted immediately, sets `STATUS.BUSY`, and
-commits `CONTROL` after the YAML-configured 10 ms virtual latency:
+`gpioinfo` reports the current kernel request direction. An unused gpio-sim
+line normally appears as `input`. The VDS4E model direction is defined from the
+virtual device's perspective:
+
+| Lines | Device perspective | Host operation |
+| --- | --- | --- |
+| `GPIO0`–`GPIO15` | Device input | Drive with `gpioset` |
+| `GPIO16`–`GPIO31` | Device output | Read with `gpioget` or monitor with `gpiomon` |
+
+With libgpiod 1.x, read the initial device output on line 16:
 
 ```shell
-cargo run -p vds-cli -- spi-transfer \
-  --socket /tmp/vds4e.sock \
-  --device spi-flash-0 \
-  --tx "02 01 5A"
-
-cargo run -p vds-cli -- spi-transfer \
-  --socket /tmp/vds4e.sock \
-  --device spi-flash-0 \
-  --tx "03 00"
-
-cargo run -p vds-cli -- spi-transfer \
-  --socket /tmp/vds4e.sock \
-  --device spi-flash-0 \
-  --tx "03 01"
+$ gpioget gpiochip2 16
+0
 ```
 
-The write returns an empty payload. A status read during the operation returns
-`RX: 01`; after 10 ms a subsequent device interaction processes the due event,
-the control read returns `RX: 5A`, and status returns `RX: 00`. Writing
-`STATUS`, reading `COMMAND`, or using an unknown address returns a structured
-register error.
+Drive device input line 0 high and keep the request active:
 
-## Virtual time behavior
-
-Production devices use a monotonic `RealTimeClock`. No SPI handler sleeps: due
-operations are applied when the device runtime next processes an interaction
-or an explicit due-event call.
-
-Tests inject `ManualClock`, which starts at `0 ns` and advances without waiting:
-
-```rust
-let clock = Arc::new(ManualClock::default());
-let device = model.into_spi_device_with_clock(clock.clone())?;
-
-device.transfer(&[0x02, 0x01, 0x5A])?;
-clock.advance(Duration::from_millis(9))?;
-device.run_due_events()?; // CONTROL is still 0x12
-clock.advance(Duration::from_millis(1))?;
-device.run_due_events()?; // CONTROL becomes 0x5A and BUSY clears
+```shell
+$ gpioset --mode=wait gpiochip2 0=1
 ```
 
-Started and completed operations emit separate structured timing logs. Wall
-clock transaction timestamps and virtual operation durations are kept as
-separate fields.
+While that command holds the line, the device's `GPIO0_STATE` register reads
+`1` in the Web UI and control API.
 
-## Device State Machine v1
+To observe a device output transition, start:
 
-The example device declares three states in YAML:
+```shell
+$ gpiomon gpiochip2 16
+```
+
+The command waits. After writing `1` to the device's writable
+`GPIO16_STATE` register, it prints:
 
 ```text
-resetting --reset_complete after 5 ms--> ready
-ready     --write_started-------------> busy
-busy      --operation_completed--------> ready
+event:  RISING EDGE offset: 16 timestamp: [<kernel timestamp>]
 ```
 
-States can declare ordered transitions, register-based guards, register entry
-and exit actions, and one-shot delayed events. The generic transition engine
-lives in `vds-core`; YAML interpretation, register actions, guards, and runtime
-state remain in `vds-device-model`.
+The runtime updates gpio-sim and the normal kernel edge event wakes `gpiomon`.
 
-`WRITE_REGISTER` is accepted only in `ready`. A write dispatches
-`write_started`; the SPI decoder never assigns the current state directly.
-Completion from the existing timing scheduler dispatches
-`operation_completed`. Reset cancels pending operations, restores registers,
-returns to `resetting`, and schedules a new `reset_complete` event.
+libgpiod 2.x uses `-c gpiochip2` to select the chip. Use the syntax shown by the
+installed command's `--help`. Never assume the `gpiochipX` number before the
+kernel creates it.
 
-Every successful transition emits a structured `state_transition` log with
-the device ID, source state, target state, trigger, and virtual timestamp.
-Models without `state_machine` or command `allowed_states` retain their prior
-behavior.
+## Web control plane
 
-## Fault Injection Engine v1
+The Web UI provides:
 
-Device YAML may declare deterministic faults targeted by device, decoded
-command, register, and state. Supported triggers are `always`, `first_n`,
-`every_nth`, and exact `operation_count`. Supported actions are timeout, delay,
-returned error, drop, response XOR corruption, forced register value, and
-stuck-at register value.
+- Dashboard
+- Devices
+- Adapters
+- Transactions
+- Device Library
+- Logs
 
-Matching faults run by descending priority and then YAML order. Timeout,
-returned error, and drop stop evaluation; other actions compose. Counters and
-delay deadlines use simulator state and the existing virtual scheduler. Reset
-clears transient fault state while definitions marked `persistent: true` retain
-their counters and active stuck-at constraints. Models without `faults` retain
-their previous behavior.
-
-## Scenario Engine v1
-
-Declarative scenario YAML executes sequentially against the same device
-registry and SPI transaction path used by normal clients. Scenario steps can
-reset devices, advance a shared manual clock, send SPI transfers, enable or
-disable faults, assert responses/errors/registers/states, and wait for
-structured device events.
-
-Command results are stored by `save_as` and consumed by later assertions. The
-first failed step stops execution and marks remaining steps skipped unless that
-step declares `continue_on_failure: true`. Scenario and step results contain
-only virtual timestamps and serialize directly to JSON, so replay with the same
-models and starting clock is deterministic. See
-`device-models/examples/generic-spi-flash/scenarios/09-program-timeout-fault.yaml`
-for a complete example.
-
-## Control API and live events v1
-
-The server listens on the configured `server.control_address` and exposes a
-REST control plane under `/api/v1`. It provides health, device/register/state,
-reset, scenario/run, and fault-management endpoints. Scenario starts return
-`202 Accepted` with a run ID; status and the final JSON result are retrieved
-from `/api/v1/runs/{run_id}` and `/api/v1/runs/{run_id}/result`.
-`GET /api/v1/telemetry/buses` derives a read-only 60-second bus-health
-snapshot from typed transaction events; it does not accept transactions.
-
-`GET /api/v1/events` upgrades to a WebSocket stream of typed domain events.
-The in-memory event bus assigns monotonically increasing IDs and retains the
-latest 10,000 events. A reconnecting client can pass
-`?after_event_id=<last_seen_id>` to replay strictly newer retained events before
-continuing with live delivery. Slow subscribers never block simulator work;
-they can recover retained events by ID after lagging.
-
-The REST surface intentionally has no SPI-transfer endpoint. Hardware
-transactions continue to use the length-prefixed Protobuf protocol over the
-Unix socket, while REST and WebSocket remain control and observability paths.
-
-The optional Linux SPI ABI adapter in `adapters/spi-preload` lets dynamically
-linked applications use mapped `/dev/spidevX.Y` paths through `LD_PRELOAD`.
-See its README for the supported ioctl subset, build commands, and limitations.
-
-The Linux CUSE adapter in `adapters/spi-cuse` creates a real
-`/dev/spidevX.Y` character device. It supports applications that cannot use
-`LD_PRELOAD`, including statically linked programs, and forwards the same
-documented spidev ioctl subset to the Unix-socket data plane. It requires the
-CUSE kernel module and root privileges to create the device node.
-
-The Linux GPIO simulator adapter in `adapters/gpio-sim` provisions the
-kernel's `gpio-sim` controller through configfs. The kernel allocates a real
-`/dev/gpiochipX` character device, so `gpiodetect`, `gpioinfo`, `gpioget`,
-`gpioset`, and unmodified libgpiod applications use it exactly like an
-Embedded Linux GPIO controller. Loading the kernel module and creating the
-configfs device require operating-system authorization.
-
-## Web UI Foundation v1
-
-The React control plane lives in `apps/vds-web`. It reads authoritative
-snapshots from REST and keeps live events, its in-memory replay cursor, and
-connection status in a separate WebSocket store. The UI includes Dashboard,
-Devices, and Transactions routes. Scenario authoring and execution live inside
-the selected device rather than in the main navigation. The UI never sends
-hardware transactions over REST.
-
-With `vds-server` running on the default control address, start the Vite
-development server:
-
-```shell
-cd apps/vds-web
-npm install
-npm run dev
-```
-
-Vite proxies `/api` (including the WebSocket upgrade) to
-`http://127.0.0.1:8080`. Override that target with `VDS_API_PROXY_TARGET` or use
-`VITE_API_ROOT` and `VITE_WS_ROOT` for a separately hosted production frontend.
-
-Frontend quality checks:
-
-```shell
-cd apps/vds-web
-npm run lint
-npm run typecheck
-npm run test:run
-npm run build
-```
-
-## C client example
-
-Build the static C library and sample application:
-
-```shell
-make -C client/c
-```
-
-With `vds-server` running, execute:
-
-```shell
-client/c/build/read_id /tmp/vds4e.sock
-```
-
-Expected output:
+Behavior flows and scenarios are device features:
 
 ```text
-TX: 9F
-RX: EF 40 18
+/devices/:deviceId/flows
+/devices/:deviceId/scenarios
 ```
 
-The C client intentionally implements only the first protocol slice. The
-authoritative wire schema is [`proto/vds.proto`](proto/vds.proto).
+There are no global flow or scenario authoring routes. Device configuration,
+registers, commands, faults, flows, and scenarios remain scoped to the selected
+device.
 
-Run the quality checks:
+Vite proxies `/api` and the WebSocket upgrade to the control server. For
+focused frontend development:
 
 ```shell
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-make -C client/c
+npm --prefix apps/vds-web install
+npm --prefix apps/vds-web run dev
 ```
+
+Use `VDS_API_PROXY_TARGET` to change the development proxy target, or
+`VITE_API_ROOT` and `VITE_WS_ROOT` for a separately hosted frontend.
+
+## Control and observability APIs
+
+The server exposes REST resources under `/api/v1` for health, devices,
+registers, commands, reset, packages, adapters, scenarios, runs, faults, and
+telemetry.
+
+`GET /api/v1/events` is the WebSocket event stream. Event IDs are monotonic,
+and reconnecting clients can replay retained events by passing
+`after_event_id`.
+
+REST and WebSocket are control/observability paths. Native bus traffic remains
+on the Unix-socket Protobuf data plane.
+
+When enabled, the SQLite event store persists the replay high-water mark and
+applies configured sampling, retention, event-count, and size limits without
+blocking device transactions on database writes.
+
+## Verification
+
+Run focused checks while developing. Before release or integration, run the
+complete repository checks:
+
+```shell
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+
+npm --prefix apps/vds-web run lint
+npm --prefix apps/vds-web run typecheck
+npm --prefix apps/vds-web run test:run
+npm --prefix apps/vds-web run build
+```
+
+Native adapters and examples have their own CMake or Make definitions. The root
+`./configure` and `./build` pipeline builds them together from staged output
+directories.
 
 ## Architecture boundaries
 
-- The Web UI is a control-plane client; it never implements device behavior.
-- High-frequency hardware transactions use Unix domain sockets and Protobuf,
-  not REST.
-- Generic buses remain independent of device-specific packages.
-- Device behavior is loaded from versioned, schema-validated YAML.
-- The first slice uses statically linked generic behavior; no dynamic libraries
-  or arbitrary scripting are loaded.
-- The default build and test path does not require root privileges.
+- The server is the only authoritative owner of runtime device state.
+- The Web UI never implements device semantics.
+- Linux adapters implement host ABI translation, not device behavior.
+- High-frequency hardware transactions do not use REST.
+- Models, behavior flows, and scenarios come only from device packages.
+- Packages are declarative and cannot load arbitrary executable extensions.
+- Privileged kernel integration is isolated from the default runtime.
+- Generated build outputs are not source artifacts.
+
+## Maintainers
+
+- Hakan Kaya — [@haknkayaa](https://github.com/haknkayaa)
+
+## Contributors
+
+- Hakan Kaya — [@haknkayaa](https://github.com/haknkayaa)

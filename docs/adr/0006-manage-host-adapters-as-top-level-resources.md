@@ -34,6 +34,12 @@ starts one managed daemon per binding, producing paths such as
 `/dev/spidev0.0` and `/dev/spidev0.1`. Process identifiers and startup errors
 are reflected in adapter snapshots.
 
+The I²C CUSE driver starts one daemon per bus, producing `/dev/i2c-N`. Every
+binding on that adapter is passed to the daemon as a unique slave-address to
+device-ID mapping. Address selection through `I2C_SLAVE` is local to each open
+file descriptor, while `I2C_RDWR` preserves Linux combined-message ordering in
+one atomic runtime request. Bus topology changes require unloading the daemon.
+
 Privileged operations remain behind the adapter-driver boundary. The HTTP API
 returns `adapter_authorization_required` when the server cannot access CUSE.
 The UI presents an authorization-required dialog but never contains a
@@ -44,6 +50,8 @@ helper through Polkit or a root-owned system service.
 
 - Several devices can share one logical SPI adapter through distinct
   chip-select endpoints.
+- Several devices can share one logical I²C adapter through distinct slave
+  addresses, and standard `i2c-tools` remain the compatibility clients.
 - Device configuration views resolve their host path from authoritative
   adapter bindings instead of assuming `/dev/spidev0.0`.
 - Load/unload and attach/detach are independently testable through a fake
