@@ -27,6 +27,29 @@ typedef struct {
     char message[256];
 } vds_error_t;
 
+typedef enum {
+    VDS_SPI_LANE_SINGLE = 1,
+    VDS_SPI_LANE_DUAL = 2,
+    VDS_SPI_LANE_QUAD = 4
+} vds_spi_lane_width_t;
+
+typedef enum {
+    VDS_SPI_RATE_STR = 1,
+    VDS_SPI_RATE_DTR = 2
+} vds_spi_transfer_rate_t;
+
+typedef struct {
+    uint8_t mode;
+    uint8_t bits_per_word;
+    uint64_t max_speed_hz;
+    vds_spi_lane_width_t command_width;
+    vds_spi_lane_width_t address_width;
+    vds_spi_lane_width_t data_width;
+    vds_spi_transfer_rate_t rate;
+    uint16_t dummy_cycles;
+    uint8_t lsb_first;
+} vds_spi_wire_config_t;
+
 vds_status_t vds_client_connect(vds_client_t *client, const char *socket_path);
 void vds_client_close(vds_client_t *client);
 
@@ -39,9 +62,19 @@ vds_status_t vds_spi_transfer(vds_client_t *client,
                               size_t *rx_length,
                               vds_error_t *error);
 
+vds_status_t vds_spi_transfer_configured(vds_client_t *client,
+                                         const char *device_id,
+                                         const uint8_t *tx,
+                                         size_t tx_length,
+                                         size_t requested_rx_length,
+                                         const vds_spi_wire_config_t *wire,
+                                         uint8_t *rx,
+                                         size_t rx_capacity,
+                                         size_t *rx_length,
+                                         vds_error_t *error);
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-

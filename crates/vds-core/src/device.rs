@@ -8,6 +8,51 @@ pub enum BusType {
     Spi,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SpiLaneWidth {
+    #[default]
+    Single,
+    Dual,
+    Quad,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SpiTransferRate {
+    #[default]
+    Str,
+    Dtr,
+}
+
+/// Physical attributes of one SPI transaction.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SpiWireConfig {
+    pub mode: u8,
+    pub bits_per_word: u8,
+    pub max_speed_hz: u64,
+    pub command_width: SpiLaneWidth,
+    pub address_width: SpiLaneWidth,
+    pub data_width: SpiLaneWidth,
+    pub rate: SpiTransferRate,
+    pub dummy_cycles: u16,
+    pub lsb_first: bool,
+}
+
+impl Default for SpiWireConfig {
+    fn default() -> Self {
+        Self {
+            mode: 0,
+            bits_per_word: 8,
+            max_speed_hz: 0,
+            command_width: SpiLaneWidth::Single,
+            address_width: SpiLaneWidth::Single,
+            data_width: SpiLaneWidth::Single,
+            rate: SpiTransferRate::Str,
+            dummy_cycles: 0,
+            lsb_first: false,
+        }
+    }
+}
+
 impl fmt::Display for BusType {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -23,6 +68,18 @@ pub struct RegisterSnapshot {
     pub width_bits: u8,
     pub access: RegisterAccessType,
     pub value: u64,
+    pub reset_value: u64,
+    pub description: String,
+    pub bitfields: Vec<RegisterBitFieldSnapshot>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RegisterBitFieldSnapshot {
+    pub name: String,
+    pub lsb: u8,
+    pub width: u8,
+    pub access: RegisterAccessType,
+    pub description: String,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -130,6 +187,21 @@ pub trait Device: Send + Sync {
     /// unsupported command.
     fn transfer(&self, request: &[u8]) -> Result<DeviceTransfer, DeviceError>;
 
+    /// Executes an SPI transaction with explicit wire attributes. The default
+    /// keeps legacy devices source-compatible and accepts only the byte stream.
+    /// Executes a configured SPI transfer.
+    ///
+    /// # Errors
+    /// Returns a device error when the request cannot be executed.
+    fn transfer_spi(
+        &self,
+        request: &[u8],
+        _rx_length: usize,
+        _wire: SpiWireConfig,
+    ) -> Result<DeviceTransfer, DeviceError> {
+        self.transfer(request)
+    }
+
     /// Applies due simulator events without issuing a bus transaction.
     ///
     /// # Errors
@@ -155,6 +227,18 @@ pub trait Device: Send + Sync {
     fn read_register(&self, name: &str) -> Result<u64, DeviceError> {
         Err(DeviceError::InvalidRequest(format!(
             "device '{}' does not expose register '{name}'",
+            self.id()
+        )))
+    }
+
+    /// Writes a device register through the public runtime control API.
+    ///
+    /// # Errors
+    /// Returns an error when the register is unavailable, read-only, or the
+    /// value does not fit its declared width.
+    fn write_register(&self, address: u64, _value: u64) -> Result<RegisterTrace, DeviceError> {
+        Err(DeviceError::InvalidRequest(format!(
+            "device '{}' does not expose writable register at 0x{address:X}",
             self.id()
         )))
     }

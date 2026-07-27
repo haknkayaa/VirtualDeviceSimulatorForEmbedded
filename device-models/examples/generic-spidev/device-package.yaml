@@ -1,0 +1,26 @@
+api_version: vds4e.dev/v1alpha1
+kind: DevicePackage
+
+metadata:
+  id: generic-spidev
+  display_name: Generic SPI Device
+  version: 1.0.0
+  description: General-purpose spidev endpoint with RX–TX shortcuts for transport testing.
+  license: Apache-2.0
+  authors: [VDS4E Contributors]
+  tags: [spi, spidev, generic, test, loopback]
+
+spec:
+  bus:
+    type: spi
+    profile: spi.mode0
+    options:
+      mode: 0
+      transfer_bits: 8
+      max_frequency_hz: 10000000
+  runtime:
+    driver: generic-spi-command
+    model: model/device.yaml
+  documentation: docs
+  extensions:
+    purpose: transport-testing

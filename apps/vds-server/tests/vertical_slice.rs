@@ -18,8 +18,25 @@ use vds_protocol::{
 struct TestServer {
     child: Child,
     config: PathBuf,
-    temporary_model: Option<PathBuf>,
+    temporary_package: PathBuf,
     socket: PathBuf,
+}
+
+fn copy_directory(source: &Path, target: &Path) {
+    fs::create_dir_all(target).expect("package directory should be created");
+    for entry in fs::read_dir(source).expect("package directory should be readable") {
+        let entry = entry.expect("package entry should be readable");
+        let destination = target.join(entry.file_name());
+        if entry
+            .file_type()
+            .expect("package entry type should be readable")
+            .is_dir()
+        {
+            copy_directory(&entry.path(), &destination);
+        } else {
+            fs::copy(entry.path(), destination).expect("package file should be copied");
+        }
+    }
 }
 
 impl TestServer {
@@ -35,23 +52,22 @@ impl TestServer {
             .as_nanos();
         let socket = std::env::temp_dir().join(format!("vds4e-{unique}.sock"));
         let config = std::env::temp_dir().join(format!("vds4e-{unique}.yaml"));
-        let temporary_model = model_yaml.map(|yaml| {
-            let path = std::env::temp_dir().join(format!("vds4e-model-{unique}.yaml"));
-            fs::write(&path, yaml).expect("test model should be written");
-            path
-        });
-        let model = temporary_model.clone().unwrap_or_else(|| {
-            Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../device-models/examples/spi-flash.yaml")
-                .canonicalize()
-                .expect("example model should exist")
-        });
+        let temporary_package = std::env::temp_dir().join(format!("vds4e-package-{unique}"));
+        let source_package = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/spi-flash")
+            .canonicalize()
+            .expect("test package should exist");
+        copy_directory(&source_package, &temporary_package);
+        if let Some(yaml) = model_yaml {
+            fs::write(temporary_package.join("model/device.yaml"), yaml)
+                .expect("test model should be written");
+        }
         fs::write(
             &config,
             format!(
-                "schema_version: 1\nserver:\n  control_address: 127.0.0.1:0\ndata_plane:\n  unix_socket: {}\nobservability:\n  log_level: info\ndevice_models:\n  - {}\n",
+                "schema_version: 1\nserver:\n  control_address: 127.0.0.1:0\ndata_plane:\n  unix_socket: {}\nobservability:\n  log_level: info\ndevice_packages:\n  - {}\n",
                 socket.display(),
-                model.display()
+                temporary_package.display()
             ),
         )
         .expect("test configuration should be written");
@@ -61,6 +77,7 @@ impl TestServer {
                 "--config",
                 config.to_str().expect("config path should be UTF-8"),
             ])
+            .env("HOME", &temporary_package)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -73,7 +90,7 @@ impl TestServer {
                 return Self {
                     child,
                     config,
-                    temporary_model,
+                    temporary_package,
                     socket,
                 };
             }
@@ -89,9 +106,7 @@ impl TestServer {
             let _ = stderr.read_to_string(&mut startup_logs);
         }
         let _ = fs::remove_file(&config);
-        if let Some(model) = temporary_model {
-            let _ = fs::remove_file(model);
-        }
+        let _ = fs::remove_dir_all(temporary_package);
         panic!("server socket was not created; startup logs:\n{startup_logs}");
     }
 
@@ -121,7 +136,7 @@ impl TestServer {
 
 fn example_model_yaml() -> String {
     fs::read_to_string(
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../device-models/examples/spi-flash.yaml"),
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/spi-flash/model/device.yaml"),
     )
     .expect("example model should be readable")
 }
@@ -135,6 +150,8 @@ async fn transfer_to_socket(socket: &Path, request_id: u64, tx: Vec<u8>) -> Serv
         payload: Some(client_request::Payload::SpiTransfer(SpiTransferRequest {
             device_id: "spi-flash-0".to_owned(),
             tx,
+            wire: None,
+            rx_length: 0,
         })),
     };
     write_message(&mut stream, &request)
@@ -150,9 +167,7 @@ impl Drop for TestServer {
         let _ = self.child.kill();
         let _ = self.child.wait();
         let _ = fs::remove_file(&self.config);
-        if let Some(model) = &self.temporary_model {
-            let _ = fs::remove_file(model);
-        }
+        let _ = fs::remove_dir_all(&self.temporary_package);
         let _ = fs::remove_file(&self.socket);
     }
 }

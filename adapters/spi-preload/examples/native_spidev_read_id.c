@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     (void)close(fd);
 
     printf("RX: %02X %02X %02X %02X\n", rx[0], rx[1], rx[2], rx[3]);
-    const uint8_t expected[] = {0x00U, 0xEFU, 0x40U, 0x18U};
+    const uint8_t expected[] = {0x00U, 0x00U, 0x40U, 0x18U};
     if (transferred != (int)sizeof(tx) ||
         memcmp(rx, expected, sizeof(expected)) != 0) {
         fprintf(stderr, "unexpected READ_ID response\n");

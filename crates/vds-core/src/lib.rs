@@ -3,6 +3,7 @@
 pub mod clock;
 pub mod config;
 pub mod device;
+pub mod device_package;
 pub mod error;
 pub mod event;
 pub mod fault;

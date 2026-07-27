@@ -45,5 +45,6 @@ void vds_log_message(const char *format, ...) {
         length = sizeof(buffer) - 2U;
     }
     buffer[length++] = '\n';
-    (void)write(STDERR_FILENO, buffer, length);
+    const ssize_t emitted = write(STDERR_FILENO, buffer, length);
+    (void)emitted;
 }

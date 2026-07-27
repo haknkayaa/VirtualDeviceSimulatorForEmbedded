@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::{AccessType, RegisterDefinition, RegisterError};
+use crate::{AccessType, BitFieldDefinition, RegisterDefinition, RegisterError};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegisterMetadata {
@@ -9,6 +9,8 @@ pub struct RegisterMetadata {
     pub width_bits: u8,
     pub reset_value: u64,
     pub access: AccessType,
+    pub description: String,
+    pub bitfields: Vec<BitFieldDefinition>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -278,6 +280,8 @@ fn metadata(definition: &RegisterDefinition) -> RegisterMetadata {
         width_bits: definition.width_bits,
         reset_value: definition.reset_value,
         access: definition.access,
+        description: definition.description.clone(),
+        bitfields: definition.bitfields.clone(),
     }
 }
 
@@ -295,6 +299,8 @@ mod tests {
             width_bits: 8,
             reset_value: 0x12,
             access,
+            description: String::new(),
+            bitfields: Vec::new(),
         }
     }
 

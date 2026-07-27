@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vds4e.dev/schemas/device-package.schema.json",
+  "title": "VDS4E portable device package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["api_version", "kind", "metadata", "spec"],
+  "properties": {
+    "api_version": { "const": "vds4e.dev/v1alpha1" },
+    "kind": { "const": "DevicePackage" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "display_name", "version"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "display_name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$" },
+        "description": { "type": "string" },
+        "license": { "type": "string" },
+        "authors": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "tags": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bus", "runtime"],
+      "properties": {
+        "bus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": { "enum": ["spi", "i2c", "gpio", "ethernet", "uart", "can", "usb", "custom"] },
+            "profile": { "type": "string", "minLength": 1 },
+            "options": { "type": "object" }
+          }
+        },
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["driver", "model"],
+          "properties": {
+            "driver": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "model": { "$ref": "#/$defs/relativePath" }
+          }
+        },
+        "authoring": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "behavior_flow": { "$ref": "#/$defs/relativePath" }
+          }
+        },
+        "validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scenarios": { "$ref": "#/$defs/relativePath" },
+            "fixtures": { "$ref": "#/$defs/relativePath" }
+          }
+        },
+        "documentation": { "$ref": "#/$defs/relativePath" },
+        "assets": { "$ref": "#/$defs/relativePath" },
+        "extensions": { "type": "object" }
+      }
+    }
+  },
+  "$defs": {
+    "relativePath": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

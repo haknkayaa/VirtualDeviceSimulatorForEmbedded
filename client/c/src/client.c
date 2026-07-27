@@ -215,14 +215,16 @@ void vds_client_close(vds_client_t *client) {
     }
 }
 
-vds_status_t vds_spi_transfer(vds_client_t *client,
-                              const char *device_id,
-                              const uint8_t *tx,
-                              size_t tx_length,
-                              uint8_t *rx,
-                              size_t rx_capacity,
-                              size_t *rx_length,
-                              vds_error_t *error) {
+vds_status_t vds_spi_transfer_configured(vds_client_t *client,
+                                         const char *device_id,
+                                         const uint8_t *tx,
+                                         size_t tx_length,
+                                         size_t requested_rx_length,
+                                         const vds_spi_wire_config_t *wire,
+                                         uint8_t *rx,
+                                         size_t rx_capacity,
+                                         size_t *rx_length,
+                                         vds_error_t *error) {
     if (client == NULL || client->fd < 0 || device_id == NULL || tx == NULL ||
         tx_length == 0U || rx == NULL || rx_length == NULL || error == NULL) {
         return VDS_ERR_ARGUMENT;
@@ -239,6 +241,37 @@ vds_status_t vds_spi_transfer(vds_client_t *client,
                      (const uint8_t *)device_id,
                      strlen(device_id)) != 0 ||
         encode_bytes(spi, sizeof(spi), &spi_length, 2U, tx, tx_length) != 0) {
+        return VDS_ERR_ARGUMENT;
+    }
+    if (wire != NULL) {
+        uint8_t encoded_wire[128];
+        size_t wire_length = 0U;
+        if (encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, 8U) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, wire->mode) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, 16U) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, wire->bits_per_word) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, 24U) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, wire->max_speed_hz) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, 32U) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, wire->command_width) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, 40U) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, wire->address_width) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, 48U) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, wire->data_width) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, 56U) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, wire->rate) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, 64U) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, wire->dummy_cycles) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, 72U) != 0 ||
+            encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, wire->lsb_first) != 0 ||
+            encode_bytes(spi, sizeof(spi), &spi_length, 26U, encoded_wire, wire_length) != 0) {
+            return VDS_ERR_ARGUMENT;
+        }
+    }
+    if (requested_rx_length > UINT32_MAX ||
+        (requested_rx_length != 0U &&
+         (encode_varint(spi, sizeof(spi), &spi_length, 32U) != 0 ||
+          encode_varint(spi, sizeof(spi), &spi_length, requested_rx_length) != 0))) {
         return VDS_ERR_ARGUMENT;
     }
 
@@ -315,4 +348,16 @@ vds_status_t vds_spi_transfer(vds_client_t *client,
         return VDS_ERR_PROTOCOL;
     }
     return status;
+}
+
+vds_status_t vds_spi_transfer(vds_client_t *client,
+                              const char *device_id,
+                              const uint8_t *tx,
+                              size_t tx_length,
+                              uint8_t *rx,
+                              size_t rx_capacity,
+                              size_t *rx_length,
+                              vds_error_t *error) {
+    return vds_spi_transfer_configured(client, device_id, tx, tx_length, 0U, NULL,
+                                       rx, rx_capacity, rx_length, error);
 }

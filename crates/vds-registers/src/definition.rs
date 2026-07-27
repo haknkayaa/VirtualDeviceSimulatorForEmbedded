@@ -21,6 +21,18 @@ impl fmt::Display for AccessType {
     }
 }
 
+/// Named bit range within a register definition.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct BitFieldDefinition {
+    pub name: String,
+    pub lsb: u8,
+    pub width: u8,
+    pub access: AccessType,
+    #[serde(default)]
+    pub description: String,
+}
+
 /// Declarative definition used to construct one runtime register.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -30,4 +42,8 @@ pub struct RegisterDefinition {
     pub width_bits: u8,
     pub reset_value: u64,
     pub access: AccessType,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub bitfields: Vec<BitFieldDefinition>,
 }

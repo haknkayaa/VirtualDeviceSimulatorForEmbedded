@@ -211,8 +211,17 @@ static int ensure_connected(vds_spi_state_t *state) {
 static bool unsupported_transfer_feature(
     const struct spi_ioc_transfer *transfer) {
     return transfer->delay_usecs != 0U || transfer->cs_change != 0U ||
-           transfer->tx_nbits != 0U || transfer->rx_nbits != 0U ||
            transfer->word_delay_usecs != 0U || transfer->pad != 0U;
+}
+
+static vds_spi_lane_width_t lane_width(uint8_t nbits) {
+    if (nbits == 4U) {
+        return VDS_SPI_LANE_QUAD;
+    }
+    if (nbits == 2U) {
+        return VDS_SPI_LANE_DUAL;
+    }
+    return VDS_SPI_LANE_SINGLE;
 }
 
 static int execute_transfer(vds_spi_state_t *state,
@@ -276,14 +285,22 @@ static int execute_transfer(vds_spi_state_t *state,
 
     size_t payload_length = 0U;
     vds_error_t error;
-    const vds_status_t status = vds_spi_transfer(&state->client,
-                                                 state->device_id,
-                                                 transmit,
-                                                 transfer.len,
-                                                 payload,
-                                                 VDS4E_MAX_RESPONSE_SIZE,
-                                                 &payload_length,
-                                                 &error);
+    const vds_spi_lane_width_t tx_width = lane_width(transfer.tx_nbits);
+    const vds_spi_lane_width_t rx_width = lane_width(transfer.rx_nbits);
+    const vds_spi_wire_config_t wire = {
+        .mode = state->mode,
+        .bits_per_word = bits,
+        .max_speed_hz = transfer.speed_hz == 0U ? state->max_speed_hz : transfer.speed_hz,
+        .command_width = tx_width,
+        .address_width = tx_width,
+        .data_width = transfer.rx_nbits == 0U ? tx_width : rx_width,
+        .rate = VDS_SPI_RATE_STR,
+        .dummy_cycles = 0U,
+        .lsb_first = (state->mode & SPI_LSB_FIRST) != 0U,
+    };
+    const vds_status_t status = vds_spi_transfer_configured(
+        &state->client, state->device_id, transmit, transfer.len, 0U, &wire,
+        payload, VDS4E_MAX_RESPONSE_SIZE, &payload_length, &error);
     free(transmit);
     if (status != VDS_OK) {
         if (status == VDS_ERR_IO) {

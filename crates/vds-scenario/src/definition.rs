@@ -92,9 +92,37 @@ impl ScenarioAction {
             Self::WaitForEvent { .. } => "wait_for_event",
         }
     }
+
+    #[must_use]
+    pub fn device(&self) -> Option<&str> {
+        match self {
+            Self::ResetDevice { device }
+            | Self::SendSpi { device, .. }
+            | Self::AssertRegister { device, .. }
+            | Self::AssertState { device, .. } => Some(device),
+            Self::WaitForEvent { device, .. } => device.as_deref(),
+            Self::AdvanceTime { .. }
+            | Self::EnableFault { .. }
+            | Self::DisableFault { .. }
+            | Self::AssertResponse { .. }
+            | Self::AssertError { .. } => None,
+        }
+    }
 }
 
 impl ScenarioDocument {
+    #[must_use]
+    pub fn referenced_devices(&self) -> Vec<String> {
+        let mut devices = self
+            .steps
+            .iter()
+            .filter_map(|step| step.action.device().map(str::to_owned))
+            .collect::<Vec<_>>();
+        devices.sort();
+        devices.dedup();
+        devices
+    }
+
     /// Parses, schema-validates, and semantically validates scenario YAML.
     ///
     /// # Errors

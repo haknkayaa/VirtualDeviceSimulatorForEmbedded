@@ -9,13 +9,15 @@ use std::{
 };
 
 use tokio::net::{UnixListener, UnixStream};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use vds_core::{
     clock::{RealTimeClock, SimulatorClock},
     config::ServerConfig,
     device::{
-        Device, DeviceError, FaultErrorCode, RegisterErrorCode, StateErrorCode, TimingErrorCode,
+        DeviceError, FaultErrorCode, RegisterErrorCode, SpiLaneWidth, SpiTransferRate,
+        SpiWireConfig, StateErrorCode, TimingErrorCode,
     },
+    device_package::DevicePackage,
     event::DeviceEvent,
     registry::DeviceRegistry,
     transaction::{Transaction, TransactionResult},
@@ -51,19 +53,53 @@ pub fn load_registry_with_clock(
     clock: Arc<dyn SimulatorClock>,
 ) -> Result<DeviceRegistry, ServerError> {
     let registry = DeviceRegistry::new();
-    for path in &config.device_models {
-        let model = DeviceModel::load(path)?;
+    for package in config.resolved_device_packages()? {
+        let model = load_package_runtime_model(&package)?;
+        validate_device_package_model(&package, &model).map_err(ServerError::PackageContract)?;
         let device = model.into_spi_device_with_clock(Arc::clone(&clock))?;
-        info!(
-            component = "device_registry",
-            device_id = device.id(),
-            model_path = %path.display(),
-            "device model loaded"
-        );
         registry.register(Arc::new(device))?;
     }
     drop(clock);
     Ok(registry)
+}
+
+pub(crate) fn load_package_runtime_model(
+    package: &DevicePackage,
+) -> Result<DeviceModel, ServerError> {
+    let mut model = DeviceModel::load(package.model_path())?;
+    if let Some(flow_path) = package.behavior_flow_path() {
+        let yaml = std::fs::read_to_string(flow_path)?;
+        model.apply_behavior_flow(&yaml, package.root())?;
+    }
+    Ok(model)
+}
+
+pub(crate) fn validate_device_package_model(
+    package: &DevicePackage,
+    model: &DeviceModel,
+) -> Result<(), String> {
+    let manifest = package.manifest();
+    if manifest.metadata.id != model.device.id {
+        return Err(format!(
+            "device package '{}' metadata.id does not match model device.id '{}'",
+            manifest.metadata.id, model.device.id
+        ));
+    }
+    if manifest.spec.bus.kind.as_str() != model.device.bus {
+        return Err(format!(
+            "device package '{}' declares bus '{}' but its model declares '{}'",
+            manifest.metadata.id,
+            manifest.spec.bus.kind.as_str(),
+            model.device.bus
+        ));
+    }
+    if manifest.spec.runtime.driver != model.device.model {
+        return Err(format!(
+            "device package '{}' declares runtime driver '{}' but its model declares '{}'",
+            manifest.metadata.id, manifest.spec.runtime.driver, model.device.model
+        ));
+    }
+    Ok(())
 }
 
 /// Runs the Unix domain socket data plane until Ctrl-C is received.
@@ -75,7 +111,56 @@ pub fn load_registry_with_clock(
 pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
     let clock: Arc<dyn SimulatorClock> = Arc::new(RealTimeClock::new());
     let registry = Arc::new(load_registry_with_clock(&config, Arc::clone(&clock))?);
-    let events = Arc::new(EventBus::default());
+    let event_store_path = std::env::var_os("HOME")
+        .map_or_else(|| PathBuf::from("."), PathBuf::from)
+        .join(".vsd4e/events.sqlite3");
+    if let Some(parent) = event_store_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let events = if config.event_store.enabled {
+        let settings = &config.event_store;
+        let policy = vds_events::EventPersistencePolicy {
+            max_size_bytes: settings.max_size_mb.saturating_mul(1024 * 1024),
+            max_events: settings.max_events,
+            cleanup_interval: std::time::Duration::from_secs(settings.cleanup_interval_seconds),
+            transaction_retention: std::time::Duration::from_secs(
+                settings.transaction_retention_hours.saturating_mul(60 * 60),
+            ),
+            register_read_retention: std::time::Duration::from_secs(
+                settings
+                    .register_read_retention_hours
+                    .saturating_mul(60 * 60),
+            ),
+            critical_retention: std::time::Duration::from_secs(
+                settings
+                    .critical_retention_days
+                    .saturating_mul(24 * 60 * 60),
+            ),
+            register_read_sample_rate: settings.register_read_sample_rate,
+        };
+        let bus = EventBus::persistent_with_policy(
+            &event_store_path,
+            vds_events::DEFAULT_RING_CAPACITY,
+            1_024,
+            policy,
+        )
+        .map_err(|error| ServerError::Api(format!("event store initialization failed: {error}")))?;
+        info!(
+            component = "domain_events",
+            path = %event_store_path.display(),
+            max_events = settings.max_events,
+            max_size_mb = settings.max_size_mb,
+            register_read_sample_rate = settings.register_read_sample_rate,
+            "SQLite event store ready"
+        );
+        Arc::new(bus)
+    } else {
+        info!(
+            component = "domain_events",
+            "SQLite event persistence disabled"
+        );
+        Arc::new(EventBus::new(vds_events::DEFAULT_RING_CAPACITY, 1_024))
+    };
     spawn_event_logger(Arc::clone(&events));
     let api_state = http::ApiState::new(
         config.clone(),
@@ -131,7 +216,7 @@ fn spawn_event_logger(events: Arc<EventBus>) {
     tokio::spawn(async move {
         let mut subscription = events.subscribe_from(0);
         while let Some(event) = subscription.recv().await {
-            info!(
+            debug!(
                 component = "domain_events",
                 event_id = event.event_id,
                 event = event.event_type.as_str(),
@@ -203,7 +288,12 @@ fn handle_request(
             request: spi.tx.clone(),
         },
     });
-    match registry.transfer(&spi.device_id, &spi.tx) {
+    let wire = match decode_spi_wire(spi.wire.as_ref()) {
+        Ok(wire) => wire,
+        Err(message) => return error_response(request_id, ErrorCode::InvalidRequest, message),
+    };
+    let rx_length = usize::try_from(spi.rx_length).unwrap_or(usize::MAX);
+    match registry.transfer_spi(&spi.device_id, &spi.tx, rx_length, wire) {
         Ok(transfer) => {
             transaction.response.clone_from(&transfer.response);
             transaction.register.clone_from(&transfer.register);
@@ -276,6 +366,42 @@ fn handle_request(
             error_response(request_id, code, error.to_string())
         }
     }
+}
+
+fn decode_spi_wire(
+    wire: Option<&vds_protocol::v1::SpiWireConfig>,
+) -> Result<SpiWireConfig, String> {
+    let Some(wire) = wire else {
+        return Ok(SpiWireConfig::default());
+    };
+    let lane = |value| match vds_protocol::v1::SpiLaneWidth::try_from(value) {
+        Ok(
+            vds_protocol::v1::SpiLaneWidth::Unspecified | vds_protocol::v1::SpiLaneWidth::Single,
+        ) => Ok(SpiLaneWidth::Single),
+        Ok(vds_protocol::v1::SpiLaneWidth::Dual) => Ok(SpiLaneWidth::Dual),
+        Ok(vds_protocol::v1::SpiLaneWidth::Quad) => Ok(SpiLaneWidth::Quad),
+        Err(_) => Err(format!("invalid SPI lane width {value}")),
+    };
+    let rate = match vds_protocol::v1::SpiTransferRate::try_from(wire.rate) {
+        Ok(
+            vds_protocol::v1::SpiTransferRate::Unspecified | vds_protocol::v1::SpiTransferRate::Str,
+        ) => SpiTransferRate::Str,
+        Ok(vds_protocol::v1::SpiTransferRate::Dtr) => SpiTransferRate::Dtr,
+        Err(_) => return Err(format!("invalid SPI transfer rate {}", wire.rate)),
+    };
+    Ok(SpiWireConfig {
+        mode: u8::try_from(wire.mode).map_err(|_| "SPI mode exceeds 8 bits".to_owned())?,
+        bits_per_word: u8::try_from(wire.bits_per_word)
+            .map_err(|_| "SPI bits-per-word exceeds 8 bits".to_owned())?,
+        max_speed_hz: wire.max_speed_hz,
+        command_width: lane(wire.command_width)?,
+        address_width: lane(wire.address_width)?,
+        data_width: lane(wire.data_width)?,
+        rate,
+        dummy_cycles: u16::try_from(wire.dummy_cycles)
+            .map_err(|_| "SPI dummy-cycle count exceeds 16 bits".to_owned())?,
+        lsb_first: wire.lsb_first,
+    })
 }
 
 fn publish_device_events(
@@ -630,6 +756,9 @@ impl Drop for SocketGuard {
 #[derive(Debug, thiserror::Error)]
 pub enum ServerError {
     #[error(transparent)]
+    Core(#[from] vds_core::Error),
+
+    #[error(transparent)]
     Io(#[from] std::io::Error),
 
     #[error(transparent)]
@@ -643,4 +772,7 @@ pub enum ServerError {
 
     #[error("control API initialization failed: {0}")]
     Api(String),
+
+    #[error("device package contract failed: {0}")]
+    PackageContract(String),
 }
