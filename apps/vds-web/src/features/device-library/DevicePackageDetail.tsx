@@ -12,7 +12,11 @@ export function DevicePackageDetail({ item }: DevicePackageDetailProps) {
   return (
     <aside aria-label={`${item.name} package details`} className="library-detail-panel">
       <header className="package-detail-hero">
-        <span className={`package-detail-acronym package-kind-${item.kind}`}>{item.acronym}</span>
+        {item.image ? (
+          <img alt={item.image.alt} className="package-detail-image" src={item.image.src} />
+        ) : (
+          <span className={`package-detail-acronym package-kind-${item.kind}`}>{item.acronym}</span>
+        )}
         <div>
           <p>{libraryKindLabel()}</p>
           <h2>{item.name}</h2>

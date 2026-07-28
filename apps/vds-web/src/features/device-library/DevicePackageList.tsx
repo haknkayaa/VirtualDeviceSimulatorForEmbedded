@@ -58,7 +58,11 @@ export function DevicePackageList({
             onClick={() => onSelect(item.id)}
             type="button"
           >
-            <span className={`package-acronym package-kind-${item.kind}`}>{item.acronym}</span>
+            {item.image ? (
+              <img alt={item.image.alt} className="package-row-image" src={item.image.src} />
+            ) : (
+              <span className={`package-acronym package-kind-${item.kind}`}>{item.acronym}</span>
+            )}
             <span className="package-row-copy">
               <strong>{item.name}</strong>
               <small>{item.source}</small>

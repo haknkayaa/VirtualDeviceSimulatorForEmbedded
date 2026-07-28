@@ -22,6 +22,7 @@ pub(super) struct ImportedPackage {
     name: String,
     version: String,
     bus: String,
+    image_url: Option<String>,
 }
 
 pub(super) async fn device_packages() -> ApiResult<Json<Vec<ImportedPackage>>> {
@@ -30,14 +31,78 @@ pub(super) async fn device_packages() -> ApiResult<Json<Vec<ImportedPackage>>> {
     Ok(Json(
         packages
             .into_iter()
-            .map(|package| ImportedPackage {
-                id: package.manifest().metadata.id.clone(),
-                name: package.manifest().metadata.display_name.clone(),
-                version: package.manifest().metadata.version.clone(),
-                bus: package.manifest().spec.bus.kind.as_str().to_owned(),
+            .map(|package| {
+                let id = package.manifest().metadata.id.clone();
+                ImportedPackage {
+                    image_url: package_image(&package)
+                        .map(|_| format!("/api/v1/device-packages/{id}/image")),
+                    id,
+                    name: package.manifest().metadata.display_name.clone(),
+                    version: package.manifest().metadata.version.clone(),
+                    bus: package.manifest().spec.bus.kind.as_str().to_owned(),
+                }
             })
             .collect(),
     ))
+}
+
+pub(super) fn package_image(package: &DevicePackage) -> Option<(PathBuf, &'static str)> {
+    let assets = package.manifest().spec.assets.as_ref()?;
+    let directory = package.root().join(assets);
+    let mut candidates = fs::read_dir(directory)
+        .ok()?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+        .filter_map(|entry| {
+            let path = entry.path();
+            let mime = match path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .map(str::to_ascii_lowercase)
+                .as_deref()
+            {
+                Some("png") => "image/png",
+                Some("jpg" | "jpeg") => "image/jpeg",
+                Some("webp") => "image/webp",
+                Some("svg") => "image/svg+xml",
+                _ => return None,
+            };
+            Some((path, mime))
+        })
+        .collect::<Vec<_>>();
+    candidates.sort_by(|left, right| left.0.cmp(&right.0));
+    candidates.into_iter().next()
+}
+
+pub(super) async fn device_package_image(Path(id): Path<String>) -> ApiResult<Response> {
+    let packages = installed_device_packages()
+        .map_err(|error| ApiError::internal("device_package_list_failed", error.to_string()))?;
+    let package = packages
+        .into_iter()
+        .find(|package| package.manifest().metadata.id == id)
+        .ok_or_else(|| {
+            ApiError::not_found(
+                "device_package_not_found",
+                format!("device package '{id}' was not found"),
+            )
+        })?;
+    let (path, content_type) = package_image(&package).ok_or_else(|| {
+        ApiError::not_found(
+            "device_package_image_not_found",
+            format!("device package '{id}' has no image asset"),
+        )
+    })?;
+    let bytes = fs::read(&path).map_err(|error| {
+        ApiError::internal(
+            "device_package_image_read_failed",
+            format!("failed to read '{}': {error}", path.display()),
+        )
+    })?;
+    Response::builder()
+        .header(header::CONTENT_TYPE, content_type)
+        .header(header::CACHE_CONTROL, "public, max-age=3600")
+        .body(axum::body::Body::from(bytes))
+        .map_err(|error| ApiError::internal("device_package_image_failed", error.to_string()))
 }
 
 pub(super) struct TemporaryPackage(PathBuf);
@@ -121,6 +186,8 @@ pub(super) async fn import_device_package(
             ApiError::internal("device_package_install_failed", error.to_string())
         }
     })?;
+    let image_url = package_image(&package)
+        .map(|_| format!("/api/v1/device-packages/{}/image", manifest.metadata.id));
     Ok((
         StatusCode::CREATED,
         Json(ImportedPackage {
@@ -128,6 +195,7 @@ pub(super) async fn import_device_package(
             name: manifest.metadata.display_name,
             version: manifest.metadata.version,
             bus: manifest.spec.bus.kind.as_str().to_owned(),
+            image_url,
         }),
     ))
 }

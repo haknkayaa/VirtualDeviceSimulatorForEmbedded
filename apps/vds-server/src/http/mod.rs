@@ -4,7 +4,7 @@ mod runs;
 mod telemetry;
 
 mod packages;
-use packages::{device_packages, import_device_package};
+use packages::{device_package_image, device_packages, import_device_package};
 mod adapter_routes;
 use adapter_routes::{
     adapters, attach_adapter_device, create_adapter, detach_adapter_device, load_adapter,
@@ -68,6 +68,7 @@ pub struct ApiState {
     pub adapters: Arc<AdapterManager>,
     pub config: ServerConfig,
     device_templates: Arc<HashMap<String, DeviceModel>>,
+    device_template_images: Arc<HashMap<String, String>>,
     device_flows: Arc<HashMap<String, serde_json::Value>>,
     device_template_instances: Arc<RwLock<HashMap<String, String>>>,
     clock: Arc<dyn SimulatorClock>,
@@ -101,6 +102,7 @@ impl ApiState {
             }
         }
         let mut device_templates = HashMap::new();
+        let mut device_template_images = HashMap::new();
         let mut device_template_instances = HashMap::new();
         let mut device_flows = HashMap::new();
         for package in config
@@ -116,6 +118,13 @@ impl ApiState {
             })?;
             crate::validate_device_package_model(&package, &model)?;
             let template_id = model.device.id.clone();
+            if packages::package_image(&package).is_some() {
+                let package_id = &package.manifest().metadata.id;
+                device_template_images.insert(
+                    template_id.clone(),
+                    format!("/api/v1/device-packages/{package_id}/image"),
+                );
+            }
             device_templates
                 .entry(template_id.clone())
                 .or_insert_with(|| model.clone());
@@ -142,6 +151,7 @@ impl ApiState {
             adapters: Arc::new(AdapterManager::system(&config)),
             config,
             device_templates: Arc::new(device_templates),
+            device_template_images: Arc::new(device_template_images),
             device_flows: Arc::new(device_flows),
             device_template_instances: Arc::new(RwLock::new(device_template_instances)),
             clock,
@@ -159,6 +169,10 @@ pub fn router(state: ApiState) -> Router {
         .route("/api/v1/devices", get(devices).post(create_device))
         .route("/api/v1/device-models", get(device_templates))
         .route("/api/v1/device-packages", get(device_packages))
+        .route(
+            "/api/v1/device-packages/{id}/image",
+            get(device_package_image),
+        )
         .route(
             "/api/v1/device-packages/import",
             post(import_device_package),

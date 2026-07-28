@@ -30,6 +30,7 @@ export interface Device {
   type?: string
   model?: string
   version?: string
+  image_url?: string | null
 }
 
 export interface DeviceTemplate {
@@ -37,6 +38,7 @@ export interface DeviceTemplate {
   name: string
   bus: string
   model: string
+  image_url?: string | null
 }
 
 export interface ImportDevicePackageFile {
@@ -49,6 +51,7 @@ export interface ImportedDevicePackage {
   name: string
   version: string
   bus: string
+  image_url?: string | null
 }
 
 export interface CreateDeviceInput {
