@@ -1,4 +1,5 @@
 import { Activity, Bell, Boxes, Cable, CircleHelp, Gauge, LibraryBig, Moon, Radio, ScrollText, Settings, Sun } from 'lucide-react'
+import { useMemo } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
 import { BrandLogo } from '../components/BrandLogo'
@@ -7,6 +8,7 @@ import { StatusBadge } from '../components/StatusBadge'
 import { useAdapters, useClock, useDevices } from '../api/queries'
 import { useEventStore } from '../stores/eventStore'
 import { useTheme } from '../hooks/useTheme'
+import { attachedDevices } from '../utils/adapterBindings'
 import { formatVirtualTime, humanize } from '../utils/format'
 
 const navigation = [
@@ -34,6 +36,11 @@ export function AppShell() {
   const adapters = useAdapters()
   const clock = useClock()
   const devices = useDevices()
+  const visibleDevices = useMemo(
+    () => attachedDevices(devices.data, adapters.data),
+    [adapters.data, devices.data],
+  )
+  const deviceInventoryPending = devices.isPending || adapters.isPending
   const connectionStatus = useEventStore((state) => state.connectionStatus)
   const virtualTime = clock.data?.virtual_time_ns ?? 0
   return (
@@ -75,17 +82,17 @@ export function AppShell() {
               </div>
             </section>
             <section>
-              <header><Boxes aria-hidden="true" size={13} /><strong>Devices</strong><span>{devices.data?.length ?? 0}</span></header>
+              <header><Boxes aria-hidden="true" size={13} /><strong>Devices</strong><span>{visibleDevices.length}</span></header>
               <div className="sidebar-resource-list">
-                {devices.isPending && <small>Loading devices…</small>}
-                {devices.data?.map((device) => (
+                {deviceInventoryPending && <small>Loading devices…</small>}
+                {visibleDevices.map((device) => (
                   <div className="sidebar-resource-row" key={device.id}>
                     <i className={device.state ? 'online' : 'offline'} />
                     <strong title={device.id}>{device.name ?? device.id}</strong>
                     <span>{device.state ? humanize(device.state) : 'Offline'}</span>
                   </div>
                 ))}
-                {!devices.isPending && devices.data?.length === 0 && <small>No devices</small>}
+                {!deviceInventoryPending && visibleDevices.length === 0 && <small>No attached devices</small>}
               </div>
             </section>
           </div>

@@ -45,4 +45,33 @@ describe('live transaction event pairing', () => {
       busType: 'unknown',
     })
   })
+
+  it('pairs GPIO line-state exchanges as GPIO transactions', () => {
+    const started = domainEvent(4, {
+      kind: 'transaction_started',
+      transaction_id: 9,
+      request: [1, 0, 1],
+    })
+    const completed = domainEvent(5, {
+      kind: 'transaction_completed',
+      transaction_id: 9,
+      response: [1, 1, 0],
+      result: 'success',
+      error_code: null,
+    })
+    started.device_id = 'gpio-bank'
+    completed.device_id = 'gpio-bank'
+
+    const result = buildLiveTransactions(
+      [started, completed],
+      [{ id: 'gpio-bank', bus: 'gpio', state: null }],
+    )
+
+    expect(result[0]).toMatchObject({
+      busType: 'gpio',
+      request: [1, 0, 1],
+      response: [1, 1, 0],
+      status: 'success',
+    })
+  })
 })
