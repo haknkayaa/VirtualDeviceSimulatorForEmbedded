@@ -46,6 +46,14 @@ The UI presents an authorization-required dialog but never contains a
 password field. Production installation should grant the narrowly scoped
 helper through Polkit or a root-owned system service.
 
+The local simulator persists logical adapter topology in
+`~/.vds4e/adapters.json`. `VDS4E_ADAPTER_STATE` may override that location.
+Writes replace the file atomically. The store includes adapter configuration,
+bindings, and whether an adapter should be loaded on the next start; it does
+not persist process IDs or kernel-assigned device paths. After the Unix-socket
+data plane is ready, startup recreates adapters marked for loading and
+rediscovers their actual host paths.
+
 ## Consequences
 
 - Several devices can share one logical SPI adapter through distinct
@@ -56,5 +64,7 @@ helper through Polkit or a root-owned system service.
   adapter bindings instead of assuming `/dev/spidev0.0`.
 - Load/unload and attach/detach are independently testable through a fake
   adapter driver without changing the host.
-- Adapter topology is currently process-local, matching ephemeral runtime
-  device instances. Persistent project topology remains future work.
+- Adapter topology and bindings survive local server restarts. Runtime process
+  state remains ephemeral and is reconstructed from the stored load intent.
+- An unreadable, malformed, or unsupported topology file stops startup instead
+  of silently discarding the user's configuration.

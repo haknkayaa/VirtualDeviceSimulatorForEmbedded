@@ -169,13 +169,14 @@ pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
         Arc::new(EventBus::new(vds_events::DEFAULT_RING_CAPACITY, 1_024))
     };
     spawn_event_logger(Arc::clone(&events));
-    let api_state = http::ApiState::new(
+    let api_state = http::ApiState::new_persistent(
         config.clone(),
         Arc::clone(&registry),
         Arc::clone(&events),
         clock,
     )
     .map_err(ServerError::Api)?;
+    let adapters = Arc::clone(&api_state.adapters);
     let control_listener = tokio::net::TcpListener::bind(&config.server.control_address).await?;
     let control_address = control_listener.local_addr()?;
     let api = http::router(api_state);
@@ -194,6 +195,22 @@ pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
         device_count = registry.len(),
         "Unix socket data plane listening"
     );
+    for (adapter_id, result) in adapters.restore_loaded() {
+        match result {
+            Ok(adapter) => info!(
+                component = "adapter",
+                adapter_id,
+                bus_type = %adapter.bus_type,
+                "persisted adapter topology restored and loaded"
+            ),
+            Err(error) => warn!(
+                component = "adapter",
+                adapter_id,
+                %error,
+                "persisted adapter topology restored but automatic load failed"
+            ),
+        }
+    }
     info!(component = "control_plane", %control_address, "REST and WebSocket control plane listening");
 
     loop {
@@ -280,18 +297,7 @@ fn handle_request(
             handle_spi_request(request_id, spi, registry, transaction_ids, events)
         }
         Some(client_request::Payload::GpioExchange(gpio)) => {
-            match registry.exchange_gpio(&gpio.device_id, &gpio.host_values) {
-                Ok(device_values) => ServerResponse {
-                    request_id,
-                    result: Some(server_response::Result::GpioExchange(
-                        GpioExchangeResponse { device_values },
-                    )),
-                },
-                Err(error) => {
-                    let (code, _) = protocol_error_code(&error);
-                    error_response(request_id, code, error.to_string())
-                }
-            }
+            handle_gpio_request(request_id, gpio, registry, transaction_ids, events)
         }
         Some(client_request::Payload::I2cTransfer(i2c)) => {
             handle_i2c_request(request_id, i2c, registry, transaction_ids, events)
@@ -301,6 +307,88 @@ fn handle_request(
             ErrorCode::InvalidRequest,
             "request payload is missing".to_owned(),
         ),
+    }
+}
+
+fn handle_gpio_request(
+    request_id: u64,
+    gpio: vds_protocol::v1::GpioExchangeRequest,
+    registry: &DeviceRegistry,
+    transaction_ids: &AtomicU64,
+    events: &EventBus,
+) -> ServerResponse {
+    let request_bytes = gpio
+        .host_values
+        .iter()
+        .copied()
+        .map(u8::from)
+        .collect::<Vec<_>>();
+    let transaction_id = transaction_ids.fetch_add(1, Ordering::Relaxed);
+    let mut transaction = Transaction::now(
+        transaction_id,
+        "gpio".to_owned(),
+        gpio.device_id.clone(),
+        Operation::GpioExchange,
+        request_bytes.clone(),
+    );
+    let virtual_time_ns = registry.virtual_time_ns(&gpio.device_id).unwrap_or(0);
+    let _ = events.publish(EventDraft {
+        virtual_time_ns,
+        device_id: Some(gpio.device_id.clone()),
+        scenario_run_id: None,
+        payload: EventPayload::TransactionStarted {
+            transaction_id: Some(transaction_id),
+            request: request_bytes,
+        },
+    });
+
+    match registry.exchange_gpio(&gpio.device_id, &gpio.host_values) {
+        Ok(device_values) => {
+            let response = device_values
+                .iter()
+                .copied()
+                .map(u8::from)
+                .collect::<Vec<_>>();
+            transaction.response.clone_from(&response);
+            let _ = events.publish(EventDraft {
+                virtual_time_ns,
+                device_id: Some(gpio.device_id),
+                scenario_run_id: None,
+                payload: EventPayload::TransactionCompleted {
+                    transaction_id: Some(transaction_id),
+                    response,
+                    result: "success".to_owned(),
+                    error_code: None,
+                },
+            });
+            log_transaction(&transaction);
+            ServerResponse {
+                request_id,
+                result: Some(server_response::Result::GpioExchange(
+                    GpioExchangeResponse { device_values },
+                )),
+            }
+        }
+        Err(error) => {
+            let (code, code_name) = protocol_error_code(&error);
+            transaction.result = TransactionResult::Error {
+                code: code_name,
+                message: error.to_string(),
+            };
+            let _ = events.publish(EventDraft {
+                virtual_time_ns,
+                device_id: Some(gpio.device_id),
+                scenario_run_id: None,
+                payload: EventPayload::TransactionCompleted {
+                    transaction_id: Some(transaction_id),
+                    response: Vec::new(),
+                    result: "error".to_owned(),
+                    error_code: Some(code_name.to_owned()),
+                },
+            });
+            log_transaction(&transaction);
+            error_response(request_id, code, error.to_string())
+        }
     }
 }
 
@@ -933,6 +1021,7 @@ device:
         registry
             .register(Arc::new(model.into_gpio_device().unwrap()))
             .unwrap();
+        let events = EventBus::default();
         let response = handle_request(
             ClientRequest {
                 request_id: 42,
@@ -943,12 +1032,32 @@ device:
             },
             &registry,
             &AtomicU64::new(1),
-            &EventBus::default(),
+            &events,
         );
         let Some(server_response::Result::GpioExchange(exchange)) = response.result else {
             panic!("GPIO exchange response expected");
         };
         assert_eq!(exchange.device_values, [true, true]);
+        let published = events.events_after(0);
+        assert_eq!(published.len(), 2);
+        assert_eq!(published[0].event_type, EventType::TransactionStarted);
+        assert_eq!(
+            published[0].payload,
+            EventPayload::TransactionStarted {
+                transaction_id: Some(1),
+                request: vec![1, 0],
+            }
+        );
+        assert_eq!(published[1].event_type, EventType::TransactionCompleted);
+        assert_eq!(
+            published[1].payload,
+            EventPayload::TransactionCompleted {
+                transaction_id: Some(1),
+                response: vec![1, 1],
+                result: "success".to_owned(),
+                error_code: None,
+            }
+        );
     }
 
     #[test]

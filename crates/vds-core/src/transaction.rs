@@ -7,6 +7,7 @@ use crate::device::RegisterTrace;
 pub enum Operation {
     SpiTransfer,
     I2cTransfer,
+    GpioExchange,
 }
 
 impl Operation {
@@ -15,6 +16,7 @@ impl Operation {
         match self {
             Self::SpiTransfer => "spi_transfer",
             Self::I2cTransfer => "i2c_transfer",
+            Self::GpioExchange => "gpio_exchange",
         }
     }
 }

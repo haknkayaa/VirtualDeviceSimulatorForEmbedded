@@ -1,16 +1,21 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::{self, OpenOptions},
     io::{BufRead, BufReader, Read},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     thread,
     time::{Duration, Instant},
 };
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use vds_core::config::ServerConfig;
+
+static STATE_WRITE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -117,6 +122,7 @@ pub enum AdapterError {
     AuthorizationRequired(String),
     DriverUnavailable(String),
     Process(String),
+    Persistence(String),
 }
 
 impl std::fmt::Display for AdapterError {
@@ -128,7 +134,8 @@ impl std::fmt::Display for AdapterError {
             | Self::Conflict(message)
             | Self::AuthorizationRequired(message)
             | Self::DriverUnavailable(message)
-            | Self::Process(message) => formatter.write_str(message),
+            | Self::Process(message)
+            | Self::Persistence(message) => formatter.write_str(message),
         }
     }
 }
@@ -1088,6 +1095,35 @@ impl AdapterDriver for SystemGpioSimDriver {
 pub struct AdapterManager {
     adapters: Mutex<HashMap<String, AdapterSnapshot>>,
     driver: Arc<dyn AdapterDriver>,
+    state_path: Option<PathBuf>,
+    load_on_startup: Mutex<HashSet<String>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct PersistedAdapterTopology {
+    version: u32,
+    adapters: Vec<PersistedAdapter>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct PersistedAdapter {
+    id: String,
+    name: String,
+    bus_type: String,
+    bus_number: u16,
+    line_count: Option<u16>,
+    load_on_startup: bool,
+    bindings: Vec<PersistedBinding>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct PersistedBinding {
+    device_id: String,
+    endpoint: u16,
+    line_names: Vec<String>,
 }
 
 impl AdapterManager {
@@ -1098,12 +1134,238 @@ impl AdapterManager {
         Self {
             adapters: Mutex::new(HashMap::from([(adapter.id.clone(), adapter)])),
             driver,
+            state_path: None,
+            load_on_startup: Mutex::new(HashSet::new()),
         }
     }
 
+    /// Creates the system adapter manager and restores its persisted topology.
+    ///
+    /// # Errors
+    /// Returns an error when the topology store cannot be read or validated.
+    pub fn system(config: &ServerConfig) -> Result<Self, AdapterError> {
+        let driver: Arc<dyn AdapterDriver> = Arc::new(SystemAdapterDriver::from_config(config));
+        let state_path = adapter_state_path()?;
+        Self::persistent(driver, state_path)
+    }
+
     #[must_use]
-    pub fn system(config: &ServerConfig) -> Self {
+    pub fn system_ephemeral(config: &ServerConfig) -> Self {
         Self::new(Arc::new(SystemAdapterDriver::from_config(config)))
+    }
+
+    fn persistent(
+        driver: Arc<dyn AdapterDriver>,
+        state_path: PathBuf,
+    ) -> Result<Self, AdapterError> {
+        let Some(topology) = read_topology(&state_path)? else {
+            let mut manager = Self::new(driver);
+            manager.state_path = Some(state_path);
+            return Ok(manager);
+        };
+        if topology.version != 1 {
+            return Err(AdapterError::Persistence(format!(
+                "adapter topology '{}' uses unsupported version {}",
+                state_path.display(),
+                topology.version
+            )));
+        }
+        let mut adapters = HashMap::new();
+        let mut load_on_startup = HashSet::new();
+        let mut assigned_buses = HashSet::new();
+        let mut assigned_devices = HashSet::new();
+        for persisted in topology.adapters {
+            if !valid_id(&persisted.id) {
+                return Err(AdapterError::Persistence(format!(
+                    "persisted adapter id '{}' is invalid",
+                    persisted.id
+                )));
+            }
+            if matches!(persisted.bus_type.as_str(), "spi" | "i2c")
+                && !assigned_buses.insert((persisted.bus_type.clone(), persisted.bus_number))
+            {
+                return Err(AdapterError::Persistence(format!(
+                    "persisted {} bus number {} is assigned more than once",
+                    persisted.bus_type.to_uppercase(),
+                    persisted.bus_number
+                )));
+            }
+            let mut adapter = match persisted.bus_type.as_str() {
+                "spi" => AdapterSnapshot::spi(
+                    persisted.id.clone(),
+                    persisted.name,
+                    persisted.bus_number,
+                ),
+                "i2c" => AdapterSnapshot::i2c(
+                    persisted.id.clone(),
+                    persisted.name,
+                    persisted.bus_number,
+                ),
+                "gpio" => AdapterSnapshot::gpio(
+                    persisted.id.clone(),
+                    persisted.name,
+                    persisted.line_count.filter(|count| (1..=1024).contains(count)).ok_or_else(|| {
+                        AdapterError::Persistence(format!(
+                            "persisted GPIO adapter '{}' must have a line_count between 1 and 1024",
+                            persisted.id
+                        ))
+                    })?,
+                ),
+                bus => {
+                    return Err(AdapterError::Persistence(format!(
+                        "persisted adapter '{}' uses unsupported bus '{bus}'",
+                        persisted.id
+                    )));
+                }
+            };
+            let mut assigned_endpoints = HashSet::new();
+            for binding in &persisted.bindings {
+                if binding.device_id.is_empty() {
+                    return Err(AdapterError::Persistence(format!(
+                        "persisted adapter '{}' has a binding with an empty device ID",
+                        persisted.id
+                    )));
+                }
+                if !assigned_devices.insert(binding.device_id.clone()) {
+                    return Err(AdapterError::Persistence(format!(
+                        "persisted device '{}' is attached more than once",
+                        binding.device_id
+                    )));
+                }
+                if !assigned_endpoints.insert(binding.endpoint) {
+                    return Err(AdapterError::Persistence(format!(
+                        "persisted adapter '{}' assigns endpoint {:#x} more than once",
+                        persisted.id, binding.endpoint
+                    )));
+                }
+                if persisted.bus_type == "i2c" && binding.endpoint > 0x3ff {
+                    return Err(AdapterError::Persistence(format!(
+                        "persisted I2C adapter '{}' has invalid address {:#x}",
+                        persisted.id, binding.endpoint
+                    )));
+                }
+                if persisted.bus_type == "gpio"
+                    && (binding.endpoint != 0
+                        || Some(binding.line_names.len()) != persisted.line_count.map(usize::from))
+                {
+                    return Err(AdapterError::Persistence(format!(
+                        "persisted GPIO binding for '{}' does not match its line count",
+                        persisted.id
+                    )));
+                }
+            }
+            if persisted.bus_type == "gpio" && persisted.bindings.len() > 1 {
+                return Err(AdapterError::Persistence(format!(
+                    "persisted GPIO adapter '{}' has more than one device binding",
+                    persisted.id
+                )));
+            }
+            adapter.bindings = persisted
+                .bindings
+                .into_iter()
+                .map(|binding| AdapterBinding {
+                    device_path: match adapter.bus_type.as_str() {
+                        "gpio" => "/dev/gpiochipX".to_owned(),
+                        "i2c" => format!("/dev/i2c-{}", adapter.bus_number),
+                        _ => format!("/dev/spidev{}.{}", adapter.bus_number, binding.endpoint),
+                    },
+                    device_id: binding.device_id,
+                    endpoint: binding.endpoint,
+                    line_names: binding.line_names,
+                })
+                .collect();
+            adapter.bindings.sort_by_key(|binding| binding.endpoint);
+            adapter.readiness = driver.readiness_for(&adapter);
+            if persisted.load_on_startup {
+                load_on_startup.insert(adapter.id.clone());
+            }
+            if adapters.insert(adapter.id.clone(), adapter).is_some() {
+                return Err(AdapterError::Persistence(
+                    "persisted adapter topology contains duplicate IDs".to_owned(),
+                ));
+            }
+        }
+        Ok(Self {
+            adapters: Mutex::new(adapters),
+            driver,
+            state_path: Some(state_path),
+            load_on_startup: Mutex::new(load_on_startup),
+        })
+    }
+
+    fn persist(&self) -> Result<(), AdapterError> {
+        let Some(state_path) = self.state_path.as_ref() else {
+            return Ok(());
+        };
+        let mut adapters = self
+            .adapters
+            .lock()
+            .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        adapters.sort_by(|left, right| left.id.cmp(&right.id));
+        let load_on_startup = self
+            .load_on_startup
+            .lock()
+            .map_err(|_| AdapterError::Process("adapter restore lock is poisoned".to_owned()))?
+            .clone();
+        let topology = PersistedAdapterTopology {
+            version: 1,
+            adapters: adapters
+                .into_iter()
+                .map(|adapter| PersistedAdapter {
+                    load_on_startup: load_on_startup.contains(&adapter.id),
+                    id: adapter.id,
+                    name: adapter.name,
+                    bus_type: adapter.bus_type,
+                    bus_number: adapter.bus_number,
+                    line_count: adapter.line_count,
+                    bindings: adapter
+                        .bindings
+                        .into_iter()
+                        .map(|binding| PersistedBinding {
+                            device_id: binding.device_id,
+                            endpoint: binding.endpoint,
+                            line_names: binding.line_names,
+                        })
+                        .collect(),
+                })
+                .collect(),
+        };
+        write_topology(state_path, &topology)
+    }
+
+    fn set_load_on_startup(&self, adapter_id: &str, load: bool) -> Result<(), AdapterError> {
+        let mut adapters = self
+            .load_on_startup
+            .lock()
+            .map_err(|_| AdapterError::Process("adapter restore lock is poisoned".to_owned()))?;
+        if load {
+            adapters.insert(adapter_id.to_owned());
+        } else {
+            adapters.remove(adapter_id);
+        }
+        Ok(())
+    }
+
+    /// Reloads adapters that were loaded when the previous server stopped.
+    pub fn restore_loaded(&self) -> Vec<(String, Result<AdapterSnapshot, AdapterError>)> {
+        let adapter_ids = self.load_on_startup.lock().map_or_else(
+            |_| Vec::new(),
+            |adapters| {
+                let mut adapters = adapters.iter().cloned().collect::<Vec<_>>();
+                adapters.sort();
+                adapters
+            },
+        );
+        adapter_ids
+            .into_iter()
+            .map(|adapter_id| {
+                let result = self.load(&adapter_id);
+                (adapter_id, result)
+            })
+            .collect()
     }
 
     /// Returns deterministic adapter snapshots with current driver readiness.
@@ -1143,26 +1405,30 @@ impl AdapterManager {
                 "adapter id must contain 1-64 letters, numbers, '.', '_' or '-' and start with a letter or number".to_owned(),
             ));
         }
-        let mut adapters = self
-            .adapters
-            .lock()
-            .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
-        if adapters.contains_key(&id) {
-            return Err(AdapterError::Duplicate(format!(
-                "adapter '{id}' already exists"
-            )));
-        }
-        if adapters
-            .values()
-            .any(|adapter| adapter.bus_type == "spi" && adapter.bus_number == bus_number)
-        {
-            return Err(AdapterError::Conflict(format!(
-                "SPI bus number {bus_number} is already assigned"
-            )));
-        }
-        let mut adapter = AdapterSnapshot::spi(id.clone(), name, bus_number);
-        adapter.readiness = self.driver.readiness_for(&adapter);
-        adapters.insert(id, adapter.clone());
+        let adapter = {
+            let mut adapters = self
+                .adapters
+                .lock()
+                .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
+            if adapters.contains_key(&id) {
+                return Err(AdapterError::Duplicate(format!(
+                    "adapter '{id}' already exists"
+                )));
+            }
+            if adapters
+                .values()
+                .any(|adapter| adapter.bus_type == "spi" && adapter.bus_number == bus_number)
+            {
+                return Err(AdapterError::Conflict(format!(
+                    "SPI bus number {bus_number} is already assigned"
+                )));
+            }
+            let mut adapter = AdapterSnapshot::spi(id.clone(), name, bus_number);
+            adapter.readiness = self.driver.readiness_for(&adapter);
+            adapters.insert(id, adapter.clone());
+            adapter
+        };
+        self.persist()?;
         Ok(adapter)
     }
 
@@ -1186,18 +1452,22 @@ impl AdapterManager {
                 "GPIO line count must be between 1 and 1024".to_owned(),
             ));
         }
-        let mut adapters = self
-            .adapters
-            .lock()
-            .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
-        if adapters.contains_key(&id) {
-            return Err(AdapterError::Duplicate(format!(
-                "adapter '{id}' already exists"
-            )));
-        }
-        let mut adapter = AdapterSnapshot::gpio(id.clone(), name, line_count);
-        adapter.readiness = self.driver.readiness_for(&adapter);
-        adapters.insert(id, adapter.clone());
+        let adapter = {
+            let mut adapters = self
+                .adapters
+                .lock()
+                .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
+            if adapters.contains_key(&id) {
+                return Err(AdapterError::Duplicate(format!(
+                    "adapter '{id}' already exists"
+                )));
+            }
+            let mut adapter = AdapterSnapshot::gpio(id.clone(), name, line_count);
+            adapter.readiness = self.driver.readiness_for(&adapter);
+            adapters.insert(id, adapter.clone());
+            adapter
+        };
+        self.persist()?;
         Ok(adapter)
     }
 
@@ -1216,26 +1486,30 @@ impl AdapterManager {
                 "adapter id must contain 1-64 letters, numbers, '.', '_' or '-' and start with a letter or number".to_owned(),
             ));
         }
-        let mut adapters = self
-            .adapters
-            .lock()
-            .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
-        if adapters.contains_key(&id) {
-            return Err(AdapterError::Duplicate(format!(
-                "adapter '{id}' already exists"
-            )));
-        }
-        if adapters
-            .values()
-            .any(|adapter| adapter.bus_type == "i2c" && adapter.bus_number == bus_number)
-        {
-            return Err(AdapterError::Conflict(format!(
-                "I2C bus number {bus_number} is already assigned"
-            )));
-        }
-        let mut adapter = AdapterSnapshot::i2c(id.clone(), name, bus_number);
-        adapter.readiness = self.driver.readiness_for(&adapter);
-        adapters.insert(id, adapter.clone());
+        let adapter = {
+            let mut adapters = self
+                .adapters
+                .lock()
+                .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
+            if adapters.contains_key(&id) {
+                return Err(AdapterError::Duplicate(format!(
+                    "adapter '{id}' already exists"
+                )));
+            }
+            if adapters
+                .values()
+                .any(|adapter| adapter.bus_type == "i2c" && adapter.bus_number == bus_number)
+            {
+                return Err(AdapterError::Conflict(format!(
+                    "I2C bus number {bus_number} is already assigned"
+                )));
+            }
+            let mut adapter = AdapterSnapshot::i2c(id.clone(), name, bus_number);
+            adapter.readiness = self.driver.readiness_for(&adapter);
+            adapters.insert(id, adapter.clone());
+            adapter
+        };
+        self.persist()?;
         Ok(adapter)
     }
 
@@ -1359,22 +1633,26 @@ impl AdapterManager {
         } else {
             None
         };
-        let mut adapters = self
-            .adapters
-            .lock()
-            .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
-        let adapter = adapters.get_mut(adapter_id).ok_or_else(|| {
-            AdapterError::NotFound(format!("adapter '{adapter_id}' was not found"))
-        })?;
-        let position = adapter
-            .bindings
-            .partition_point(|existing| existing.endpoint < binding.endpoint);
-        adapter.bindings.insert(position, binding);
-        if let Some(pid) = pid {
-            adapter.daemon_pids.insert(position, pid);
-        }
-        adapter.error = None;
-        Ok(adapter.clone())
+        let adapter = {
+            let mut adapters = self
+                .adapters
+                .lock()
+                .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
+            let adapter = adapters.get_mut(adapter_id).ok_or_else(|| {
+                AdapterError::NotFound(format!("adapter '{adapter_id}' was not found"))
+            })?;
+            let position = adapter
+                .bindings
+                .partition_point(|existing| existing.endpoint < binding.endpoint);
+            adapter.bindings.insert(position, binding);
+            if let Some(pid) = pid {
+                adapter.daemon_pids.insert(position, pid);
+            }
+            adapter.error = None;
+            adapter.clone()
+        };
+        self.persist()?;
+        Ok(adapter)
     }
 
     /// Detaches a runtime device and hot-stops its endpoint when loaded.
@@ -1422,24 +1700,31 @@ impl AdapterManager {
         } else {
             None
         };
-        let mut adapters = self
-            .adapters
-            .lock()
-            .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
-        let adapter = adapters.get_mut(adapter_id).ok_or_else(|| {
-            AdapterError::NotFound(format!("adapter '{adapter_id}' was not found"))
-        })?;
-        adapter
-            .bindings
-            .retain(|existing| existing.device_id != device_id);
-        if let Some(pid) = stopped_pid {
-            adapter.daemon_pids.retain(|existing| *existing != pid);
+        let adapter = {
+            let mut adapters = self
+                .adapters
+                .lock()
+                .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
+            let adapter = adapters.get_mut(adapter_id).ok_or_else(|| {
+                AdapterError::NotFound(format!("adapter '{adapter_id}' was not found"))
+            })?;
+            adapter
+                .bindings
+                .retain(|existing| existing.device_id != device_id);
+            if let Some(pid) = stopped_pid {
+                adapter.daemon_pids.retain(|existing| *existing != pid);
+            }
+            if adapter.bindings.is_empty() && adapter.state == AdapterState::Loaded {
+                adapter.state = AdapterState::Unloaded;
+            }
+            adapter.error = None;
+            adapter.clone()
+        };
+        if adapter.bindings.is_empty() {
+            self.set_load_on_startup(adapter_id, false)?;
         }
-        if adapter.bindings.is_empty() && adapter.state == AdapterState::Loaded {
-            adapter.state = AdapterState::Unloaded;
-        }
-        adapter.error = None;
-        Ok(adapter.clone())
+        self.persist()?;
+        Ok(adapter)
     }
 
     /// Loads all configured endpoints through the adapter driver.
@@ -1465,7 +1750,8 @@ impl AdapterManager {
             adapter.error = None;
             adapter.clone()
         };
-        match self.driver.load(&snapshot) {
+        self.set_load_on_startup(adapter_id, true)?;
+        let result = match self.driver.load(&snapshot) {
             Ok(pids) => self.finish_load(adapter_id, AdapterState::Loaded, pids, None),
             Err(error) => {
                 let _ = self.finish_load(
@@ -1476,6 +1762,10 @@ impl AdapterManager {
                 );
                 Err(error)
             }
+        };
+        match (result, self.persist()) {
+            (Ok(adapter), Ok(())) => Ok(adapter),
+            (Ok(_), Err(error)) | (Err(error), _) => Err(error),
         }
     }
 
@@ -1533,8 +1823,11 @@ impl AdapterManager {
             adapter.state = AdapterState::Unloading;
             adapter.clone()
         };
-        match self.driver.unload(&snapshot) {
-            Ok(()) => self.finish_load(adapter_id, AdapterState::Unloaded, Vec::new(), None),
+        let result = match self.driver.unload(&snapshot) {
+            Ok(()) => {
+                self.set_load_on_startup(adapter_id, false)?;
+                self.finish_load(adapter_id, AdapterState::Unloaded, Vec::new(), None)
+            }
             Err(error) => {
                 let mut adapters = self.adapters.lock().map_err(|_| {
                     AdapterError::Process("adapter state lock is poisoned".to_owned())
@@ -1545,8 +1838,76 @@ impl AdapterManager {
                 }
                 Err(error)
             }
+        };
+        match (result, self.persist()) {
+            (Ok(adapter), Ok(())) => Ok(adapter),
+            (Ok(_), Err(error)) | (Err(error), _) => Err(error),
         }
     }
+}
+
+fn adapter_state_path() -> Result<PathBuf, AdapterError> {
+    if let Some(path) = std::env::var_os("VDS4E_ADAPTER_STATE") {
+        return Ok(PathBuf::from(path));
+    }
+    let home = std::env::var_os("HOME").ok_or_else(|| {
+        AdapterError::Persistence(
+            "HOME is not set and VDS4E_ADAPTER_STATE was not provided".to_owned(),
+        )
+    })?;
+    Ok(PathBuf::from(home).join(".vds4e/adapters.json"))
+}
+
+fn read_topology(path: &Path) -> Result<Option<PersistedAdapterTopology>, AdapterError> {
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(AdapterError::Persistence(format!(
+                "failed to read adapter topology '{}': {error}",
+                path.display()
+            )));
+        }
+    };
+    serde_json::from_slice(&bytes).map(Some).map_err(|error| {
+        AdapterError::Persistence(format!(
+            "failed to parse adapter topology '{}': {error}",
+            path.display()
+        ))
+    })
+}
+
+fn write_topology(path: &Path, topology: &PersistedAdapterTopology) -> Result<(), AdapterError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            AdapterError::Persistence(format!(
+                "failed to create adapter topology directory '{}': {error}",
+                parent.display()
+            ))
+        })?;
+    }
+    let mut bytes = serde_json::to_vec_pretty(topology).map_err(|error| {
+        AdapterError::Persistence(format!("failed to serialize adapter topology: {error}"))
+    })?;
+    bytes.push(b'\n');
+    let temporary = path.with_extension(format!(
+        "json.{}.{}.tmp",
+        std::process::id(),
+        STATE_WRITE_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+    ));
+    fs::write(&temporary, bytes).map_err(|error| {
+        AdapterError::Persistence(format!(
+            "failed to write adapter topology staging file '{}': {error}",
+            temporary.display()
+        ))
+    })?;
+    fs::rename(&temporary, path).map_err(|error| {
+        let _ = fs::remove_file(&temporary);
+        AdapterError::Persistence(format!(
+            "failed to replace adapter topology '{}': {error}",
+            path.display()
+        ))
+    })
 }
 
 fn require_unloaded(adapter: &AdapterSnapshot) -> Result<(), AdapterError> {
@@ -1583,7 +1944,19 @@ fn valid_id(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicU64 as TestAtomicU64, Ordering as TestOrdering};
+
     use super::*;
+
+    static NEXT_STATE_FILE: TestAtomicU64 = TestAtomicU64::new(0);
+
+    fn temporary_state_path() -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "vds4e-adapters-{}-{}.json",
+            std::process::id(),
+            NEXT_STATE_FILE.fetch_add(1, TestOrdering::Relaxed)
+        ))
+    }
 
     struct FakeDriver;
 
@@ -1716,5 +2089,90 @@ mod tests {
             manager.attach("i2c0", "other".to_owned(), 0x51),
             Err(AdapterError::Conflict(_))
         ));
+    }
+
+    #[test]
+    fn persists_topology_and_restores_loaded_adapters() {
+        let state_path = temporary_state_path();
+        let manager = AdapterManager::persistent(Arc::new(FakeDriver), state_path.clone()).unwrap();
+        manager
+            .create_gpio("gpio0".to_owned(), "GPIO 0".to_owned(), 4)
+            .unwrap();
+        manager
+            .attach_gpio(
+                "gpio0",
+                "gpio-bank".to_owned(),
+                vec![
+                    "RESET".to_owned(),
+                    "READY".to_owned(),
+                    "IRQ".to_owned(),
+                    "POWER".to_owned(),
+                ],
+            )
+            .unwrap();
+        manager.load("gpio0").unwrap();
+
+        let persisted = fs::read_to_string(&state_path).unwrap();
+        assert!(persisted.contains("\"load_on_startup\": true"));
+        assert!(!persisted.contains("daemon_pids"));
+        assert!(!persisted.contains("device_path"));
+        drop(manager);
+
+        let restored =
+            AdapterManager::persistent(Arc::new(FakeDriver), state_path.clone()).unwrap();
+        let before_load = restored
+            .list()
+            .unwrap()
+            .into_iter()
+            .find(|adapter| adapter.id == "gpio0")
+            .unwrap();
+        assert_eq!(before_load.state, AdapterState::Unloaded);
+        assert_eq!(before_load.bindings[0].device_path, "/dev/gpiochipX");
+        assert!(before_load.daemon_pids.is_empty());
+
+        let results = restored.restore_loaded();
+        assert_eq!(results.len(), 1);
+        let loaded = results.into_iter().next().unwrap().1.unwrap();
+        assert_eq!(loaded.state, AdapterState::Loaded);
+        assert_eq!(loaded.device_path.as_deref(), Some("/dev/gpiochip7"));
+        assert_eq!(loaded.bindings[0].device_path, "/dev/gpiochip7");
+
+        restored.unload("gpio0").unwrap();
+        drop(restored);
+        let unloaded =
+            AdapterManager::persistent(Arc::new(FakeDriver), state_path.clone()).unwrap();
+        assert!(unloaded.restore_loaded().is_empty());
+
+        fs::remove_file(state_path).unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_persisted_topology() {
+        let state_path = temporary_state_path();
+        fs::write(
+            &state_path,
+            r#"{
+                "version": 1,
+                "adapters": [{
+                    "id": "gpio0",
+                    "name": "GPIO 0",
+                    "bus_type": "gpio",
+                    "bus_number": 0,
+                    "line_count": 2,
+                    "load_on_startup": false,
+                    "bindings": [{
+                        "device_id": "gpio-bank",
+                        "endpoint": 0,
+                        "line_names": ["ONLY_ONE"]
+                    }]
+                }]
+            }"#,
+        )
+        .unwrap();
+
+        let result = AdapterManager::persistent(Arc::new(FakeDriver), state_path.clone());
+        assert!(matches!(result, Err(AdapterError::Persistence(_))));
+
+        fs::remove_file(state_path).unwrap();
     }
 }

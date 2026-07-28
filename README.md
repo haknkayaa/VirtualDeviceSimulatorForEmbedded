@@ -150,6 +150,11 @@ supported spidev ioctls to the runtime over `/tmp/vds4e.sock`.
 The bus and chip-select numbers come from the adapter configuration. For
 example, SPI bus `2` and endpoint `1` produce `/dev/spidev2.1`.
 
+The local simulator saves adapter configuration, device bindings, and loaded
+state in `~/.vds4e/adapters.json`. On the next start it recreates adapters that
+were loaded and rediscovers transient process IDs and device paths. Set
+`VDS4E_ADAPTER_STATE` to use a different state-file location.
+
 ## Access `/dev/spidevX.Y` from C
 
 The following is a normal Embedded Linux spidev program. It sends the
