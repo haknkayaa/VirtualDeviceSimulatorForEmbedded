@@ -666,9 +666,8 @@ pub struct SystemI2cCuseDriver {
 
 impl SystemI2cCuseDriver {
     fn from_config(config: &ServerConfig) -> Self {
-        let executable = std::env::var_os("VDS4E_I2C_CUSE_EXECUTABLE")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| {
+        let executable = std::env::var_os("VDS4E_I2C_CUSE_EXECUTABLE").map_or_else(
+            || {
                 [
                     PathBuf::from(".vds4e-build/i2c-cuse/vds4e-i2c-cuse"),
                     PathBuf::from("build/i2c-cuse/vds4e-i2c-cuse"),
@@ -678,7 +677,9 @@ impl SystemI2cCuseDriver {
                 .into_iter()
                 .find(|candidate| candidate.is_file())
                 .unwrap_or_else(|| PathBuf::from(".vds4e-build/i2c-cuse/vds4e-i2c-cuse"))
-            });
+            },
+            PathBuf::from,
+        );
         Self {
             executable,
             socket_path: config.data_plane.unix_socket.clone(),
@@ -1154,6 +1155,7 @@ impl AdapterManager {
         Self::new(Arc::new(SystemAdapterDriver::from_config(config)))
     }
 
+    #[allow(clippy::too_many_lines)]
     fn persistent(
         driver: Arc<dyn AdapterDriver>,
         state_path: PathBuf,

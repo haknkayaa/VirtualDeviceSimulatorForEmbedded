@@ -38,7 +38,7 @@ impl GenericI2cDevice {
         })
     }
 
-    fn pointer_from(&self, bytes: &[u8]) -> u64 {
+    fn pointer_from(bytes: &[u8]) -> u64 {
         bytes
             .iter()
             .fold(0_u64, |value, byte| (value << 8) | u64::from(*byte))
@@ -141,7 +141,7 @@ impl Device for GenericI2cDevice {
                     "I2C write requires {address_bytes} register-address bytes"
                 )));
             }
-            state.pointer = self.pointer_from(&message.data[..address_bytes]);
+            state.pointer = Self::pointer_from(&message.data[..address_bytes]);
             for byte in &message.data[address_bytes..] {
                 let pointer = state.pointer;
                 match state.registers.write(pointer, u64::from(*byte)) {
