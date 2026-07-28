@@ -54,6 +54,7 @@ pub struct AdapterSnapshot {
     pub readiness: DriverReadiness,
     pub bus_number: u16,
     pub line_count: Option<u16>,
+    pub max_frequency_hz: Option<u32>,
     pub device_path: Option<String>,
     pub bindings: Vec<AdapterBinding>,
     pub daemon_pids: Vec<u32>,
@@ -61,7 +62,7 @@ pub struct AdapterSnapshot {
 }
 
 impl AdapterSnapshot {
-    fn spi(id: String, name: String, bus_number: u16) -> Self {
+    fn spi(id: String, name: String, bus_number: u16, max_frequency_hz: Option<u32>) -> Self {
         Self {
             id,
             name,
@@ -71,6 +72,7 @@ impl AdapterSnapshot {
             readiness: DriverReadiness::Unavailable,
             bus_number,
             line_count: None,
+            max_frequency_hz,
             device_path: None,
             bindings: Vec::new(),
             daemon_pids: Vec::new(),
@@ -88,6 +90,7 @@ impl AdapterSnapshot {
             readiness: DriverReadiness::Unavailable,
             bus_number: 0,
             line_count: Some(line_count),
+            max_frequency_hz: None,
             device_path: None,
             bindings: Vec::new(),
             daemon_pids: Vec::new(),
@@ -95,7 +98,7 @@ impl AdapterSnapshot {
         }
     }
 
-    fn i2c(id: String, name: String, bus_number: u16) -> Self {
+    fn i2c(id: String, name: String, bus_number: u16, max_frequency_hz: Option<u32>) -> Self {
         Self {
             id,
             name,
@@ -105,6 +108,7 @@ impl AdapterSnapshot {
             readiness: DriverReadiness::Unavailable,
             bus_number,
             line_count: None,
+            max_frequency_hz,
             device_path: None,
             bindings: Vec::new(),
             daemon_pids: Vec::new(),
@@ -1115,6 +1119,8 @@ struct PersistedAdapter {
     bus_type: String,
     bus_number: u16,
     line_count: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    max_frequency_hz: Option<u32>,
     load_on_startup: bool,
     bindings: Vec<PersistedBinding>,
 }
@@ -1130,7 +1136,8 @@ struct PersistedBinding {
 impl AdapterManager {
     #[must_use]
     pub fn new(driver: Arc<dyn AdapterDriver>) -> Self {
-        let mut adapter = AdapterSnapshot::spi("spi0".to_owned(), "SPI 0".to_owned(), 0);
+        let mut adapter =
+            AdapterSnapshot::spi("spi0".to_owned(), "SPI 0".to_owned(), 0, None);
         adapter.readiness = driver.readiness_for(&adapter);
         Self {
             adapters: Mutex::new(HashMap::from([(adapter.id.clone(), adapter)])),
@@ -1197,11 +1204,13 @@ impl AdapterManager {
                     persisted.id.clone(),
                     persisted.name,
                     persisted.bus_number,
+                    persisted.max_frequency_hz,
                 ),
                 "i2c" => AdapterSnapshot::i2c(
                     persisted.id.clone(),
                     persisted.name,
                     persisted.bus_number,
+                    persisted.max_frequency_hz,
                 ),
                 "gpio" => AdapterSnapshot::gpio(
                     persisted.id.clone(),
@@ -1323,6 +1332,7 @@ impl AdapterManager {
                     bus_type: adapter.bus_type,
                     bus_number: adapter.bus_number,
                     line_count: adapter.line_count,
+                    max_frequency_hz: adapter.max_frequency_hz,
                     bindings: adapter
                         .bindings
                         .into_iter()
@@ -1401,6 +1411,7 @@ impl AdapterManager {
         id: String,
         name: String,
         bus_number: u16,
+        max_frequency_hz: Option<u32>,
     ) -> Result<AdapterSnapshot, AdapterError> {
         if !valid_id(&id) {
             return Err(AdapterError::Invalid(
@@ -1425,7 +1436,13 @@ impl AdapterManager {
                     "SPI bus number {bus_number} is already assigned"
                 )));
             }
-            let mut adapter = AdapterSnapshot::spi(id.clone(), name, bus_number);
+            if max_frequency_hz == Some(0) {
+                return Err(AdapterError::Invalid(
+                    "SPI maximum frequency must be greater than zero".to_owned(),
+                ));
+            }
+            let mut adapter =
+                AdapterSnapshot::spi(id.clone(), name, bus_number, max_frequency_hz);
             adapter.readiness = self.driver.readiness_for(&adapter);
             adapters.insert(id, adapter.clone());
             adapter
@@ -1482,6 +1499,7 @@ impl AdapterManager {
         id: String,
         name: String,
         bus_number: u16,
+        max_frequency_hz: Option<u32>,
     ) -> Result<AdapterSnapshot, AdapterError> {
         if !valid_id(&id) {
             return Err(AdapterError::Invalid(
@@ -1506,7 +1524,13 @@ impl AdapterManager {
                     "I2C bus number {bus_number} is already assigned"
                 )));
             }
-            let mut adapter = AdapterSnapshot::i2c(id.clone(), name, bus_number);
+            if max_frequency_hz == Some(0) {
+                return Err(AdapterError::Invalid(
+                    "I2C maximum frequency must be greater than zero".to_owned(),
+                ));
+            }
+            let mut adapter =
+                AdapterSnapshot::i2c(id.clone(), name, bus_number, max_frequency_hz);
             adapter.readiness = self.driver.readiness_for(&adapter);
             adapters.insert(id, adapter.clone());
             adapter
@@ -2080,7 +2104,7 @@ mod tests {
     fn manages_i2c_address_bindings_as_one_bus_daemon() {
         let manager = AdapterManager::new(Arc::new(FakeDriver));
         manager
-            .create_i2c("i2c0".to_owned(), "I2C 0".to_owned(), 0)
+            .create_i2c("i2c0".to_owned(), "I2C 0".to_owned(), 0, None)
             .unwrap();
         let attached = manager.attach("i2c0", "sensor".to_owned(), 0x50).unwrap();
         assert_eq!(attached.bindings[0].device_path, "/dev/i2c-0");

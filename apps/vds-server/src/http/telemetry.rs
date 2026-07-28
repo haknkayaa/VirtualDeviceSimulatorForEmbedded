@@ -97,6 +97,7 @@ pub(super) async fn bus_telemetry(
         if let EventPayload::TransactionStarted {
             transaction_id: Some(transaction_id),
             request,
+            ..
         } = &event.payload
         {
             starts.insert(

@@ -6,6 +6,7 @@ import { supportsSignalScope } from './signalScopeSupport'
 
 interface BusSignalScopeProps {
   transaction: LiveTransaction
+  gpioControllerIndex?: number
 }
 
 const LABEL_WIDTH = 66
@@ -14,6 +15,7 @@ const MIN_CLOCK_WIDTH = 12
 const MIN_HORIZONTAL_SCALE = 0.08
 const MAX_HORIZONTAL_SCALE = 4
 const SVG_HEIGHT = 232
+const GPIO_ROW_HEIGHT = 15
 
 function hex(byte: number) {
   return byte.toString(16).padStart(2, '0').toUpperCase()
@@ -39,6 +41,7 @@ function downloadVisibleDiagram(
   scroll: HTMLDivElement | null,
   sourceSvg: SVGSVGElement | null,
   width: number,
+  height: number,
   fileName: string,
 ) {
   if (!scroll || !sourceSvg) return
@@ -46,9 +49,9 @@ function downloadVisibleDiagram(
   const captureWidth = Math.max(1, Math.min(scroll.clientWidth, width - scroll.scrollLeft))
   const clone = sourceSvg.cloneNode(true) as SVGSVGElement
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  clone.setAttribute('viewBox', `${scroll.scrollLeft} 0 ${captureWidth} ${SVG_HEIGHT}`)
+  clone.setAttribute('viewBox', `${scroll.scrollLeft} 0 ${captureWidth} ${height}`)
   clone.setAttribute('width', String(captureWidth))
-  clone.setAttribute('height', String(SVG_HEIGHT))
+  clone.setAttribute('height', String(height))
 
   const sourceNodes = [sourceSvg, ...sourceSvg.querySelectorAll('*')]
   const cloneNodes = [clone, ...clone.querySelectorAll('*')]
@@ -72,14 +75,14 @@ function downloadVisibleDiagram(
     const pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
     const canvas = document.createElement('canvas')
     canvas.width = Math.round(captureWidth * pixelRatio)
-    canvas.height = SVG_HEIGHT * pixelRatio
+    canvas.height = height * pixelRatio
     const context = canvas.getContext('2d')
     if (!context) {
       URL.revokeObjectURL(url)
       return
     }
     context.scale(pixelRatio, pixelRatio)
-    context.drawImage(image, 0, 0, captureWidth, SVG_HEIGHT)
+    context.drawImage(image, 0, 0, captureWidth, height)
     canvas.toBlob(pngBlob => {
       if (!pngBlob) return
       const link = document.createElement('a')
@@ -158,7 +161,7 @@ function SpiTimingDiagram({ request, response }: { request: number[]; response: 
   }
 
   const downloadPng = () => {
-    downloadVisibleDiagram(scrollRef.current, svgRef.current, width, `spi-timing-${byteCount}-bytes.png`)
+    downloadVisibleDiagram(scrollRef.current, svgRef.current, width, SVG_HEIGHT, `spi-timing-${byteCount}-bytes.png`)
   }
 
   return (
@@ -270,6 +273,11 @@ function directedBytes(request: number[], response: number[]): DirectedByte[] {
   ]
 }
 
+function gpioRowsPerBankLabel(lineCount: number) {
+  const first = Math.ceil(lineCount / 2)
+  return `${first}/${lineCount - first}`
+}
+
 function levelPath(
   values: number[],
   startX: number,
@@ -290,10 +298,14 @@ function levelPath(
 
 function ProtocolTimingDiagram({
   bus,
+  gpioControllerIndex,
+  gpioOutputLines,
   request,
   response,
 }: {
   bus: DecodedBus
+  gpioControllerIndex?: number
+  gpioOutputLines?: boolean[]
   request: number[]
   response: number[]
 }) {
@@ -315,7 +327,12 @@ function ProtocolTimingDiagram({
 
   const bytes = directedBytes(request, response)
   const visibleBytes = bytes.length > 0 ? bytes : [{ byte: 0, direction: 'tx' as const }]
-  const byteCount = visibleBytes.length
+  const gpioLineCount = Math.max(request.length, response.length, 1)
+  const gpioValues = Array.from(
+    { length: gpioLineCount },
+    (_, line) => response[line] ?? request[line] ?? 0,
+  )
+  const byteCount = bus === 'gpio' ? 1 : visibleBytes.length
   const hasRepeatedStart = bus === 'i2c' && request.length > 0 && response.length > 0
   const unitCount = bus === 'i2c'
     ? byteCount * 9 + 2 + (hasRepeatedStart ? 1 : 0)
@@ -331,6 +348,9 @@ function ProtocolTimingDiagram({
   const activeStart = LABEL_WIDTH + IDLE_WIDTH
   const activeEnd = activeStart + unitCount * unitWidth
   const width = activeEnd + IDLE_WIDTH
+  const gpioRowsPerBank = Math.ceil(gpioLineCount / 2)
+  const gpioSummaryY = 32 + gpioRowsPerBank * GPIO_ROW_HEIGHT
+  const svgHeight = bus === 'gpio' ? Math.max(SVG_HEIGHT, gpioSummaryY + 14) : SVG_HEIGHT
 
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
     if (!event.shiftKey) return
@@ -344,7 +364,10 @@ function ProtocolTimingDiagram({
       scrollRef.current,
       svgRef.current,
       width,
-      `${bus}-timing-${bytes.length}-bytes.png`,
+      svgHeight,
+      bus === 'gpio'
+        ? `gpio-timing-${gpioLineCount}-lines.png`
+        : `${bus}-timing-${bytes.length}-bytes.png`,
     )
   }
 
@@ -498,39 +521,66 @@ function ProtocolTimingDiagram({
   }
 
   const renderGpio = () => {
-    const sampleWidth = unitWidth
-    return <>
-      <g className="protocol-grid gpio-grid">
-        {Array.from({ length: byteCount + 1 }, (_, index) => {
-          const x = activeStart + index * sampleWidth
-          return <line className="frame-boundary" key={x} x1={x} x2={x} y1="21" y2="219" />
+    const outerPadding = 9
+    const bankGap = 14
+    const bankWidth = (width - outerPadding * 2 - bankGap) / 2
+    const bankSeparatorX = outerPadding + bankWidth + bankGap / 2
+    const renderBank = (bank: number) => {
+      const bankStart = outerPadding + bank * (bankWidth + bankGap)
+      const bankEnd = bankStart + bankWidth
+      const directionDivider = bankStart + bankWidth * .34
+      const valueDivider = bankStart + bankWidth * .62
+      const indicatorDivider = bankStart + bankWidth * .81
+      const directionX = (directionDivider + valueDivider) / 2
+      const valueX = (valueDivider + indicatorDivider) / 2
+      const indicatorX = indicatorDivider + (bankEnd - indicatorDivider) / 2
+      const firstLine = bank * gpioRowsPerBank
+
+      return <g className={`gpio-bank gpio-bank-${bank + 1}`} key={bank}>
+        <g className="protocol-grid gpio-grid">
+          {[directionDivider, valueDivider, indicatorDivider].map((x) =>
+            <line className="gpio-column-divider" key={x} x1={x} x2={x} y1="3" y2={gpioSummaryY - 12} />,
+          )}
+          {Array.from({ length: gpioRowsPerBank + 1 }, (_, index) => {
+            const y = 18 + index * GPIO_ROW_HEIGHT
+            return <line className="gpio-row-divider" key={y} x1={bankStart} x2={bankEnd} y1={y} y2={y} />
+          })}
+        </g>
+        <g className="protocol-axis gpio-axis">
+          <text className="gpio-column-heading gpio-line-heading" x={bankStart + 3} y="14">GPIOx_IOy</text>
+          <text className="gpio-column-heading gpio-direction-heading" textAnchor="middle" x={directionX} y="14">INPUT/OUTPUT</text>
+          <text className="gpio-column-heading gpio-value-heading" textAnchor="middle" x={valueX} y="14">HIGH/LOW</text>
+          <text className="gpio-column-heading gpio-indicator-heading" textAnchor="middle" x={indicatorX} y="14">INDICATOR</text>
+        </g>
+        {Array.from({ length: gpioRowsPerBank }, (_, row) => {
+          const line = firstLine + row
+          if (line >= gpioLineCount) return null
+          const centerY = 25 + row * GPIO_ROW_HEIGHT
+          const high = gpioValues[line] !== 0
+          const direction = gpioOutputLines?.[line] === undefined
+            ? '—'
+            : gpioOutputLines[line]
+              ? 'OUTPUT'
+              : 'INPUT'
+          return <g className="gpio-line" key={line}>
+            <text className="gpio-line-label" x={bankStart + 3} y={centerY + 4}>{`GPIO${gpioControllerIndex ?? 0}_IO${line}`}</text>
+            <text className="gpio-direction-label" textAnchor="middle" x={directionX} y={centerY + 4}>{direction}</text>
+            <text className={`gpio-value-label ${high ? 'high' : 'low'}`} textAnchor="middle" x={valueX} y={centerY + 4}>{high ? 'HIGH' : 'LOW'}</text>
+            <circle className={`gpio-value-indicator ${high ? 'high' : 'low'}`} cx={indicatorX} cy={centerY} r="4" />
+          </g>
         })}
       </g>
-      <g className="protocol-axis gpio-axis">
-        <text className="axis-unit" x={LABEL_WIDTH - 7} y="14">BANK</text>
-        {visibleBytes.map(({ byte, direction }, index) => <text className={`axis-${direction}`} key={`${direction}-${index}`} x={activeStart + (index + .5) * sampleWidth} y="14">{`${direction === 'tx' ? 'OUT' : 'IN'} ${hex(byte)}`}</text>)}
+    }
+
+    return <>
+      {renderBank(0)}
+      <g className="gpio-bank-separator">
+        <line x1={bankSeparatorX} x2={bankSeparatorX} y1="3" y2={gpioSummaryY - 12} />
       </g>
-      {Array.from({ length: 8 }, (_, bit) => {
-        const centerY = 34 + bit * 24
-        const highY = centerY - 7
-        const lowY = centerY + 7
-        let previousY = lowY
-        return <g className="gpio-line" key={bit}>
-          <text className="gpio-line-label" x="9" y={centerY + 4}>{`G${bit}`}</text>
-          <path className="protocol-trace gpio-idle-trace" d={`M ${LABEL_WIDTH} ${lowY} L ${activeStart} ${lowY}`} />
-          {visibleBytes.map(({ byte, direction }, index) => {
-            const x = activeStart + index * sampleWidth
-            const nextY = byte & (1 << bit) ? highY : lowY
-            const path = `M ${x} ${previousY} L ${x} ${nextY} L ${x + sampleWidth} ${nextY}`
-            previousY = nextY
-            return <path className={`protocol-trace gpio-${direction}-trace`} d={path} key={`${direction}-${index}`} />
-          })}
-          <path className="protocol-trace gpio-idle-trace" d={`M ${activeEnd} ${previousY} L ${width} ${previousY}`} />
-        </g>
-      })}
+      {renderBank(1)}
       <g className="protocol-summary">
-        <line x1={activeStart} x2={activeEnd} y1="226" y2="226" />
-        <text x={(activeStart + activeEnd) / 2} y="224">{`${bytes.length} bank samples · G0 is LSB`}</text>
+        <line x1={outerPadding} x2={width - outerPadding} y1={gpioSummaryY} y2={gpioSummaryY} />
+        <text x={width / 2} y={gpioSummaryY - 2}>{`${gpioLineCount} GPIO lines · ${gpioRowsPerBank} + ${gpioLineCount - gpioRowsPerBank} bank split`}</text>
       </g>
     </>
   }
@@ -539,20 +589,20 @@ function ProtocolTimingDiagram({
     ? `I2C timing diagram with ${bytes.length} bytes and ${bytes.length * 9} clock pulses`
     : bus === 'uart'
       ? `UART 8N1 timing diagram with ${bytes.length} frames`
-      : `GPIO timing diagram with ${bytes.length} bank samples`
+      : `GPIO line-state table with ${gpioLineCount} lines`
 
   return <div className={`spi-timing-frame protocol-timing-frame protocol-${bus}`}>
     <div className="spi-timing-scroll" onWheel={handleWheel} ref={scrollRef}>
       <svg
         aria-label={ariaLabel}
         className="spi-timing-svg protocol-timing-svg"
-        height={SVG_HEIGHT}
+        height={svgHeight}
         ref={svgRef}
         role="img"
-        viewBox={`0 0 ${width} ${SVG_HEIGHT}`}
+        viewBox={`0 0 ${width} ${svgHeight}`}
         width={width}
       >
-        <rect className="spi-timing-background" height={SVG_HEIGHT} width={width} />
+        <rect className="spi-timing-background" height={svgHeight} width={width} />
         {bus === 'i2c' ? renderI2c() : bus === 'uart' ? renderUart() : renderGpio()}
       </svg>
     </div>
@@ -569,8 +619,12 @@ function ProtocolTimingDiagram({
   </div>
 }
 
-export function BusSignalScope({ transaction }: BusSignalScopeProps) {
+export function BusSignalScope({
+  gpioControllerIndex,
+  transaction,
+}: BusSignalScopeProps) {
   const bus = transaction.busType.toLowerCase()
+  const gpioLineCount = Math.max(transaction.request.length, transaction.response.length)
   if (bus === 'spi') {
     return <section className="bus-signal-scope">
       <header><div><span>Protocol-aware timing diagram</span><strong>SPI signal scope</strong></div><small>Mode 0 · CPOL=0 · CPHA=0 · /CS Active Low · 8 clocks / byte · 1-cycle gap</small></header>
@@ -591,14 +645,22 @@ export function BusSignalScope({ transaction }: BusSignalScopeProps) {
       pins: ['TX', 'RX'],
     },
     gpio: {
-      title: 'GPIO signal scope',
-      detail: '8-line bank samples · G0 is LSB · high/low line states',
-      pins: ['G0…G7'],
+      title: 'GPIO line states',
+      detail: `${gpioLineCount} lines · ${gpioRowsPerBankLabel(gpioLineCount)} banks · current I/O`,
+      pins: gpioLineCount > 0 ? [`G0…G${gpioLineCount - 1}`] : ['No lines'],
     },
   }[bus as DecodedBus]
-  return <section className="bus-signal-scope">
-    <header><div><span>Protocol-aware timing diagram</span><strong>{scopeCopy.title}</strong></div><small>{scopeCopy.detail}</small></header>
+  return <section className={`bus-signal-scope${bus === 'gpio' ? ' gpio-line-state-scope' : ''}`}>
+    {bus === 'gpio'
+      ? <header><strong>GPIO Line State View</strong><small>{scopeCopy.detail}</small></header>
+      : <header><div><span>Protocol-aware timing diagram</span><strong>{scopeCopy.title}</strong></div><small>{scopeCopy.detail}</small></header>}
     <div className="signal-pin-rail"><span>Active pins</span>{scopeCopy.pins.map(pin => <i key={pin}>{pin}</i>)}</div>
-    <ProtocolTimingDiagram bus={bus as DecodedBus} request={transaction.request} response={transaction.response} />
+    <ProtocolTimingDiagram
+      bus={bus as DecodedBus}
+      gpioControllerIndex={gpioControllerIndex}
+      gpioOutputLines={transaction.gpioOutputLines}
+      request={transaction.request}
+      response={transaction.response}
+    />
   </section>
 }

@@ -13,6 +13,9 @@ function mockApi() {
     if (url.endsWith('/api/v1/devices')) {
       return Promise.resolve(jsonResponse([{ id: 'spi-flash-0', bus: 'spi', state: 'ready' }]))
     }
+    if (url.endsWith('/api/v1/adapters')) {
+      return Promise.resolve(jsonResponse([]))
+    }
     if (url.endsWith('/api/v1/telemetry/buses')) {
       return Promise.resolve(jsonResponse({
         generated_at_wall_ns: 1,
@@ -79,7 +82,12 @@ describe('live transactions workspace', () => {
     expect(screen.getByText('00000010')).toBeInTheDocument()
     expect(screen.getByText('|..|')).toBeInTheDocument()
     expect(await screen.findByText('Bus Health Summary')).toBeInTheDocument()
-    expect(await screen.findByText('4.00 B/s')).toBeInTheDocument()
+    expect(await screen.findByRole('meter', { name: 'Success rate: 100.0%' })).toBeInTheDocument()
+    expect(await screen.findAllByText('7.00 B/s')).toHaveLength(2)
+    expect(screen.getByText('TOTAL THROUGHPUT (LIVE)')).toBeInTheDocument()
+    expect(screen.getByText('0.00%')).toBeInTheDocument()
+    expect(screen.getByText('14 µs')).toBeInTheDocument()
+    expect(screen.getByText('LATENCY P95 (LIVE)')).toBeInTheDocument()
 
     const pause = screen.getByRole('button', { name: 'Pause' })
     await user.click(pause)

@@ -15,6 +15,7 @@ export interface LiveTransaction {
   completedVirtualNs?: number
   request: number[]
   response: number[]
+  gpioOutputLines?: boolean[]
   status: TransactionStatus
   errorCode?: string
 }
@@ -59,6 +60,7 @@ export function buildLiveTransactions(
     }
     if (payload.kind === 'transaction_started') {
       current.request = payload.request
+      current.gpioOutputLines = payload.gpio_output_lines ?? undefined
       current.startedWallNs = event.timestamp_wall_ns
       current.startedVirtualNs = event.timestamp_virtual_ns
       current.status = 'running'

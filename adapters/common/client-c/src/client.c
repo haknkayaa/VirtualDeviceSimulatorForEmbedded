@@ -419,13 +419,14 @@ vds_status_t vds_spi_transfer_configured(vds_client_t *client,
 vds_status_t vds_gpio_exchange(vds_client_t *client,
                                const char *device_id,
                                const uint8_t *host_values,
+                               const uint8_t *host_outputs,
                                size_t line_count,
                                uint8_t *device_values,
                                size_t device_capacity,
                                size_t *device_count,
                                vds_error_t *error) {
     if (client == NULL || client->fd < 0 || device_id == NULL ||
-        host_values == NULL || line_count == 0U || device_values == NULL ||
+        host_values == NULL || host_outputs == NULL || line_count == 0U || device_values == NULL ||
         device_count == NULL || error == NULL || line_count > VDS_MAX_REQUEST_SIZE) {
         return VDS_ERR_ARGUMENT;
     }
@@ -433,10 +434,15 @@ vds_status_t vds_gpio_exchange(vds_client_t *client,
     *device_count = 0U;
 
     uint8_t packed_values[VDS_MAX_REQUEST_SIZE];
+    uint8_t packed_outputs[VDS_MAX_REQUEST_SIZE];
     size_t packed_length = 0U;
+    size_t packed_outputs_length = 0U;
     for (size_t index = 0U; index < line_count; ++index) {
         if (encode_varint(packed_values, sizeof(packed_values), &packed_length,
-                          host_values[index] != 0U ? 1U : 0U) != 0) {
+                          host_values[index] != 0U ? 1U : 0U) != 0 ||
+            encode_varint(packed_outputs, sizeof(packed_outputs),
+                          &packed_outputs_length,
+                          host_outputs[index] != 0U ? 1U : 0U) != 0) {
             return VDS_ERR_ARGUMENT;
         }
     }
@@ -446,7 +452,9 @@ vds_status_t vds_gpio_exchange(vds_client_t *client,
     if (encode_bytes(gpio, sizeof(gpio), &gpio_length, 1U,
                      (const uint8_t *)device_id, strlen(device_id)) != 0 ||
         encode_bytes(gpio, sizeof(gpio), &gpio_length, 2U, packed_values,
-                     packed_length) != 0) {
+                     packed_length) != 0 ||
+        encode_bytes(gpio, sizeof(gpio), &gpio_length, 3U, packed_outputs,
+                     packed_outputs_length) != 0) {
         return VDS_ERR_ARGUMENT;
     }
 

@@ -111,6 +111,7 @@ mod tests {
             payload: Some(client_request::Payload::GpioExchange(GpioExchangeRequest {
                 device_id: "generic-gpio-bank-32".to_owned(),
                 host_values: vec![true, false, true],
+                host_outputs: vec![false, true, false],
             })),
         };
 

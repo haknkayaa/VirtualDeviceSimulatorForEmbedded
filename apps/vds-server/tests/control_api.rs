@@ -589,6 +589,7 @@ async fn bus_telemetry_is_derived_from_typed_transaction_events() {
         payload: EventPayload::TransactionStarted {
             transaction_id: Some(42),
             request: vec![0x9f, 0, 0, 0],
+            gpio_output_lines: None,
         },
     });
     let _ = events.publish(EventDraft {
@@ -609,6 +610,7 @@ async fn bus_telemetry_is_derived_from_typed_transaction_events() {
         payload: EventPayload::TransactionStarted {
             transaction_id: Some(43),
             request: vec![0x05, 0],
+            gpio_output_lines: None,
         },
     });
 

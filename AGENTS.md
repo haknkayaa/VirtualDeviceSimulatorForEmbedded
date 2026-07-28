@@ -60,3 +60,16 @@ Yocto application using standard Linux device ABI
     -> Unix-socket transaction data plane
     -> declarative virtual device runtime
 ```
+
+## Test execution cadence
+
+Optimize the edit-feedback loop and do not automatically run tests, lint,
+builds, browser verification, or other validation after every incremental
+change. Accumulate related changes and run the appropriate validation once
+immediately before a requested commit, or earlier only when the user explicitly
+asks for it.
+
+ABI/conformance tests involving real Linux tools, device nodes, kernel modules,
+host adapters, or full control/data-plane integration are especially
+time-consuming. Run those tests only when the user explicitly requests them;
+do not infer authorization from an ordinary implementation or UI task.

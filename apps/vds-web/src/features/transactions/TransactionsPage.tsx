@@ -1,4 +1,9 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  buildStyles,
+  CircularProgressbarWithChildren,
+} from 'react-circular-progressbar'
+import 'react-circular-progressbar/dist/styles.css'
 import {
   Circle,
   Download,
@@ -25,14 +30,86 @@ import {
 
 type DirectionFilter = TransactionDirection | 'all'
 
-function Sparkline({ color, points }: { color: string; points: number[] }) {
-  const max = Math.max(...points, 1)
-  const path = points.map((point, index) => `${(index / Math.max(points.length - 1, 1)) * 100},${38 - (point / max) * 29}`).join(' ')
-  return <svg aria-hidden="true" className="dashboard-sparkline" preserveAspectRatio="none" viewBox="0 0 100 40"><polyline fill="none" points={path} stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg>
+function axisValue(value: number) {
+  if (value >= 100) return value.toFixed(0)
+  if (value >= 10) return value.toFixed(1)
+  return value.toFixed(2)
 }
 
-function Dial({ value, label, color }: { value: string; label: string; color: string }) {
-  return <div className="health-dial" style={{ '--dial-color': color } as CSSProperties}><div><strong>{value}</strong><span>{label}</span></div></div>
+function Sparkline({
+  axisUnit,
+  color,
+  points,
+  windowSeconds,
+}: {
+  axisUnit: string
+  color: string
+  points: number[]
+  windowSeconds: number
+}) {
+  const chartPoints = points.length === 1 ? [points[0], points[0]] : points
+  const max = Math.max(...chartPoints, 1)
+  const plotStartX = 0
+  const plotEndX = 140
+  const plotTopY = 10
+  const plotBottomY = 90
+  const yTicks = Array.from({ length: 5 }, (_, index) => ({
+    value: max * (1 - index / 4),
+    y: plotTopY + (index / 4) * (plotBottomY - plotTopY),
+  }))
+  const xTicks = Array.from({ length: 10 }, (_, index) => ({
+    label: index === 9 ? 'now' : `-${Math.round(windowSeconds * (1 - index / 9))}s`,
+    x: plotStartX + (index / 9) * (plotEndX - plotStartX),
+  }))
+  const path = chartPoints.map((point, index) => `${plotStartX + (index / Math.max(chartPoints.length - 1, 1)) * (plotEndX - plotStartX)},${plotBottomY - (point / max) * (plotBottomY - plotTopY)}`).join(' ')
+  return <div aria-hidden="true" className="dashboard-chart-frame">
+    <svg className="dashboard-sparkline" preserveAspectRatio="none" viewBox="0 0 140 90">
+      <g className="dashboard-chart-grid">
+        {yTicks.map(({ y }) =>
+          <line className={y === plotBottomY ? 'dashboard-chart-axis-line' : undefined} key={`horizontal-${y}`} x1={plotStartX} x2={plotEndX} y1={y} y2={y} />,
+        )}
+        {xTicks.map(({ x }) =>
+          <line className={x === plotStartX ? 'dashboard-chart-axis-line' : undefined} key={`vertical-${x}`} x1={x} x2={x} y1={plotTopY} y2={plotBottomY} />,
+        )}
+      </g>
+      <polyline fill="none" points={path} stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+    </svg>
+    <div className="dashboard-chart-y-axis">
+      {yTicks.map(({ value, y }) =>
+        <span key={`y-label-${y}`} style={{ top: `${(y / 90) * 100}%` }}>{`${axisValue(value)} ${axisUnit}`}</span>,
+      )}
+    </div>
+    <div className="dashboard-chart-x-axis">
+      {xTicks.map(({ label, x }) =>
+        <span key={`x-label-${x}`} style={{ left: `${(x / plotEndX) * 100}%` }}>{label}</span>,
+      )}
+    </div>
+  </div>
+}
+
+function Dial({ value, label, color }: { value?: number; label: string; color: string }) {
+  const displayValue = value === undefined ? '—' : `${value.toFixed(1)}%`
+  return <div
+    aria-label={`${label}: ${displayValue}`}
+    aria-valuemax={100}
+    aria-valuemin={0}
+    aria-valuenow={value}
+    className="health-dial"
+    role="meter"
+  >
+    <CircularProgressbarWithChildren
+      strokeWidth={8}
+      styles={buildStyles({
+        pathColor: color,
+        trailColor: 'rgba(255, 255, 255, 0.08)',
+        strokeLinecap: 'round',
+      })}
+      value={value ?? 0}
+    >
+      <strong>{displayValue}</strong>
+      <span>{label}</span>
+    </CircularProgressbarWithChildren>
+  </div>
 }
 
 function MetricChart({
@@ -41,18 +118,66 @@ function MetricChart({
   unit,
   color,
   points,
+  deviceLabel,
+  windowSeconds,
 }: {
   label: string
   value: string
   unit: string
   color: string
   points: number[]
+  deviceLabel: string
+  windowSeconds: number
 }) {
   return <section className="dashboard-chart-card">
-    <header><div><span>{label}</span><strong>{value}<small>{unit}</small></strong></div><select aria-label={`${label} bus`} defaultValue="all"><option value="all">All buses</option></select></header>
-    <Sparkline color={color} points={points} />
-    <footer><span style={{ color }}>● SPI</span><span>● I2C</span><span>● UART</span></footer>
+    <header><div><span>{label}</span><strong>{value}<small>{unit}</small></strong></div><span className="metric-device-label">{deviceLabel}</span></header>
+    {points.length > 0
+      ? <Sparkline axisUnit={unit.trim()} color={color} points={points} windowSeconds={windowSeconds} />
+      : <div className="dashboard-sparkline-empty">Waiting for telemetry</div>}
+    <footer><span style={{ color }}>● Live API</span><span>{windowSeconds}s window</span><span>{points.length} samples</span></footer>
   </section>
+}
+
+interface TelemetrySample {
+  generatedAtWallNs: number
+  throughputBytesPerSecond: number
+  latencyP95Us: number
+}
+
+function useTelemetryHistory(
+  deviceId: string | undefined,
+  generatedAtWallNs: number | undefined,
+  throughputBytesPerSecond: number | undefined,
+  latencyP95Us: number | undefined,
+) {
+  const [history, setHistory] = useState<Record<string, TelemetrySample[]>>({})
+
+  useEffect(() => {
+    if (
+      deviceId === undefined ||
+      generatedAtWallNs === undefined ||
+      throughputBytesPerSecond === undefined ||
+      latencyP95Us === undefined
+    ) return
+
+    const updateId = window.setTimeout(() => {
+      setHistory((current) => {
+        const deviceHistory = current[deviceId] ?? []
+        if (deviceHistory.at(-1)?.generatedAtWallNs === generatedAtWallNs) return current
+        return {
+          ...current,
+          [deviceId]: [
+            ...deviceHistory,
+            { generatedAtWallNs, throughputBytesPerSecond, latencyP95Us },
+          ].slice(-30),
+        }
+      })
+    }, 0)
+
+    return () => window.clearTimeout(updateId)
+  }, [deviceId, generatedAtWallNs, latencyP95Us, throughputBytesPerSecond])
+
+  return deviceId === undefined ? [] : history[deviceId] ?? []
 }
 
 function transactionTimestamp(transaction: LiveTransaction) {
@@ -123,6 +248,11 @@ export function TransactionsPage() {
   const selectedTelemetry = telemetry.data?.buses.find(
     (bus) => bus.device_id === selectedTransaction?.deviceId,
   ) ?? telemetry.data?.buses[0]
+  const selectedGpioAdapter = adapters.data?.find(
+    (adapter) =>
+      adapter.bus_type === 'gpio' &&
+      adapter.bindings.some((binding) => binding.device_id === selectedTransaction?.deviceId),
+  )
   const discoveredBusTypes = useMemo(
     () => [...new Set((devices.data ?? []).map((device) => device.bus.toLowerCase()))].sort(),
     [devices.data],
@@ -130,9 +260,30 @@ export function TransactionsPage() {
   const busTypes = ['gpio', 'spi', 'i2c', 'uart', 'ethernet'].filter(
     (bus) => discoveredBusTypes.includes(bus) || ['gpio', 'spi', 'i2c', 'uart', 'ethernet'].includes(bus),
   )
-  const chartBase = transactions.slice(0, 18).map((transaction) => transaction.request.length + transaction.response.length).reverse()
-  const points = chartBase.length > 2 ? chartBase : [18, 26, 21, 34, 25, 42, 31, 48, 35, 52, 45, 60]
-  const throughput = throughputRate(selectedTelemetry?.throughput.tx_bytes_per_second)
+  const hasCompletedTransactions = (selectedTelemetry?.transactions_total ?? 0) > 0
+  const throughputBytesPerSecond = selectedTelemetry
+    ? selectedTelemetry.throughput.tx_bytes_per_second + selectedTelemetry.throughput.rx_bytes_per_second
+    : undefined
+  const throughput = throughputRate(throughputBytesPerSecond)
+  const successRate = hasCompletedTransactions && selectedTelemetry
+    ? Math.max(0, Math.min(100, (1 - selectedTelemetry.errors.rate) * 100))
+    : undefined
+  const telemetryHistory = useTelemetryHistory(
+    selectedTelemetry?.device_id,
+    telemetry.data?.generated_at_wall_ns,
+    throughputBytesPerSecond,
+    selectedTelemetry?.latency.wall_p95_us,
+  )
+  const healthColor = selectedTelemetry?.health === 'unhealthy'
+    ? '#ff6b7a'
+    : selectedTelemetry?.health === 'degraded'
+      ? '#f2b84b'
+      : '#53d98c'
+  const telemetryWindowSeconds = telemetry.data?.window_seconds ?? 60
+  const selectedDeviceLabel = selectedTelemetry
+    ? `${selectedTelemetry.bus_type.toUpperCase()} · ${selectedTelemetry.device_id}`
+    : 'No device'
+  const throughputChartScale = throughput.unit === ' KB/s' ? 1000 : 1
 
   function exportTransactions() {
     const blob = new Blob([JSON.stringify(filteredTransactions, null, 2)], {
@@ -187,7 +338,7 @@ export function TransactionsPage() {
       </div>
     </section>
 
-    <main className="dashboard-console-grid">
+    <main className={`dashboard-console-grid${selectedTransaction?.busType.toLowerCase() === 'gpio' ? ' gpio-timing-expanded' : ''}`}>
       <GlassPanel className="dashboard-live-panel">
         <header className="console-panel-header">
           <div><span>LIVE TRANSACTIONS</span><small><i className="live-dot" /> {capturing ? 'Live' : 'Paused'}</small></div>
@@ -224,7 +375,10 @@ export function TransactionsPage() {
           <StatusBadge status={selectedTransaction?.status ?? connectionStatus} />
         </header>
         {!selectedTransaction && <AsyncState kind="empty" title="No signal captured yet" />}
-        {selectedTransaction && supportsSignalScope(selectedTransaction.busType) && <BusSignalScope transaction={selectedTransaction} />}
+        {selectedTransaction && supportsSignalScope(selectedTransaction.busType) && <BusSignalScope
+          gpioControllerIndex={selectedGpioAdapter?.bus_number}
+          transaction={selectedTransaction}
+        />}
         {selectedTransaction && !supportsSignalScope(selectedTransaction.busType) && <AsyncState detail="Ethernet payload remains available in the hex viewer below." kind="empty" title="No electrical timing scope for Ethernet" />}
       </GlassPanel>
 
@@ -232,16 +386,32 @@ export function TransactionsPage() {
         <GlassPanel>
           <header className="console-panel-header"><div><span>Bus Health Summary</span><small>Runtime telemetry</small></div><Gauge size={15} /></header>
           <div className="health-summary-content">
-            <Dial color="#53d98c" label="Health Score" value={selectedTelemetry ? '98' : '—'} />
+            <Dial color={healthColor} label="Success rate" value={successRate} />
             <div className="health-kpis">
-              <p><span>●</span> Error Rate <b>{selectedTelemetry ? `${(selectedTelemetry.errors.rate * 100).toFixed(2)}%` : '—'}</b></p>
-              <p><span>●</span> Throughput <b>{`${throughput.value}${throughput.unit}`}</b></p>
-              <p><span>●</span> Latency (p95) <b>{selectedTelemetry ? `${selectedTelemetry.latency.wall_p95_us.toFixed(0)} µs` : '—'}</b></p>
+              <p><span>●</span> Error Rate <b>{hasCompletedTransactions && selectedTelemetry ? `${(selectedTelemetry.errors.rate * 100).toFixed(2)}%` : '—'}</b></p>
+              <p><span>●</span> Total Throughput <b>{`${throughput.value}${throughput.unit}`}</b></p>
+              <p><span>●</span> Latency (p95) <b>{hasCompletedTransactions && selectedTelemetry ? `${selectedTelemetry.latency.wall_p95_us.toFixed(0)} µs` : '—'}</b></p>
             </div>
           </div>
         </GlassPanel>
-        <MetricChart label="THROUGHPUT (LIVE)" value={throughput.value} unit={throughput.unit} color="#48cfe7" points={points} />
-        <MetricChart label="LATENCY (LIVE)" value={selectedTelemetry ? selectedTelemetry.latency.wall_avg_us.toFixed(0) : '—'} unit=" µs" color="#a77bff" points={points.map((point) => Math.max(4, 72 - point))} />
+        <MetricChart
+          color="#48cfe7"
+          deviceLabel={selectedDeviceLabel}
+          label="TOTAL THROUGHPUT (LIVE)"
+          points={telemetryHistory.map((sample) => sample.throughputBytesPerSecond / throughputChartScale)}
+          unit={throughput.unit}
+          value={throughput.value}
+          windowSeconds={telemetryWindowSeconds}
+        />
+        <MetricChart
+          color="#a77bff"
+          deviceLabel={selectedDeviceLabel}
+          label="LATENCY P95 (LIVE)"
+          points={telemetryHistory.map((sample) => sample.latencyP95Us)}
+          unit=" µs"
+          value={hasCompletedTransactions && selectedTelemetry ? selectedTelemetry.latency.wall_p95_us.toFixed(0) : '—'}
+          windowSeconds={telemetryWindowSeconds}
+        />
       </aside>
 
       <GlassPanel className="dashboard-selected-panel">
@@ -256,8 +426,6 @@ export function TransactionsPage() {
               <span>Operation<strong>{selectedTransaction.response.length ? 'READ' : 'WRITE'}</strong></span>
               <span>Request<strong>{selectedTransaction.request.length} Bytes</strong></span>
               <span>Response<strong>{selectedTransaction.response.length} Bytes</strong></span>
-              <span>Devices<strong>{devices.data?.length ?? 0}</strong></span>
-              <span>Adapters<strong>{adapters.data?.length ?? 0}</strong></span>
             </div>
             <TransactionHexViewer request={selectedTransaction.request} response={selectedTransaction.response} />
           </div>

@@ -1,4 +1,4 @@
-import { Cpu, Plus } from 'lucide-react'
+import { Cpu } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import type { Device } from '../../types/api'
@@ -8,7 +8,6 @@ interface DeviceInstanceListProps {
   devices: Device[]
   errorMessage?: string
   isLoading: boolean
-  onAdd: () => void
   selectedId?: string
 }
 
@@ -16,7 +15,6 @@ export function DeviceInstanceList({
   devices,
   errorMessage,
   isLoading,
-  onAdd,
   selectedId,
 }: DeviceInstanceListProps) {
   return (
@@ -28,14 +26,6 @@ export function DeviceInstanceList({
         </div>
         <span className="device-instance-count">{devices.length}</span>
       </header>
-
-      <button
-        className="button button-primary device-add-button"
-        onClick={onAdd}
-        type="button"
-      >
-        <Plus aria-hidden="true" size={15} /> Add Device
-      </button>
 
       <nav aria-label="Loaded devices" className="device-instance-list">
         {isLoading && <span className="device-instance-message">Loading device instances…</span>}

@@ -1,6 +1,8 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include <errno.h>
+#include <fcntl.h>
+#include <linux/gpio.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -8,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -41,10 +44,12 @@ static int synchronize_lines(vds_client_t *client,
                              const char *sysfs_root,
                              const char *platform_name,
                              const char *chip_name,
+                             int chip_fd,
                              size_t line_count,
                              uint8_t *applied_values)
 {
     uint8_t host_values[MAX_LINES];
+    uint8_t host_outputs[MAX_LINES];
     uint8_t device_values[MAX_LINES];
     char path[768];
     char value[16];
@@ -53,6 +58,14 @@ static int synchronize_lines(vds_client_t *client,
     vds_error_t error;
 
     for (index = 0U; index < line_count; ++index) {
+        struct gpio_v2_line_info line_info;
+        memset(&line_info, 0, sizeof(line_info));
+        line_info.offset = (uint32_t)index;
+        if (ioctl(chip_fd, GPIO_V2_GET_LINEINFO_IOCTL, &line_info) != 0) {
+            return -1;
+        }
+        host_outputs[index] =
+            (line_info.flags & GPIO_V2_LINE_FLAG_OUTPUT) != 0U ? 1U : 0U;
         if (snprintf(path, sizeof(path), "%s/%s/%s/sim_gpio%zu/value",
                      sysfs_root, platform_name, chip_name, index) >=
             (int)sizeof(path) ||
@@ -62,7 +75,7 @@ static int synchronize_lines(vds_client_t *client,
         host_values[index] = strcmp(value, "1") == 0 ? 1U : 0U;
     }
     const vds_status_t status =
-        vds_gpio_exchange(client, device_id, host_values, line_count,
+        vds_gpio_exchange(client, device_id, host_values, host_outputs, line_count,
                           device_values, sizeof(device_values), &device_count,
                           &error);
     if (status != VDS_OK || device_count != line_count) {
@@ -191,6 +204,7 @@ int main(int argc, char **argv)
     char line_name[32];
     struct sigaction action;
     int index;
+    int chip_fd = -1;
     int result = EXIT_FAILURE;
     bool live = false;
     vds_client_t client = {.fd = -1, .next_request_id = 1U};
@@ -346,6 +360,12 @@ int main(int argc, char **argv)
                 device_path, strerror(errno));
         goto cleanup;
     }
+    chip_fd = open(device_path, O_RDONLY | O_CLOEXEC);
+    if (chip_fd < 0) {
+        fprintf(stderr, "cannot open GPIO character device '%s': %s\n",
+                device_path, strerror(errno));
+        goto cleanup;
+    }
     if (vds_client_connect(&client, socket_path) != VDS_OK) {
         fprintf(stderr, "cannot connect to VDS4E data plane '%s'\n",
                 socket_path);
@@ -363,7 +383,7 @@ int main(int argc, char **argv)
     while (!stop_requested) {
         struct timespec delay = {.tv_sec = 0, .tv_nsec = 10000000L};
         if (synchronize_lines(&client, device_id, sysfs_root, platform_name,
-                              chip_name, (size_t)line_count,
+                              chip_name, chip_fd, (size_t)line_count,
                               applied_values) != 0) {
             fprintf(stderr, "GPIO line synchronization failed: %s\n",
                     strerror(errno));
@@ -374,6 +394,9 @@ int main(int argc, char **argv)
     result = EXIT_SUCCESS;
 
 cleanup:
+    if (chip_fd >= 0) {
+        (void)close(chip_fd);
+    }
     vds_client_close(&client);
     (void)snprintf(attribute, sizeof(attribute), "%s/live", device_dir);
     if (live && write_attribute(attribute, "0") != 0) {

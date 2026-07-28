@@ -30,18 +30,38 @@ describe('protocol signal scopes', () => {
     expect(screen.getByText('RX 3C')).toBeInTheDocument()
   })
 
-  it('renders UART as 8N1 frames and GPIO as eight line states', () => {
-    const { rerender } = render(<BusSignalScope transaction={transaction('uart')} />)
+  it('renders UART as 8N1 frames and every GPIO line state', () => {
+    const { container, rerender } = render(<BusSignalScope transaction={transaction('uart')} />)
 
     expect(screen.getByText('UART signal scope')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /UART 8N1 timing diagram with 2 frames/i })).toBeInTheDocument()
     expect(screen.getAllByText('D0…D7')).toHaveLength(2)
 
-    rerender(<BusSignalScope transaction={transaction('gpio', [0x01], [])} />)
-    expect(screen.getByText('GPIO signal scope')).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: /GPIO timing diagram with 1 bank samples/i })).toBeInTheDocument()
-    expect(screen.getByText('G0')).toBeInTheDocument()
-    expect(screen.getByText('G7')).toBeInTheDocument()
+    const gpioLines = Array.from({ length: 32 }, (_, line) => Number(line === 0 || line === 31))
+    const gpioTransaction = transaction('gpio', gpioLines, gpioLines)
+    gpioTransaction.gpioOutputLines = Array.from({ length: 32 }, (_, offset) => offset === 0)
+    rerender(<BusSignalScope
+      gpioControllerIndex={2}
+      transaction={gpioTransaction}
+    />)
+    expect(screen.getByText('GPIO Line State View')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: /GPIO line-state table with 32 lines/i })).toBeInTheDocument()
+    expect(screen.getAllByText('GPIOx_IOy')).toHaveLength(2)
+    expect(screen.getAllByText('INPUT/OUTPUT')).toHaveLength(2)
+    expect(screen.getAllByText('HIGH/LOW')).toHaveLength(2)
+    expect(screen.getAllByText('INDICATOR')).toHaveLength(2)
+    expect(container.querySelectorAll('.gpio-bank')).toHaveLength(2)
+    expect(container.querySelectorAll('.gpio-bank-1 .gpio-line')).toHaveLength(16)
+    expect(container.querySelectorAll('.gpio-bank-2 .gpio-line')).toHaveLength(16)
+    expect(screen.getByText('GPIO2_IO0')).toBeInTheDocument()
+    expect(screen.getByText('GPIO2_IO31')).toBeInTheDocument()
+    expect(screen.getAllByText('INPUT')).toHaveLength(31)
+    expect(screen.getByText('OUTPUT')).toBeInTheDocument()
+    expect(screen.getByText('G0…G31')).toBeInTheDocument()
+    expect(screen.getAllByText('HIGH')).toHaveLength(2)
+    expect(screen.getAllByText('LOW')).toHaveLength(30)
+    expect(container.querySelectorAll('.gpio-value-indicator.high')).toHaveLength(2)
+    expect(container.querySelectorAll('.gpio-value-indicator.low')).toHaveLength(30)
   })
 
   it('does not render an electrical scope for Ethernet', () => {
