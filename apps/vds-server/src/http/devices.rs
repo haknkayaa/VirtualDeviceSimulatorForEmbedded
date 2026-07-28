@@ -8,6 +8,7 @@ pub(super) struct DeviceDto {
     id: String,
     bus: String,
     state: Option<String>,
+    image_url: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -16,6 +17,7 @@ pub(super) struct DeviceTemplateDto {
     name: String,
     bus: String,
     model: String,
+    image_url: Option<String>,
 }
 
 pub(super) async fn device_templates(
@@ -29,6 +31,7 @@ pub(super) async fn device_templates(
             name: template.device.name.clone(),
             bus: template.device.bus.clone(),
             model: template.device.model.clone(),
+            image_url: state.device_template_images.get(id).cloned(),
         })
         .collect::<Vec<_>>();
     templates.sort_by(|left, right| left.id.cmp(&right.id));
@@ -123,6 +126,10 @@ pub(super) async fn create_device(
         id: device.id().to_owned(),
         bus: device.bus_type().to_string(),
         state: device.current_state().map_err(ApiError::device)?,
+        image_url: state
+            .device_template_images
+            .get(&request.template_id)
+            .cloned(),
     };
     state.registry.register(device).map_err(|error| {
         if error.to_string().contains("duplicate device id") {
@@ -156,13 +163,18 @@ fn valid_device_id(value: &str) -> bool {
         })
 }
 
-impl From<DeviceSnapshot> for DeviceDto {
-    fn from(value: DeviceSnapshot) -> Self {
-        Self {
-            id: value.id,
-            bus: value.bus,
-            state: value.state,
-        }
+fn device_dto(state: &ApiState, value: DeviceSnapshot) -> DeviceDto {
+    let image_url = state
+        .device_template_instances
+        .read()
+        .ok()
+        .and_then(|instances| instances.get(&value.id).cloned())
+        .and_then(|template_id| state.device_template_images.get(&template_id).cloned());
+    DeviceDto {
+        id: value.id,
+        bus: value.bus,
+        state: value.state,
+        image_url,
     }
 }
 
@@ -173,7 +185,7 @@ pub(super) async fn devices(State(state): State<ApiState>) -> ApiResult<Json<Vec
             .snapshots()
             .map_err(ApiError::device)?
             .into_iter()
-            .map(Into::into)
+            .map(|snapshot| device_dto(&state, snapshot))
             .collect(),
     ))
 }
@@ -191,7 +203,7 @@ pub(super) async fn device(
         .ok_or_else(|| {
             ApiError::not_found("device_not_found", format!("device '{id}' was not found"))
         })?;
-    Ok(Json(found.into()))
+    Ok(Json(device_dto(&state, found)))
 }
 
 fn device_template(state: &ApiState, id: &str) -> ApiResult<DeviceModel> {

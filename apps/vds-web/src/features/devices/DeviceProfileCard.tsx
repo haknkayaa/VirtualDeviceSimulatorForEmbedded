@@ -13,9 +13,17 @@ interface DeviceProfileCardProps {
 export function DeviceProfileCard({ device, currentState, actions }: DeviceProfileCardProps) {
   return (
     <section className="glass-panel device-profile-card">
-      <div aria-label={`${device.id} device illustration`} className="device-profile-image" role="img">
-        <Microchip aria-hidden="true" size={38} strokeWidth={1.4} />
-      </div>
+      {device.image_url ? (
+        <img
+          alt={`${device.name ?? device.id} product`}
+          className="device-profile-product-image"
+          src={device.image_url}
+        />
+      ) : (
+        <div aria-label={`${device.id} device illustration`} className="device-profile-image" role="img">
+          <Microchip aria-hidden="true" size={38} strokeWidth={1.4} />
+        </div>
+      )}
       <div className="device-profile-content">
         <header className="device-profile-header">
           <div className="device-profile-identity">

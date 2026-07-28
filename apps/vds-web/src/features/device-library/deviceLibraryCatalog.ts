@@ -14,6 +14,7 @@ export interface LibraryPackage {
   capabilities: string[]
   statistics: Array<{ label: string; value: string }>
   readme: string[]
+  image?: { alt: string; src: string }
 }
 
 export function libraryPackageFromApi(devicePackage: ImportedDevicePackage): LibraryPackage {
@@ -34,6 +35,9 @@ export function libraryPackageFromApi(devicePackage: ImportedDevicePackage): Lib
       { label: 'Version', value: devicePackage.version },
     ],
     readme: ['Package metadata is loaded from the local package service.'],
+    image: devicePackage.image_url
+      ? { alt: `${devicePackage.name} package image`, src: devicePackage.image_url }
+      : undefined,
   }
 }
 

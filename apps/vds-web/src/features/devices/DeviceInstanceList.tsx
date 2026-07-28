@@ -52,7 +52,15 @@ export function DeviceInstanceList({
               key={device.id}
               to={`/devices/${encodeURIComponent(device.id)}`}
             >
-              <span className="device-instance-icon"><Cpu aria-hidden="true" size={17} /></span>
+              {device.image_url ? (
+                <img
+                  alt=""
+                  className="device-instance-product-image"
+                  src={device.image_url}
+                />
+              ) : (
+                <span className="device-instance-icon"><Cpu aria-hidden="true" size={17} /></span>
+              )}
               <span className="device-instance-copy">
                 <strong>{device.name ?? device.id}</strong>
                 <small>{device.id}</small>
