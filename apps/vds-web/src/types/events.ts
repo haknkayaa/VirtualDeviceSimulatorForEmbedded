@@ -17,7 +17,12 @@ export const eventTypes = [
 export type EventType = (typeof eventTypes)[number]
 
 export type EventPayload =
-  | { kind: 'transaction_started'; transaction_id: number | null; request: number[] }
+  | {
+      kind: 'transaction_started'
+      transaction_id: number | null
+      request: number[]
+      gpio_output_lines?: boolean[] | null
+    }
   | {
       kind: 'transaction_completed'
       transaction_id: number | null

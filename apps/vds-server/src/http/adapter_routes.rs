@@ -17,6 +17,7 @@ pub(super) struct CreateAdapterRequest {
     bus_type: String,
     bus_number: Option<u16>,
     line_count: Option<u16>,
+    max_frequency_hz: Option<u32>,
 }
 
 pub(super) async fn create_adapter(
@@ -33,6 +34,7 @@ pub(super) async fn create_adapter(
                     "SPI adapters require bus_number".to_owned(),
                 )
             })?,
+            request.max_frequency_hz,
         ),
         "i2c" => state.adapters.create_i2c(
             request.id,
@@ -43,6 +45,7 @@ pub(super) async fn create_adapter(
                     "I2C adapters require bus_number".to_owned(),
                 )
             })?,
+            request.max_frequency_hz,
         ),
         "gpio" => state.adapters.create_gpio(
             request.id,

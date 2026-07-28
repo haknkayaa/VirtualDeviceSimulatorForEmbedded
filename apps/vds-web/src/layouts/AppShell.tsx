@@ -9,7 +9,7 @@ import { useAdapters, useClock, useDevices } from '../api/queries'
 import { useEventStore } from '../stores/eventStore'
 import { useTheme } from '../hooks/useTheme'
 import { attachedDevices } from '../utils/adapterBindings'
-import { formatVirtualTime, humanize } from '../utils/format'
+import { formatVirtualTime } from '../utils/format'
 
 const navigation = [
   { to: '/', label: 'Dashboard', icon: Gauge, end: true },
@@ -85,13 +85,19 @@ export function AppShell() {
               <header><Boxes aria-hidden="true" size={13} /><strong>Devices</strong><span>{visibleDevices.length}</span></header>
               <div className="sidebar-resource-list">
                 {deviceInventoryPending && <small>Loading devices…</small>}
-                {visibleDevices.map((device) => (
-                  <div className="sidebar-resource-row" key={device.id}>
-                    <i className={device.state ? 'online' : 'offline'} />
-                    <strong title={device.id}>{device.name ?? device.id}</strong>
-                    <span>{device.state ? humanize(device.state) : 'Offline'}</span>
-                  </div>
-                ))}
+                {visibleDevices.map((device) => {
+                  const adapterLoaded = adapters.data?.some(
+                    (adapter) => adapter.state === 'loaded'
+                      && adapter.bindings.some((binding) => binding.device_id === device.id),
+                  )
+                  return (
+                    <div className="sidebar-resource-row" key={device.id}>
+                      <i className={adapterLoaded ? 'online' : 'offline'} />
+                      <strong title={device.id}>{device.name ?? device.id}</strong>
+                      <span>{adapterLoaded ? 'Attached' : 'Offline'}</span>
+                    </div>
+                  )
+                })}
                 {!deviceInventoryPending && visibleDevices.length === 0 && <small>No attached devices</small>}
               </div>
             </section>

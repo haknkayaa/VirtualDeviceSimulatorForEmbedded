@@ -1,4 +1,4 @@
-import { Cable, ChevronDown, Cpu, LoaderCircle, Plus, Power, PowerOff } from 'lucide-react'
+import { Cable, ChevronDown, Cpu, LoaderCircle, Power, PowerOff } from 'lucide-react'
 
 import type { Adapter } from '../../types/api'
 
@@ -11,7 +11,6 @@ interface AdapterTreeProps {
   busy: boolean
   errorMessage?: string
   isLoading: boolean
-  onAdd: () => void
   onLoad: (adapterId: string) => void
   onSelect: (selection: AdapterTreeSelection) => void
   onUnload: (adapterId: string) => void
@@ -23,7 +22,6 @@ export function AdapterTree({
   busy,
   errorMessage,
   isLoading,
-  onAdd,
   onLoad,
   onSelect,
   onUnload,
@@ -40,10 +38,6 @@ export function AdapterTree({
         </div>
         <span className="adapter-tree-count">{adapters.length}</span>
       </header>
-
-      <button className="button button-primary adapter-tree-add" onClick={onAdd} type="button">
-        <Plus aria-hidden="true" size={15} /> New Adapter
-      </button>
 
       <div aria-label={`${adapters.length} adapters and ${deviceCount} attached devices`} className="adapter-tree" role="tree">
         {isLoading && <span className="adapter-tree-message">Loading adapter topology…</span>}

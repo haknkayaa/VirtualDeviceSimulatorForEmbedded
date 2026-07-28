@@ -16,6 +16,7 @@ message ClientRequest {
 message GpioExchangeRequest {
   string device_id = 1;
   repeated bool host_values = 2;
+  repeated bool host_outputs = 3;
 }
 
 message I2cTransferRequest {

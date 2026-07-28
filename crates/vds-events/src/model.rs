@@ -51,6 +51,8 @@ pub enum EventPayload {
     TransactionStarted {
         transaction_id: Option<u64>,
         request: Vec<u8>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        gpio_output_lines: Option<Vec<bool>>,
     },
     TransactionCompleted {
         transaction_id: Option<u64>,

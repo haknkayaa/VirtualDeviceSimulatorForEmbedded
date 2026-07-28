@@ -78,6 +78,7 @@ export interface Adapter {
   readiness: AdapterReadiness
   bus_number: number
   line_count?: number | null
+  max_frequency_hz?: number | null
   device_path?: string | null
   bindings: AdapterBinding[]
   daemon_pids: number[]
@@ -90,6 +91,7 @@ export interface CreateAdapterInput {
   bus_type: string
   bus_number?: number
   line_count?: number
+  max_frequency_hz?: number
 }
 
 export interface AttachAdapterDeviceInput {

@@ -318,6 +318,17 @@ fn handle_gpio_request(
     transaction_ids: &AtomicU64,
     events: &EventBus,
 ) -> ServerResponse {
+    if gpio.host_outputs.len() != gpio.host_values.len() {
+        return error_response(
+            request_id,
+            ErrorCode::InvalidRequest,
+            format!(
+                "GPIO host_outputs length {} does not match host_values length {}",
+                gpio.host_outputs.len(),
+                gpio.host_values.len()
+            ),
+        );
+    }
     let request_bytes = gpio
         .host_values
         .iter()
@@ -340,6 +351,7 @@ fn handle_gpio_request(
         payload: EventPayload::TransactionStarted {
             transaction_id: Some(transaction_id),
             request: request_bytes,
+            gpio_output_lines: Some(gpio.host_outputs),
         },
     });
 
@@ -422,6 +434,7 @@ fn handle_i2c_request(
         payload: EventPayload::TransactionStarted {
             transaction_id: Some(transaction_id),
             request: request_bytes,
+            gpio_output_lines: None,
         },
     });
     let messages = i2c
@@ -502,6 +515,7 @@ fn handle_spi_request(
         payload: EventPayload::TransactionStarted {
             transaction_id: Some(transaction_id),
             request: spi.tx.clone(),
+            gpio_output_lines: None,
         },
     });
     let wire = match decode_spi_wire(spi.wire.as_ref()) {
@@ -1029,6 +1043,7 @@ device:
                 payload: Some(client_request::Payload::GpioExchange(GpioExchangeRequest {
                     device_id: "gpio-bank".to_owned(),
                     host_values: vec![true, false],
+                    host_outputs: vec![true, false],
                 })),
             },
             &registry,
@@ -1047,6 +1062,7 @@ device:
             EventPayload::TransactionStarted {
                 transaction_id: Some(1),
                 request: vec![1, 0],
+                gpio_output_lines: None,
             }
         );
         assert_eq!(published[1].event_type, EventType::TransactionCompleted);

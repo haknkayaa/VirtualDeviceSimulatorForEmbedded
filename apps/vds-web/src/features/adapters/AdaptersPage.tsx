@@ -1,4 +1,4 @@
-import { Cable, CircleAlert, Link2, LoaderCircle, LockKeyhole, Power, PowerOff, Unlink } from 'lucide-react'
+import { Cable, CheckCircle2, CircleAlert, Link2, LoaderCircle, LockKeyhole, Plus, Power, PowerOff, Unlink } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { ApiError } from '../../api/client'
@@ -62,25 +62,22 @@ export function AdaptersPage() {
   return (
     <div className="page-stack adapters-page">
       <PageHeader
+        action={(
+          <button className="button button-primary" onClick={() => setShowCreate(true)} type="button">
+            <Plus aria-hidden="true" size={14} /> New Adapter
+          </button>
+        )}
         description="Manage host bus adapters, operating-system drivers, and device endpoint topology."
         eyebrow="Host integration"
         title="Adapters"
       />
 
-      <div className="adapter-page-actions">
-        <div>
-          <strong>{adapters.data?.length ?? 0} adapters</strong>
-          <span>Devices attach to bus-specific endpoints and can be moved while adapters are unloaded.</span>
-        </div>
-      </div>
-
-      <div className="adapters-page-layout">
+      <div className={`adapters-page-layout${showCreate ? ' creating-adapter' : ''}`}>
         <AdapterTree
           adapters={adapters.data ?? []}
           busy={busy}
           errorMessage={adapters.error?.message}
           isLoading={adapters.isPending}
-          onAdd={() => setShowCreate(true)}
           onLoad={mutateLoad}
           onSelect={setSelection}
           onUnload={(adapterId) => unloadAdapter.mutate(adapterId)}
@@ -277,30 +274,89 @@ function AdapterCard({ adapter, availableDevices, attachDraft, busy, onAttach, o
 function CreateAdapterPanel({ isPending, onCancel, onCreate }: {
   isPending: boolean
   onCancel: () => void
-  onCreate: (input: { id: string; name: string; bus_type: string; bus_number?: number; line_count?: number }) => void
+  onCreate: (input: { id: string; name: string; bus_type: string; bus_number?: number; line_count?: number; max_frequency_hz?: number }) => void
 }) {
   const [busType, setBusType] = useState<'spi' | 'i2c' | 'gpio'>('spi')
   const [id, setId] = useState('spi1')
   const [name, setName] = useState('SPI 1')
   const [busNumber, setBusNumber] = useState('1')
   const [lineCount, setLineCount] = useState('32')
+  const [maxFrequency, setMaxFrequency] = useState('10000000')
   const changeBusType = (next: 'spi' | 'i2c' | 'gpio') => {
     setBusType(next)
     setId(next === 'gpio' ? 'gpio0' : next === 'i2c' ? 'i2c0' : 'spi1')
     setName(next === 'gpio' ? 'GPIO 0' : next === 'i2c' ? 'I2C 0' : 'SPI 1')
+    setMaxFrequency(next === 'i2c' ? '400000' : '10000000')
   }
+  const adapterTypes = [
+    { id: 'spi' as const, label: 'SPI Adapter', driver: 'CUSE', path: '/dev/spidevX.Y' },
+    { id: 'i2c' as const, label: 'I2C Adapter', driver: 'CUSE', path: '/dev/i2c-N' },
+    { id: 'gpio' as const, label: 'GPIO Adapter', driver: 'gpio-sim', path: '/dev/gpiochipX' },
+  ]
   return (
     <GlassPanel className="adapter-create-panel" eyebrow="Topology" title="New Adapter">
-      <div className="adapter-create-fields">
-        <label><span>ID</span><input onChange={(event) => setId(event.target.value)} value={id} /></label>
-        <label><span>Name</span><input onChange={(event) => setName(event.target.value)} value={name} /></label>
-        <label><span>Bus type</span><select onChange={(event) => changeBusType(event.target.value as 'spi' | 'i2c' | 'gpio')} value={busType}><option value="spi">SPI</option><option value="i2c">I2C</option><option value="gpio">GPIO</option></select></label>
-        {busType !== 'gpio'
-          ? <label><span>Bus number</span><input min="0" onChange={(event) => setBusNumber(event.target.value)} type="number" value={busNumber} /></label>
-          : <label><span>Line count</span><input max="1024" min="1" onChange={(event) => setLineCount(event.target.value)} type="number" value={lineCount} /></label>}
+      <div className="adapter-create-layout">
+        <div className="adapter-create-form">
+          <label>
+            <span>Bus type</span>
+            <select onChange={(event) => changeBusType(event.target.value as 'spi' | 'i2c' | 'gpio')} value={busType}>
+              <option value="spi">SPI</option>
+              <option value="i2c">I2C</option>
+              <option value="gpio">GPIO</option>
+            </select>
+          </label>
+          <label><span>Name</span><input onChange={(event) => setName(event.target.value)} value={name} /></label>
+          <label><span>Adapter ID</span><input onChange={(event) => setId(event.target.value)} value={id} /></label>
+
+          <section className="adapter-bus-configuration">
+            <header>
+              <span>{busType.toUpperCase()} configuration</span>
+              <small>{busType === 'spi' ? '/dev/spidevX.Y' : busType === 'i2c' ? '/dev/i2c-N' : '/dev/gpiochipX'}</small>
+            </header>
+            {busType !== 'gpio'
+              ? <>
+                  <label>
+                    <span>Bus number</span>
+                    <input min="0" onChange={(event) => setBusNumber(event.target.value)} type="number" value={busNumber} />
+                  </label>
+                  <label>
+                    <span>Maximum frequency (Hz)</span>
+                    <input min="1" onChange={(event) => setMaxFrequency(event.target.value)} type="number" value={maxFrequency} />
+                  </label>
+                </>
+              : <label>
+                  <span>Line count</span>
+                  <select onChange={(event) => setLineCount(event.target.value)} value={lineCount}>
+                    <option value="8">8 lines</option>
+                    <option value="16">16 lines</option>
+                    <option value="32">32 lines</option>
+                  </select>
+                  <small>The kernel assigns the final gpiochip path when the adapter loads.</small>
+                </label>}
+          </section>
+        </div>
+
+        <aside className="available-adapters">
+          <header><span>Available adapters</span><small>Linux ABI host integrations</small></header>
+          <div>
+            {adapterTypes.map((adapter) => (
+              <button
+                aria-pressed={busType === adapter.id}
+                className={busType === adapter.id ? 'selected' : ''}
+                key={adapter.id}
+                onClick={() => changeBusType(adapter.id)}
+                type="button"
+              >
+                <CheckCircle2 aria-hidden="true" size={17} />
+                <span><strong>{adapter.label}</strong><small>{adapter.driver} · {adapter.path}</small></span>
+              </button>
+            ))}
+          </div>
+          <p>Standard Linux device interfaces with server-owned runtime topology.</p>
+        </aside>
       </div>
-      <footer><button className="button button-secondary" onClick={onCancel} type="button">Cancel</button><button className="button button-primary" disabled={isPending || !id || !name} onClick={() => onCreate(busType !== 'gpio'
-        ? { id, name, bus_type: busType, bus_number: Number(busNumber) }
+      <footer><button className="button button-secondary" onClick={onCancel} type="button">Cancel</button><button className="button button-primary" disabled={isPending || !id || !name || (busType !== 'gpio' && !maxFrequency)} onClick={() => onCreate(busType !== 'gpio'
+        ? { id, name, bus_type: busType, bus_number: Number(busNumber), max_frequency_hz: Number(maxFrequency) }
         : { id, name, bus_type: busType, line_count: Number(lineCount) })} type="button">Create Adapter</button></footer>
     </GlassPanel>
   )

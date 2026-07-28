@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Ellipsis, Pencil, Power, RadioTower, RefreshCw, RotateCcw, Save } from 'lucide-react'
+import { Ellipsis, Pencil, Plus, Power, RadioTower, RefreshCw, RotateCcw, Save } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import {
@@ -298,6 +298,18 @@ export function DevicesPage() {
   return (
     <div className="page-stack devices-page">
       <PageHeader
+        action={(
+          <button
+            className="button button-primary"
+            onClick={() => {
+              createDevice.reset()
+              setShowAddDevice(true)
+            }}
+            type="button"
+          >
+            <Plus aria-hidden="true" size={14} /> Add Device
+          </button>
+        )}
         description="Inspect authoritative device state and operate only through public control APIs."
         eyebrow="Runtime inventory"
         title="Devices"
@@ -308,10 +320,6 @@ export function DevicesPage() {
           devices={devices.data ?? []}
           errorMessage={devices.error?.message}
           isLoading={devices.isPending}
-          onAdd={() => {
-            createDevice.reset()
-            setShowAddDevice(true)
-          }}
           selectedId={deviceId}
         />
         <div className="device-detail-page">

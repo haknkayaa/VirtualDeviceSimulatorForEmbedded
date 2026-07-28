@@ -267,6 +267,7 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
             EventPayload::TransactionStarted {
                 transaction_id: None,
                 request: bytes.clone(),
+                gpio_output_lines: None,
             },
         );
         let result = match self.runtime.send_spi(device, &bytes) {
