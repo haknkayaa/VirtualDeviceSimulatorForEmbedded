@@ -64,7 +64,7 @@ describe('live transactions workspace', () => {
     useEventStore.getState().acceptEvent(event({
       event_id: 1,
       event_type: 'transaction_started',
-      payload: { kind: 'transaction_started', transaction_id: 7, request: [0x9f, 0, 0, 0] },
+      payload: { kind: 'transaction_started', transaction_id: 7, request: [0x9f, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14] },
     }))
     useEventStore.getState().acceptEvent(event({
       event_id: 2,
@@ -76,6 +76,8 @@ describe('live transactions workspace', () => {
     expect(await screen.findByText('spi-flash-0 · #7')).toBeInTheDocument()
     expect(await screen.findByText('SPI signal scope')).toBeInTheDocument()
     expect(screen.getByText('TX Buffer')).toBeInTheDocument()
+    expect(screen.getByText('00000010')).toBeInTheDocument()
+    expect(screen.getByText('|..|')).toBeInTheDocument()
     expect(await screen.findByText('Bus Health Summary')).toBeInTheDocument()
     expect(await screen.findByText('4.00 B/s')).toBeInTheDocument()
 
