@@ -115,6 +115,7 @@ pub(crate) fn validate_device_package_model(
 ///
 /// Returns an error when models cannot be loaded, the socket cannot be created,
 /// or the listener fails.
+#[allow(clippy::too_many_lines)]
 pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
     let clock: Arc<dyn SimulatorClock> = Arc::new(RealTimeClock::new());
     let registry = Arc::new(load_registry_with_clock(&config, Arc::clone(&clock))?);
@@ -294,7 +295,7 @@ fn handle_request(
     let request_id = request.request_id;
     match request.payload {
         Some(client_request::Payload::SpiTransfer(spi)) => {
-            handle_spi_request(request_id, spi, registry, transaction_ids, events)
+            handle_spi_request(request_id, &spi, registry, transaction_ids, events)
         }
         Some(client_request::Payload::GpioExchange(gpio)) => {
             handle_gpio_request(request_id, gpio, registry, transaction_ids, events)
@@ -480,7 +481,7 @@ fn handle_i2c_request(
 
 fn handle_spi_request(
     request_id: u64,
-    spi: vds_protocol::v1::SpiTransferRequest,
+    spi: &vds_protocol::v1::SpiTransferRequest,
     registry: &DeviceRegistry,
     transaction_ids: &AtomicU64,
     events: &EventBus,

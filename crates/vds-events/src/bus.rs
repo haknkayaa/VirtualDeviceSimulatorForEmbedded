@@ -196,8 +196,9 @@ fn delete_expired(
     predicate: &str,
     cutoff: i64,
 ) -> Result<(), rusqlite::Error> {
+    let cleanup_batch_size = usize::try_from(CLEANUP_BATCH_SIZE).unwrap_or(usize::MAX);
     for _ in 0..MAX_CLEANUP_CHUNKS {
-        if delete_chunk(connection, predicate, cutoff)? < CLEANUP_BATCH_SIZE as usize {
+        if delete_chunk(connection, predicate, cutoff)? < cleanup_batch_size {
             break;
         }
     }
@@ -360,6 +361,9 @@ impl EventBus {
     ///
     /// # Errors
     /// Returns an error when the database cannot be opened, initialized, or read.
+    ///
+    /// # Panics
+    /// Panics when either the event ring capacity or subscriber capacity is zero.
     pub fn persistent_with_policy(
         path: impl AsRef<Path>,
         capacity: usize,
