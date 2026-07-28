@@ -36,8 +36,12 @@ While the daemon is running:
 
 ```sh
 ls -l /dev/spidev0.0
-sudo build/spi-preload/native-spidev-read-id /dev/spidev0.0
+sudo spidev_test -D /dev/spidev0.0 -v -p '\x9f\x00\x00\x00'
 ```
+
+Use the host distribution's `spidev_test` package when available. Otherwise,
+build the utility from the upstream Linux source at
+`tools/spi/spidev_test.c`.
 
 The node is removed automatically when the daemon stops. Its default
 permissions are controlled by the host's device manager. Use an appropriate
@@ -46,7 +50,7 @@ world-writable.
 
 ## Supported ABI
 
-The CUSE adapter intentionally matches the SPI preload v1 subset:
+The CUSE adapter currently implements this SPI userspace ABI subset:
 
 - mode 0
 - 8 bits per word

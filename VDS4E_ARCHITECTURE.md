@@ -32,7 +32,7 @@ declarative virtual devices.
 The intended product is:
 
 > A headless virtual embedded hardware laboratory in which unmodified Linux
-> applications, native clients, scenarios, and the Web control plane interact
+> applications, host adapters, scenarios, and the Web control plane interact
 > with the same authoritative device runtime.
 
 VDS4E addresses runtime hardware absence and testability. It does not solve
@@ -58,8 +58,8 @@ The repository currently implements:
 - package-local scenario execution and JUnit/JSON results
 - REST control APIs and WebSocket event replay
 - a length-prefixed Protobuf transaction protocol over a Unix socket
-- native C and Rust clients
-- Linux SPI preload and CUSE adapters
+- a diagnostic Rust CLI and internal adapter transport helpers
+- a managed Linux SPI CUSE adapter
 - a Linux I²C CUSE adapter
 - kernel `gpio-sim` integration exposing real `/dev/gpiochipX` devices
 - a device-scoped Web workspace for configuration, behavior, and scenarios
@@ -99,7 +99,7 @@ component or introduced as a convenience REST endpoint.
 ### 3.3 Headless operation is mandatory
 
 Package validation, server startup, device execution, scenario execution, and
-native integration must work without the Web UI. The browser is an optional
+host adapter integration must work without the Web UI. The browser is an optional
 authoring and observability surface.
 
 ### 3.4 Device packages are the source of truth
@@ -122,7 +122,7 @@ wall-clock scheduling must not redefine device semantics.
 
 ### 3.7 Privilege is isolated
 
-The server, Web application, CLI, C client, and preload adapter run without
+The server, Web application, CLI, and shared adapter transport helper run without
 root. Kernel-module loading, CUSE device creation, and configfs GPIO
 provisioning remain behind explicit adapter-driver boundaries.
 
@@ -146,8 +146,7 @@ and documentation together.
                                                    |             |
                          TRANSACTION DATA PLANE     | Device      |
                                                    | Registry    |
-  Rust CLI / C client ---- framed Protobuf ------> |             |
-  SPI preload adapter ---- Unix socket ----------> | Runtime     |
+  Rust CLI --------------- framed Protobuf ------> |             |
   SPI CUSE adapter ------- /tmp/vds4e.sock ------> | Drivers     |
   I2C CUSE adapter ------------------------------> |             |
   GPIO sync helper ------------------------------> +------+------+
@@ -167,7 +166,7 @@ apps/vds-web        apps/vds-cli        native Linux applications
       |                   |                         |
       | REST/WS           | Rust APIs / UDS         | Linux ABI
       v                   v                         v
-apps/vds-server <---- client/c <--------------- adapters
+apps/vds-server <---- adapters/common/client-c <--- adapters
       |
       v
 vds-core + vds-device-model + focused engine crates
@@ -212,11 +211,10 @@ plane client but not on model-specific code.
 - `crates/vds-protocol` owns generated Protobuf types and length-prefixed async
   framing.
 
-### 5.3 Native integration
+### 5.3 Host integration
 
-- `client/c` is the reusable native C client for the Unix-socket protocol.
-- `adapters/spi-preload` intercepts a documented dynamic-linker/spidev subset
-  without requiring root.
+- `adapters/common/client-c` is internal shared transport code used by the
+  Linux host adapters; it is not a public application SDK.
 - `adapters/spi-cuse` exposes privileged `/dev/spidevX.Y` character devices.
 - `adapters/i2c-cuse` exposes privileged `/dev/i2c-N` buses.
 - `adapters/gpio-sim` provisions kernel-owned `/dev/gpiochipX` devices and
@@ -228,7 +226,7 @@ plane client but not on model-specific code.
 
 ### 5.4 Public contracts and documentation
 
-- `proto/vds.proto` is the transaction wire contract.
+- `crates/vds-protocol/proto/vds.proto` is the transaction wire contract.
 - `schemas/server-config.schema.json` is the server configuration contract.
 - `schemas/device-package.schema.json` is the portable package manifest
   contract.
@@ -559,7 +557,7 @@ one consistent editing model.
 ## 11. Scenario architecture
 
 Scenario YAML belongs to a device package and is executed by `vds-scenario`
-against the same registry used by native clients.
+against the same registry used by the CLI and host adapters.
 
 Current scenario actions cover device reset, manual clock advancement, SPI
 transfer, fault enable/disable, state/register/response/error assertions, and
@@ -611,17 +609,7 @@ store atomically and restores adapters only after the Unix-socket data plane is
 listening. Daemon PIDs and kernel-assigned paths are never persisted; they are
 recreated and rediscovered on startup.
 
-### 12.2 SPI preload
-
-The preload adapter maps exact `/dev/spidevX.Y` paths to runtime device IDs and
-intercepts a documented subset of `open`, descriptor duplication, `close`, and
-spidev ioctls.
-
-It is useful for dynamically linked, non-setuid applications and requires no
-kernel module or root privilege. It cannot cover static binaries, direct
-syscalls, or unsupported APIs.
-
-### 12.3 SPI CUSE
+### 12.2 SPI CUSE
 
 The SPI CUSE adapter creates a real character device such as
 `/dev/spidev0.0`. It supports dynamically and statically linked applications
@@ -630,7 +618,7 @@ require operating-system authorization.
 
 One SPI adapter may bind several devices by distinct chip-select endpoints.
 
-### 12.4 I²C CUSE
+### 12.3 I²C CUSE
 
 The I²C CUSE adapter creates one `/dev/i2c-N` bus. Each binding maps a unique
 slave address to a runtime device ID. Address selection through `I2C_SLAVE` is
@@ -648,7 +636,7 @@ reads at capacity, and returns a device-busy error during the configured
 self-timed write interval. The I²C adapter maps that busy response to the NACK
 observed by normal Linux ACK-polling clients.
 
-### 12.5 GPIO through kernel gpio-sim
+### 12.4 GPIO through kernel gpio-sim
 
 GPIO does not emulate the character-device ABI in userspace. The helper
 configures the kernel `gpio-sim` module through configfs. Linux allocates the
@@ -675,7 +663,7 @@ not validate physical controllers, DMA, interrupts, or electrical behavior.
 
 ### 13.1 Unix-socket Protobuf protocol
 
-`proto/vds.proto` defines request/response envelopes with a request ID and
+`crates/vds-protocol/proto/vds.proto` defines request/response envelopes with a request ID and
 typed payloads for:
 
 - SPI transfer;
@@ -840,7 +828,7 @@ Server tests use complete package fixtures and verify:
 ### 18.3 Native adapter tests
 
 Each native adapter owns its CMake and focused tests. Root verification builds
-the C client, SPI preload adapter, SPI CUSE adapter, I²C CUSE adapter, GPIO
+the shared adapter transport, SPI CUSE adapter, I²C CUSE adapter, GPIO
 simulator helper, and Micron Embedded Linux example from clean output
 directories.
 
@@ -908,7 +896,7 @@ The current ADR set records:
 - virtual time before state-machine execution;
 - fault precedence;
 - runtime device instances;
-- Linux SPI preload;
+- managed Linux SPI CUSE;
 - managed host adapters;
 - behavior-flow compilation;
 - kernel gpio-sim integration.
@@ -917,6 +905,6 @@ The current ADR set records:
 
 Every externally visible hardware operation must converge on the same
 authoritative runtime device state, whether it originates from a Linux device
-node, the native client, a scenario, the CLI, or the control plane. Any design
+node, a host adapter, a scenario, the CLI, or the control plane. Any design
 that creates separate device truth in the Web UI, an adapter, a test-only mock,
 or a compatibility route violates this architecture.

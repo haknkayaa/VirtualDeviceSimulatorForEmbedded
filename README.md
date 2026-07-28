@@ -20,8 +20,8 @@ in [docs/ROADMAP.md](docs/ROADMAP.md).
 | Device behavior | Registers, bitfields, memory, state machines, virtual time, scheduled operations, faults, reset |
 | Automation | CLI package validation/scaffolding, SPI transfer, scenario execution, JSON and JUnit results |
 | Control plane | REST API, WebSocket replay/live events, React Web UI |
-| Native data plane | Length-prefixed Protobuf over `/tmp/vds4e.sock`, Rust CLI, static C client |
-| Linux SPI | Rootless `LD_PRELOAD` adapter and privileged CUSE `/dev/spidevX.Y` adapter |
+| Native data plane | Length-prefixed Protobuf over `/tmp/vds4e.sock`, Rust CLI, Linux host adapters |
+| Linux SPI | Managed CUSE `/dev/spidevX.Y` adapter |
 | Linux I²C | Privileged CUSE `/dev/i2c-N` adapter with `I2C_RDWR` and common SMBus operations |
 | Linux GPIO | Kernel `gpio-sim` integration exposing a real `/dev/gpiochipX` |
 | Observability | Transactions, registers, state, faults, runs, telemetry, bounded replay, optional SQLite persistence |
@@ -30,7 +30,7 @@ in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 | Interface | Runtime | Linux host interface | Compatible clients | Status |
 | --- | --- | --- | --- | --- |
-| SPI / spidev | `generic-spi-command` | `/dev/spidevX.Y` through CUSE, or `LD_PRELOAD` | Normal spidev applications, `spi-tools`, `spidev_test`-style programs | Supported |
+| SPI / spidev | `generic-spi-command` | `/dev/spidevX.Y` through CUSE | Normal spidev applications and upstream `spidev_test` | Supported |
 | I²C / i2c-dev | `generic-i2c-register` | `/dev/i2c-N` through CUSE | `i2cdetect`, `i2cget`, `i2cset`, `i2ctransfer`, libi2c applications | Supported |
 | GPIO | `generic-gpio-bank` | Real `/dev/gpiochipX` through kernel `gpio-sim` | `gpiodetect`, `gpioinfo`, `gpioget`, `gpioset`, `gpiomon`, libgpiod applications | Supported |
 | QSPI multi-lane / DTR | SPI command and wire-setting validation | No dedicated host adapter | VDS4E native transaction clients | Runtime only |
@@ -346,7 +346,7 @@ the Unix-socket runtime. They contain no device opcodes or register behavior.
 
 ### SPI example
 
-- [SPI preload adapter](adapters/spi-preload/README.md): rootless integration
+- [SPI CUSE adapter](adapters/spi-cuse/README.md): real `/dev/spidevX.Y` integration
   for compatible dynamically linked applications.
 - [SPI CUSE adapter](adapters/spi-cuse/README.md): real `/dev/spidevX.Y` nodes
   for supported spidev ioctls, including static applications.

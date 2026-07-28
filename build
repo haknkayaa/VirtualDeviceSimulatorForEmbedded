@@ -24,11 +24,8 @@ cargo build \
 echo "Building Web application..."
 npm --prefix "$ROOT_DIR/apps/vds-web" run build
 
-echo "Building C client..."
-make -C "$ROOT_DIR/client/c" all
-
-echo "Building SPI preload adapter..."
-cmake --build "$STATE_DIR/spi-preload" --config Release --parallel
+echo "Building shared adapter transport..."
+make -C "$ROOT_DIR/adapters/common/client-c" all
 
 echo "Building SPI CUSE adapter..."
 cmake --build "$STATE_DIR/spi-cuse" --config Release --parallel

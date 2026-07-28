@@ -25,5 +25,5 @@ jobs:
         run: cargo test --workspace --locked
       - name: Validate example configuration
         run: cargo run --locked -p vds-server -- --config config/vds-server.yaml --check-config
-      - name: Build C client and example
-        run: make -C client/c
+      - name: Build shared adapter transport
+        run: make -C adapters/common/client-c

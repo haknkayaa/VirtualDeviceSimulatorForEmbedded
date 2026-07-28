@@ -30,14 +30,6 @@ cargo fetch --locked --manifest-path "$ROOT_DIR/Cargo.toml"
 echo "Installing locked Web dependencies..."
 npm --prefix "$ROOT_DIR/apps/vds-web" ci
 
-echo "Configuring SPI preload adapter..."
-cmake \
-  -S "$ROOT_DIR/adapters/spi-preload" \
-  -B "$STATE_DIR/spi-preload" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DVDS4E_SPI_PRELOAD_BUILD_TESTS=OFF \
-  -DVDS4E_SERVER_EXECUTABLE="$ROOT_DIR/target/release/vds-server"
-
 echo "Configuring SPI CUSE adapter..."
 cmake \
   -S "$ROOT_DIR/adapters/spi-cuse" \
