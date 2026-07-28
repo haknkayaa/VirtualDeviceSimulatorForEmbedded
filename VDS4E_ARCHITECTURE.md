@@ -605,6 +605,12 @@ performs explicit OS authorization when necessary, creates the host endpoint,
 and records the actual path. Unloading terminates managed helpers and removes
 their endpoints.
 
+The local simulator stores logical adapter topology, device bindings, and load
+intent in `~/.vds4e/adapters.json` (or `VDS4E_ADAPTER_STATE`). It writes the
+store atomically and restores adapters only after the Unix-socket data plane is
+listening. Daemon PIDs and kernel-assigned paths are never persisted; they are
+recreated and rediscovered on startup.
+
 ### 12.2 SPI preload
 
 The preload adapter maps exact `/dev/spidevX.Y` paths to runtime device IDs and

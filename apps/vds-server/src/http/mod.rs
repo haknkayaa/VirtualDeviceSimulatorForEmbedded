@@ -76,6 +76,20 @@ pub struct ApiState {
 }
 
 impl ApiState {
+    pub(crate) fn new_persistent(
+        config: ServerConfig,
+        registry: Arc<DeviceRegistry>,
+        events: Arc<EventBus>,
+        clock: Arc<dyn SimulatorClock>,
+    ) -> Result<Self, String> {
+        let mut state = Self::new(config, registry, events, clock)?;
+        state.adapters = Arc::new(
+            AdapterManager::system(&state.config)
+                .map_err(|error| format!("adapter state: {error}"))?,
+        );
+        Ok(state)
+    }
+
     /// Creates API state and loads configured scenario documents.
     ///
     /// # Errors
@@ -148,7 +162,7 @@ impl ApiState {
             events,
             scenarios: Arc::new(scenarios),
             runs: Arc::new(RunManager::default()),
-            adapters: Arc::new(AdapterManager::system(&config)),
+            adapters: Arc::new(AdapterManager::system_ephemeral(&config)),
             config,
             device_templates: Arc::new(device_templates),
             device_template_images: Arc::new(device_template_images),
@@ -299,6 +313,11 @@ impl ApiError {
             AdapterError::Process(message) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "adapter_process_failed",
+                message,
+            ),
+            AdapterError::Persistence(message) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "adapter_persistence_failed",
                 message,
             ),
         };

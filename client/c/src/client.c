@@ -330,7 +330,7 @@ vds_status_t vds_spi_transfer_configured(vds_client_t *client,
             encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, wire->dummy_cycles) != 0 ||
             encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, 72U) != 0 ||
             encode_varint(encoded_wire, sizeof(encoded_wire), &wire_length, wire->lsb_first) != 0 ||
-            encode_bytes(spi, sizeof(spi), &spi_length, 26U, encoded_wire, wire_length) != 0) {
+            encode_bytes(spi, sizeof(spi), &spi_length, 3U, encoded_wire, wire_length) != 0) {
             return VDS_ERR_ARGUMENT;
         }
     }
