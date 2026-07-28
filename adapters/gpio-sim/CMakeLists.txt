@@ -9,10 +9,10 @@ set(VDS4E_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
 add_executable(vds4e-gpio-sim
     src/main.c
-    "${VDS4E_ROOT}/client/c/src/client.c"
+    "${VDS4E_ROOT}/adapters/common/client-c/src/client.c"
 )
 target_include_directories(vds4e-gpio-sim PRIVATE
-    "${VDS4E_ROOT}/client/c/include"
+    "${VDS4E_ROOT}/adapters/common/client-c/include"
 )
 target_compile_options(vds4e-gpio-sim PRIVATE
     -Wall -Wextra -Wpedantic -Werror
