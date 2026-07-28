@@ -3,8 +3,7 @@ import { CircleAlert, CircleX, Info } from 'lucide-react'
 import { useEventStore } from '../../stores/eventStore'
 import type { DomainEvent } from '../../types/events'
 import { formatHex, formatVirtualTime, humanize } from '../../utils/format'
-
-type EventSeverity = 'info' | 'warn' | 'error'
+import { getEventSeverity } from './eventSeverity'
 
 interface LiveEventStreamProps {
   events: DomainEvent[]
@@ -23,21 +22,6 @@ const severityIcons = {
   warn: CircleAlert,
   error: CircleX,
 } as const
-
-function includesFailure(value: string | null | undefined) {
-  return value != null && /error|fail|reject|timeout|cancel/i.test(value)
-}
-
-function getSeverity(event: DomainEvent): EventSeverity {
-  const payload = event.payload
-  if (payload.kind === 'transaction_completed' && (payload.error_code || includesFailure(payload.result))) return 'error'
-  if (payload.kind === 'scenario_step_completed' && includesFailure(payload.status)) return 'error'
-  if (payload.kind === 'scenario_completed' && includesFailure(payload.status)) return 'error'
-  if (payload.kind === 'operation_completed' && includesFailure(payload.result)) return 'error'
-  if (payload.kind === 'state_transition' && (payload.to_state === 'error' || includesFailure(payload.result))) return 'error'
-  if (payload.kind === 'fault_triggered') return 'warn'
-  return 'info'
-}
 
 function formatEventTimestamp(event: DomainEvent) {
   if (event.timestamp_wall_ns > 0) return wallTimeFormatter.format(new Date(event.timestamp_wall_ns / 1_000_000))
@@ -86,7 +70,7 @@ export function LiveEventStream({ events }: LiveEventStreamProps) {
   return (
     <div aria-label="Live event stream" className="dashboard-live-events" role="log">
       {events.map((event) => {
-        const severity = getSeverity(event)
+        const severity = getEventSeverity(event)
         const SeverityIcon = severityIcons[severity]
         return (
           <button
