@@ -25,6 +25,26 @@ port_is_open() {
   (exec 8<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
 }
 
+wait_for_control_api() {
+  echo "Waiting for the Control API to become ready..."
+
+  while ! port_is_open "$CONTROL_PORT"; do
+    if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+      set +e
+      wait "$SERVER_PID"
+      local status=$?
+      set -e
+
+      echo "vds-server stopped before the Control API became ready (status $status)." >&2
+      if [[ $status -eq 0 ]]; then
+        return 1
+      fi
+      return "$status"
+    fi
+    sleep 0.1
+  done
+}
+
 if port_is_open "$WEB_PORT"; then
   echo "Web port $WEB_PORT is already in use." >&2
   echo "Stop the existing process or choose VDS_WEB_PORT=<port>." >&2
@@ -77,6 +97,8 @@ setsid env \
   VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
   cargo run -p vds-server -- --config config/vds-server.yaml &
 SERVER_PID=$!
+
+wait_for_control_api
 
 setsid npm --prefix "$WEB_DIR" run dev -- --host 127.0.0.1 --port "$WEB_PORT" --strictPort &
 WEB_PID=$!
