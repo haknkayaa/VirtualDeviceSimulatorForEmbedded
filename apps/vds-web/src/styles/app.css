@@ -58,8 +58,8 @@ h2 { margin-bottom: 0; font-size: .85rem; letter-spacing: -.01em; }
   border: 0; border-right: 1px solid rgba(133,157,178,.14);
   box-shadow: 8px 0 28px rgba(0,0,0,.14); backdrop-filter: blur(20px);
 }
-.brand-lockup { display: block; width: 100%; padding: 0 21px 27px; }
-.sidebar-brand-logo { display: block; width: min(100%, 158px); opacity: .98; transition: opacity .16s ease; }
+.brand-lockup { display: block; width: 100%; padding: 0 12px 27px; }
+.sidebar-brand-logo { display: block; width: min(100%, 190px); opacity: .98; transition: opacity .16s ease; }
 .sidebar-brand-logo img { display: block; width: 100%; height: auto; }
 .brand-lockup:hover .sidebar-brand-logo { opacity: 1; }
 .sidebar nav { display: grid; gap: 5px; }
