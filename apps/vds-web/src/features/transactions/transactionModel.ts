@@ -4,6 +4,12 @@ import type { DomainEvent } from '../../types/events'
 export type TransactionStatus = 'running' | 'success' | 'error' | 'partial'
 export type TransactionDirection = 'full_duplex' | 'tx' | 'rx'
 
+export interface GpioEdgeChange {
+  line: number
+  from: 0 | 1
+  to: 0 | 1
+}
+
 export interface LiveTransaction {
   id: string
   transactionId: number
@@ -16,6 +22,7 @@ export interface LiveTransaction {
   request: number[]
   response: number[]
   gpioOutputLines?: boolean[]
+  gpioEdges?: GpioEdgeChange[]
   status: TransactionStatus
   errorCode?: string
 }
@@ -74,7 +81,36 @@ export function buildLiveTransactions(
     transactions.set(id, current)
   }
 
-  return [...transactions.values()].sort((left, right) => {
+  const chronological = [...transactions.values()].sort((left, right) => {
+    const leftTime = left.completedWallNs ?? left.startedWallNs ?? 0
+    const rightTime = right.completedWallNs ?? right.startedWallNs ?? 0
+    return leftTime - rightTime || left.transactionId - right.transactionId
+  })
+  const previousGpioValues = new Map<string, number[]>()
+  const annotated = chronological.map((transaction) => {
+    if (
+      transaction.busType.toLowerCase() !== 'gpio' ||
+      transaction.status !== 'success' ||
+      transaction.response.length === 0
+    ) {
+      return transaction
+    }
+
+    const previous = previousGpioValues.get(transaction.deviceId)
+    previousGpioValues.set(transaction.deviceId, [...transaction.response])
+    if (!previous || previous.length !== transaction.response.length) {
+      return { ...transaction, gpioEdges: [] }
+    }
+
+    const gpioEdges = transaction.response.flatMap<GpioEdgeChange>((value, line) => {
+      const from = previous[line] === 0 ? 0 : 1
+      const to = value === 0 ? 0 : 1
+      return from === to ? [] : [{ line, from, to }]
+    })
+    return { ...transaction, gpioEdges }
+  })
+
+  return annotated.sort((left, right) => {
     const leftTime = left.completedWallNs ?? left.startedWallNs ?? 0
     const rightTime = right.completedWallNs ?? right.startedWallNs ?? 0
     return rightTime - leftTime || right.transactionId - left.transactionId

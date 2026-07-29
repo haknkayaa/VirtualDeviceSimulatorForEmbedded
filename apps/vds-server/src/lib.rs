@@ -1,9 +1,10 @@
 use std::{
+    collections::HashMap,
     io::ErrorKind,
     os::unix::fs::FileTypeExt,
     path::{Path, PathBuf},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicU64, Ordering},
     },
 };
@@ -189,6 +190,7 @@ pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
     let listener = UnixListener::bind(&socket_path)?;
     let _socket_guard = SocketGuard(socket_path.clone());
     let transaction_ids = Arc::new(AtomicU64::new(1));
+    let gpio_events = Arc::new(GpioEventTracker::default());
 
     info!(
         component = "data_plane",
@@ -221,8 +223,12 @@ pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
                 let registry = Arc::clone(&registry);
                 let transaction_ids = Arc::clone(&transaction_ids);
                 let events = Arc::clone(&events);
+                let gpio_events = Arc::clone(&gpio_events);
                 tokio::spawn(async move {
-                    if let Err(error) = serve_connection(stream, registry, transaction_ids, events).await {
+                    if let Err(error) =
+                        serve_connection(stream, registry, transaction_ids, events, gpio_events)
+                            .await
+                    {
                         warn!(component = "data_plane", %error, "client connection closed with error");
                     }
                 });
@@ -274,6 +280,7 @@ async fn serve_connection(
     registry: Arc<DeviceRegistry>,
     transaction_ids: Arc<AtomicU64>,
     events: Arc<EventBus>,
+    gpio_events: Arc<GpioEventTracker>,
 ) -> Result<(), ServerError> {
     loop {
         let request: ClientRequest = match read_message(&mut stream).await {
@@ -281,7 +288,7 @@ async fn serve_connection(
             Err(error) if error.kind() == ErrorKind::UnexpectedEof => return Ok(()),
             Err(error) => return Err(error.into()),
         };
-        let response = handle_request(request, &registry, &transaction_ids, &events);
+        let response = handle_request(request, &registry, &transaction_ids, &events, &gpio_events);
         write_message(&mut stream, &response).await?;
     }
 }
@@ -291,15 +298,21 @@ fn handle_request(
     registry: &DeviceRegistry,
     transaction_ids: &AtomicU64,
     events: &EventBus,
+    gpio_events: &GpioEventTracker,
 ) -> ServerResponse {
     let request_id = request.request_id;
     match request.payload {
         Some(client_request::Payload::SpiTransfer(spi)) => {
             handle_spi_request(request_id, &spi, registry, transaction_ids, events)
         }
-        Some(client_request::Payload::GpioExchange(gpio)) => {
-            handle_gpio_request(request_id, gpio, registry, transaction_ids, events)
-        }
+        Some(client_request::Payload::GpioExchange(gpio)) => handle_gpio_request(
+            request_id,
+            gpio,
+            registry,
+            transaction_ids,
+            events,
+            gpio_events,
+        ),
         Some(client_request::Payload::I2cTransfer(i2c)) => {
             handle_i2c_request(request_id, i2c, registry, transaction_ids, events)
         }
@@ -317,6 +330,7 @@ fn handle_gpio_request(
     registry: &DeviceRegistry,
     transaction_ids: &AtomicU64,
     events: &EventBus,
+    gpio_events: &GpioEventTracker,
 ) -> ServerResponse {
     if gpio.host_outputs.len() != gpio.host_values.len() {
         return error_response(
@@ -344,16 +358,6 @@ fn handle_gpio_request(
         request_bytes.clone(),
     );
     let virtual_time_ns = registry.virtual_time_ns(&gpio.device_id).unwrap_or(0);
-    let _ = events.publish(EventDraft {
-        virtual_time_ns,
-        device_id: Some(gpio.device_id.clone()),
-        scenario_run_id: None,
-        payload: EventPayload::TransactionStarted {
-            transaction_id: Some(transaction_id),
-            request: request_bytes,
-            gpio_output_lines: Some(gpio.host_outputs),
-        },
-    });
 
     match registry.exchange_gpio(&gpio.device_id, &gpio.host_values) {
         Ok(device_values) => {
@@ -363,18 +367,23 @@ fn handle_gpio_request(
                 .map(u8::from)
                 .collect::<Vec<_>>();
             transaction.response.clone_from(&response);
-            let _ = events.publish(EventDraft {
-                virtual_time_ns,
-                device_id: Some(gpio.device_id),
-                scenario_run_id: None,
-                payload: EventPayload::TransactionCompleted {
-                    transaction_id: Some(transaction_id),
+            let activity = gpio_events.observe(&gpio.device_id, &response);
+            if activity != GpioActivity::Unchanged {
+                publish_gpio_transaction(
+                    events,
+                    virtual_time_ns,
+                    &gpio.device_id,
+                    transaction_id,
+                    request_bytes,
+                    gpio.host_outputs,
                     response,
-                    result: "success".to_owned(),
-                    error_code: None,
-                },
-            });
-            log_transaction(&transaction);
+                    "success",
+                    None,
+                );
+            }
+            if let GpioActivity::Edges(edges) = activity {
+                log_gpio_edges(&transaction, &edges);
+            }
             ServerResponse {
                 request_id,
                 result: Some(server_response::Result::GpioExchange(
@@ -388,21 +397,125 @@ fn handle_gpio_request(
                 code: code_name,
                 message: error.to_string(),
             };
-            let _ = events.publish(EventDraft {
+            publish_gpio_transaction(
+                events,
                 virtual_time_ns,
-                device_id: Some(gpio.device_id),
-                scenario_run_id: None,
-                payload: EventPayload::TransactionCompleted {
-                    transaction_id: Some(transaction_id),
-                    response: Vec::new(),
-                    result: "error".to_owned(),
-                    error_code: Some(code_name.to_owned()),
-                },
-            });
+                &gpio.device_id,
+                transaction_id,
+                request_bytes,
+                gpio.host_outputs,
+                Vec::new(),
+                "error",
+                Some(code_name),
+            );
             log_transaction(&transaction);
             error_response(request_id, code, error.to_string())
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct GpioEdge {
+    line: usize,
+    from: u8,
+    to: u8,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum GpioActivity {
+    Baseline,
+    Unchanged,
+    Edges(Vec<GpioEdge>),
+}
+
+#[derive(Default)]
+struct GpioEventTracker {
+    values: Mutex<HashMap<String, Vec<u8>>>,
+}
+
+impl GpioEventTracker {
+    fn observe(&self, device_id: &str, values: &[u8]) -> GpioActivity {
+        let mut previous_values = self
+            .values
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Some(previous) = previous_values.insert(device_id.to_owned(), values.to_vec()) else {
+            return GpioActivity::Baseline;
+        };
+        if previous.len() != values.len() {
+            return GpioActivity::Baseline;
+        }
+        let edges = previous
+            .iter()
+            .copied()
+            .zip(values.iter().copied())
+            .enumerate()
+            .filter_map(|(line, (from, to))| (from != to).then_some(GpioEdge { line, from, to }))
+            .collect::<Vec<_>>();
+        if edges.is_empty() {
+            GpioActivity::Unchanged
+        } else {
+            GpioActivity::Edges(edges)
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn publish_gpio_transaction(
+    events: &EventBus,
+    virtual_time_ns: u64,
+    device_id: &str,
+    transaction_id: u64,
+    request: Vec<u8>,
+    gpio_output_lines: Vec<bool>,
+    response: Vec<u8>,
+    result: &str,
+    error_code: Option<&str>,
+) {
+    let _ = events.publish(EventDraft {
+        virtual_time_ns,
+        device_id: Some(device_id.to_owned()),
+        scenario_run_id: None,
+        payload: EventPayload::TransactionStarted {
+            transaction_id: Some(transaction_id),
+            request,
+            gpio_output_lines: Some(gpio_output_lines),
+        },
+    });
+    let _ = events.publish(EventDraft {
+        virtual_time_ns,
+        device_id: Some(device_id.to_owned()),
+        scenario_run_id: None,
+        payload: EventPayload::TransactionCompleted {
+            transaction_id: Some(transaction_id),
+            response,
+            result: result.to_owned(),
+            error_code: error_code.map(str::to_owned),
+        },
+    });
+}
+
+fn log_gpio_edges(transaction: &Transaction, edges: &[GpioEdge]) {
+    let edge_changes = edges
+        .iter()
+        .map(|edge| {
+            let direction = if edge.to == 0 { "falling" } else { "rising" };
+            format!("GPIO{} {}->{} ({direction})", edge.line, edge.from, edge.to)
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    info!(
+        component = "transaction",
+        event = "gpio_edge",
+        transaction_id = transaction.id,
+        bus_id = %transaction.bus_id,
+        device_id = %transaction.device_id,
+        operation = transaction.operation.as_str(),
+        edge_count = edges.len(),
+        edges = %edge_changes,
+        result = "success",
+        "GPIO edge detected"
+    );
 }
 
 fn handle_i2c_request(
@@ -1037,6 +1150,8 @@ device:
             .register(Arc::new(model.into_gpio_device().unwrap()))
             .unwrap();
         let events = EventBus::default();
+        let gpio_events = GpioEventTracker::default();
+        let transaction_ids = AtomicU64::new(1);
         let response = handle_request(
             ClientRequest {
                 request_id: 42,
@@ -1047,8 +1162,9 @@ device:
                 })),
             },
             &registry,
-            &AtomicU64::new(1),
+            &transaction_ids,
             &events,
+            &gpio_events,
         );
         let Some(server_response::Result::GpioExchange(exchange)) = response.result else {
             panic!("GPIO exchange response expected");
@@ -1062,7 +1178,7 @@ device:
             EventPayload::TransactionStarted {
                 transaction_id: Some(1),
                 request: vec![1, 0],
-                gpio_output_lines: None,
+                gpio_output_lines: Some(vec![true, false]),
             }
         );
         assert_eq!(published[1].event_type, EventType::TransactionCompleted);
@@ -1071,6 +1187,64 @@ device:
             EventPayload::TransactionCompleted {
                 transaction_id: Some(1),
                 response: vec![1, 1],
+                result: "success".to_owned(),
+                error_code: None,
+            }
+        );
+
+        let unchanged = handle_request(
+            ClientRequest {
+                request_id: 43,
+                payload: Some(client_request::Payload::GpioExchange(GpioExchangeRequest {
+                    device_id: "gpio-bank".to_owned(),
+                    host_values: vec![true, false],
+                    host_outputs: vec![true, false],
+                })),
+            },
+            &registry,
+            &transaction_ids,
+            &events,
+            &gpio_events,
+        );
+        assert!(matches!(
+            unchanged.result,
+            Some(server_response::Result::GpioExchange(_))
+        ));
+        assert_eq!(events.events_after(0).len(), 2);
+
+        let edge = handle_request(
+            ClientRequest {
+                request_id: 44,
+                payload: Some(client_request::Payload::GpioExchange(GpioExchangeRequest {
+                    device_id: "gpio-bank".to_owned(),
+                    host_values: vec![false, false],
+                    host_outputs: vec![true, false],
+                })),
+            },
+            &registry,
+            &transaction_ids,
+            &events,
+            &gpio_events,
+        );
+        assert!(matches!(
+            edge.result,
+            Some(server_response::Result::GpioExchange(_))
+        ));
+        let published = events.events_after(0);
+        assert_eq!(published.len(), 4);
+        assert_eq!(
+            published[2].payload,
+            EventPayload::TransactionStarted {
+                transaction_id: Some(3),
+                request: vec![0, 0],
+                gpio_output_lines: Some(vec![true, false]),
+            }
+        );
+        assert_eq!(
+            published[3].payload,
+            EventPayload::TransactionCompleted {
+                transaction_id: Some(3),
+                response: vec![0, 1],
                 result: "success".to_owned(),
                 error_code: None,
             }
@@ -1126,6 +1300,7 @@ device:
             &registry,
             &AtomicU64::new(1),
             &events,
+            &GpioEventTracker::default(),
         );
         let Some(server_response::Result::I2cTransfer(transfer)) = response.result else {
             panic!("I2C transfer response expected");
