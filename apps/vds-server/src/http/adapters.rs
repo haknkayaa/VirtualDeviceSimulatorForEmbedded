@@ -1136,8 +1136,7 @@ struct PersistedBinding {
 impl AdapterManager {
     #[must_use]
     pub fn new(driver: Arc<dyn AdapterDriver>) -> Self {
-        let mut adapter =
-            AdapterSnapshot::spi("spi0".to_owned(), "SPI 0".to_owned(), 0, None);
+        let mut adapter = AdapterSnapshot::spi("spi0".to_owned(), "SPI 0".to_owned(), 0, None);
         adapter.readiness = driver.readiness_for(&adapter);
         Self {
             adapters: Mutex::new(HashMap::from([(adapter.id.clone(), adapter)])),
@@ -1441,8 +1440,7 @@ impl AdapterManager {
                     "SPI maximum frequency must be greater than zero".to_owned(),
                 ));
             }
-            let mut adapter =
-                AdapterSnapshot::spi(id.clone(), name, bus_number, max_frequency_hz);
+            let mut adapter = AdapterSnapshot::spi(id.clone(), name, bus_number, max_frequency_hz);
             adapter.readiness = self.driver.readiness_for(&adapter);
             adapters.insert(id, adapter.clone());
             adapter
@@ -1529,8 +1527,7 @@ impl AdapterManager {
                     "I2C maximum frequency must be greater than zero".to_owned(),
                 ));
             }
-            let mut adapter =
-                AdapterSnapshot::i2c(id.clone(), name, bus_number, max_frequency_hz);
+            let mut adapter = AdapterSnapshot::i2c(id.clone(), name, bus_number, max_frequency_hz);
             adapter.readiness = self.driver.readiness_for(&adapter);
             adapters.insert(id, adapter.clone());
             adapter
