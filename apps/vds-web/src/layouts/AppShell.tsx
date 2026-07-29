@@ -1,4 +1,4 @@
-import { Activity, Bell, Boxes, Cable, CircleHelp, Gauge, LibraryBig, Moon, Radio, ScrollText, Settings, Sun } from 'lucide-react'
+import { Activity, Bell, Boxes, Cable, CircleHelp, Gauge, LibraryBig, Moon, Radio, ScrollText, Settings, Sun, UserRound } from 'lucide-react'
 import { useMemo } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
@@ -103,7 +103,15 @@ export function AppShell() {
             </section>
           </div>
         </div>
-        <div className="workspace-identity"><span>LW</span><div><strong>Local workspace</strong><small>Control Panel</small></div></div>
+        <div className="workspace-identity">
+          <label className="environment-context sidebar-environment">
+            <span>Environment</span>
+            <select aria-label="Environment" defaultValue="local">
+              <option value="local">Local simulator</option>
+              <option disabled value="new">+ New Environment</option>
+            </select>
+          </label>
+        </div>
       </aside>
       <div className="workspace-shell">
         <header className="workspace-topbar">
@@ -121,13 +129,13 @@ export function AppShell() {
               <button aria-label="Help" title="Help" type="button"><CircleHelp aria-hidden="true" size={17} /></button>
               <button aria-label="Settings" title="Settings" type="button"><Settings aria-hidden="true" size={17} /></button>
             </div>
-            <label className="environment-context">
-              <span>Environment</span>
-              <select aria-label="Environment" defaultValue="local">
-                <option value="local">Local simulator</option>
-                <option disabled value="new">+ New Environment</option>
-              </select>
-            </label>
+            <div className="account-context">
+              <span aria-label="Anonymous profile image" className="account-avatar" role="img"><UserRound aria-hidden="true" size={18} /></span>
+              <div>
+                <div className="account-tier-row"><small>Account</small><span className="account-tier">Pro+</span></div>
+                <strong>Hakan Kaya</strong>
+              </div>
+            </div>
           </div>
         </header>
         <main className="main-content"><Outlet /></main>
@@ -136,6 +144,9 @@ export function AppShell() {
             <strong>VDS<span>4E</span></strong>
             <span>Virtual Device Simulator for Embedded</span>
           </div>
+          <span className="footer-credit">
+            Crafted by <a href="https://www.hakankaya.kim" rel="noreferrer" target="_blank">Hakan Kaya</a>
+          </span>
           <div>
             <code>v0.1.0-alpha</code>
             <span>Local Control Panel</span>

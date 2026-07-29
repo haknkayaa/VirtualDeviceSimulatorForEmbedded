@@ -193,6 +193,15 @@ function transactionTimestamp(transaction: LiveTransaction) {
 }
 
 function transactionSummary(transaction: LiveTransaction) {
+  if (transaction.busType.toLowerCase() === 'gpio') {
+    const edges = transaction.gpioEdges ?? []
+    const first = edges[0]
+    if (!first) return 'NO EDGE'
+    const transition = `${first.from ? 'HIGH' : 'LOW'}→${first.to ? 'HIGH' : 'LOW'}`
+    return edges.length === 1
+      ? `IO${first.line} ${transition}`
+      : `IO${first.line} ${transition} · +${edges.length - 1}`
+  }
   if (transaction.response.length > 0) {
     const first = transaction.response[0]?.toString(16).padStart(2, '0').toUpperCase()
     return `READ 0x${first} (${transaction.response.length} B)`
@@ -235,6 +244,7 @@ export function TransactionsPage() {
   )
   const filteredTransactions = useMemo(
     () => transactions.filter((transaction) =>
+      (transaction.busType.toLowerCase() !== 'gpio' || (transaction.gpioEdges?.length ?? 0) > 0) &&
       (busFilter === 'all' || transaction.busType.toLowerCase() === busFilter) &&
       (deviceFilter === 'all' || transaction.deviceId === deviceFilter) &&
       (directionFilter === 'all' || transactionDirection(transaction) === directionFilter),
@@ -351,7 +361,13 @@ export function TransactionsPage() {
         </div>
         <div className="console-filter-row"><span>Time</span><span>Bus</span><span>Device</span><span>Summary</span><span>Status</span></div>
         {connectionStatus === 'disconnected' && events.length === 0 && <AsyncState detail={`Replay cursor #${lastEventId}`} kind="disconnected" title="Capture stream disconnected" />}
-        {connectionStatus !== 'disconnected' && filteredTransactions.length === 0 && <AsyncState detail="Transactions from every workspace device will appear here." kind="empty" title="Waiting for bus traffic" />}
+        {connectionStatus !== 'disconnected' && filteredTransactions.length === 0 && <AsyncState
+          detail={busFilter === 'gpio'
+            ? 'Only LOW → HIGH and HIGH → LOW line changes appear here.'
+            : 'Transactions from every workspace device will appear here.'}
+          kind="empty"
+          title={busFilter === 'gpio' ? 'Waiting for a GPIO edge' : 'Waiting for bus traffic'}
+        />}
         <div className="console-transaction-list">
           {filteredTransactions.slice(0, 100).map((transaction) => <button
             className={`console-transaction-row${selectedTransaction?.id === transaction.id ? ' active' : ''}`}
@@ -422,12 +438,40 @@ export function TransactionsPage() {
         {!selectedTransaction && <AsyncState kind="empty" title="No transaction selected" />}
         {selectedTransaction && (
           <div className="selected-transaction-grid">
-            <div className="selected-meta">
-              <span>Operation<strong>{selectedTransaction.response.length ? 'READ' : 'WRITE'}</strong></span>
-              <span>Request<strong>{selectedTransaction.request.length} Bytes</strong></span>
-              <span>Response<strong>{selectedTransaction.response.length} Bytes</strong></span>
-            </div>
-            <TransactionHexViewer request={selectedTransaction.request} response={selectedTransaction.response} />
+            {selectedTransaction.busType.toLowerCase() === 'gpio'
+              ? <>
+                <div className="selected-meta">
+                  <span>Operation<strong>EDGE</strong></span>
+                  <span>Changes<strong>{selectedTransaction.gpioEdges?.length ?? 0} lines</strong></span>
+                  <span>Direction<strong>{(() => {
+                    const edges = selectedTransaction.gpioEdges ?? []
+                    const rising = edges.some((edge) => edge.from === 0 && edge.to === 1)
+                    const falling = edges.some((edge) => edge.from === 1 && edge.to === 0)
+                    return rising && falling ? 'MIXED' : rising ? 'RISING' : 'FALLING'
+                  })()}</strong></span>
+                </div>
+                <div className="gpio-edge-change-list" aria-label="GPIO edge changes">
+                  {selectedTransaction.gpioEdges?.map((edge) => {
+                    const rising = edge.from === 0 && edge.to === 1
+                    return <div className="gpio-edge-change" key={edge.line}>
+                      <strong>{`GPIO${selectedGpioAdapter?.bus_number ?? 0}_IO${edge.line}`}</strong>
+                      <span className={rising ? 'rising' : 'falling'}>
+                        <i>{edge.from ? 'HIGH' : 'LOW'}</i>
+                        <b>→</b>
+                        <i>{edge.to ? 'HIGH' : 'LOW'}</i>
+                      </span>
+                    </div>
+                  })}
+                </div>
+              </>
+              : <>
+                <div className="selected-meta">
+                  <span>Operation<strong>{selectedTransaction.response.length ? 'READ' : 'WRITE'}</strong></span>
+                  <span>Request<strong>{selectedTransaction.request.length} Bytes</strong></span>
+                  <span>Response<strong>{selectedTransaction.response.length} Bytes</strong></span>
+                </div>
+                <TransactionHexViewer request={selectedTransaction.request} response={selectedTransaction.response} />
+              </>}
           </div>
         )}
       </GlassPanel>
