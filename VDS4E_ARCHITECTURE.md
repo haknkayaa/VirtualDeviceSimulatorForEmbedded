@@ -166,7 +166,7 @@ apps/vds-web        apps/vds-cli        native Linux applications
       |                   |                         |
       | REST/WS           | Rust APIs / UDS         | Linux ABI
       v                   v                         v
-apps/vds-server <---- adapters/common/client-c <--- adapters
+apps/vds-server <---- adapters/bridge <--- adapters
       |
       v
 vds-core + vds-device-model + focused engine crates
@@ -213,7 +213,7 @@ plane client but not on model-specific code.
 
 ### 5.3 Host integration
 
-- `adapters/common/client-c` is internal shared transport code used by the
+- `adapters/bridge` is internal shared transport code used by the
   Linux host adapters; it is not a public application SDK.
 - `adapters/spi-cuse` exposes privileged `/dev/spidevX.Y` character devices.
 - `adapters/i2c-cuse` exposes privileged `/dev/i2c-N` buses.

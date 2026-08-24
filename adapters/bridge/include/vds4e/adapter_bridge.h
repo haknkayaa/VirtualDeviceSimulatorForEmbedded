@@ -1,5 +1,5 @@
-#ifndef VDS4E_CLIENT_H
-#define VDS4E_CLIENT_H
+#ifndef VDS4E_ADAPTER_BRIDGE_H
+#define VDS4E_ADAPTER_BRIDGE_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -11,7 +11,7 @@ extern "C" {
 typedef struct {
     int fd;
     uint64_t next_request_id;
-} vds_client_t;
+} vds_adapter_bridge_t;
 
 typedef enum {
     VDS_OK = 0,
@@ -57,10 +57,10 @@ typedef struct {
     uint16_t flags;
 } vds_i2c_message_t;
 
-vds_status_t vds_client_connect(vds_client_t *client, const char *socket_path);
-void vds_client_close(vds_client_t *client);
+vds_status_t vds_adapter_bridge_connect(vds_adapter_bridge_t *client, const char *socket_path);
+void vds_adapter_bridge_close(vds_adapter_bridge_t *client);
 
-vds_status_t vds_spi_transfer_configured(vds_client_t *client,
+vds_status_t vds_spi_transfer_configured(vds_adapter_bridge_t *client,
                                          const char *device_id,
                                          const uint8_t *tx,
                                          size_t tx_length,
@@ -71,7 +71,7 @@ vds_status_t vds_spi_transfer_configured(vds_client_t *client,
                                          size_t *rx_length,
                                          vds_error_t *error);
 
-vds_status_t vds_gpio_exchange(vds_client_t *client,
+vds_status_t vds_gpio_exchange(vds_adapter_bridge_t *client,
                                const char *device_id,
                                const uint8_t *host_values,
                                const uint8_t *host_outputs,
@@ -81,7 +81,7 @@ vds_status_t vds_gpio_exchange(vds_client_t *client,
                                size_t *device_count,
                                vds_error_t *error);
 
-vds_status_t vds_i2c_transfer(vds_client_t *client,
+vds_status_t vds_i2c_transfer(vds_adapter_bridge_t *client,
                               const char *device_id,
                               uint16_t address,
                               const vds_i2c_message_t *messages,

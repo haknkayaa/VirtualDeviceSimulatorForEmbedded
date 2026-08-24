@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+# VDS4E development workspace launcher.
+#
+# Usage:
+#   ./run.sh
+#   VDS_WEB_PORT=4200 ./run.sh
+
+set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ADAPTER_AUTH="${VDS4E_ADAPTER_AUTH:-sudo}"
+
+if [[ ! -x "$ROOT_DIR/dev.sh" ]]; then
+  echo "Cannot start VDS4E: dev.sh is missing or is not executable." >&2
+  exit 1
+fi
+
+case "$ADAPTER_AUTH" in
+  sudo)
+    if ! command -v sudo >/dev/null 2>&1; then
+      echo "Cannot start VDS4E with one-time adapter authorization: sudo is unavailable." >&2
+      exit 1
+    fi
+    echo "Authorize VDS4E adapter helpers once for this development session..."
+    sudo -v
+    export VDS4E_ADAPTER_AUTH=sudo
+    ;;
+  pkexec)
+    export VDS4E_ADAPTER_AUTH=pkexec
+    ;;
+  *)
+    echo "Unsupported VDS4E_ADAPTER_AUTH value: $ADAPTER_AUTH (use sudo or pkexec)." >&2
+    exit 1
+    ;;
+esac
+
+exec "$ROOT_DIR/dev.sh" "$@"

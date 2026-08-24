@@ -25,7 +25,7 @@ echo "Building Web application..."
 npm --prefix "$ROOT_DIR/apps/vds-web" run build
 
 echo "Building shared adapter transport..."
-make -C "$ROOT_DIR/adapters/common/client-c" all
+make -C "$ROOT_DIR/adapters/bridge" all
 
 echo "Building SPI CUSE adapter..."
 cmake --build "$STATE_DIR/spi-cuse" --config Release --parallel

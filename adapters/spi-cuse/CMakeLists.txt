@@ -12,11 +12,11 @@ set(VDS4E_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 
 add_executable(vds4e-spi-cuse
     src/main.c
-    "${VDS4E_ROOT}/adapters/common/client-c/src/client.c"
+    "${VDS4E_ROOT}/adapters/bridge/src/adapter_bridge.c"
 )
 target_compile_definitions(vds4e-spi-cuse PRIVATE FUSE_USE_VERSION=31)
 target_include_directories(vds4e-spi-cuse PRIVATE
-    "${VDS4E_ROOT}/adapters/common/client-c/include"
+    "${VDS4E_ROOT}/adapters/bridge/include"
 )
 target_compile_options(vds4e-spi-cuse PRIVATE
     -Wall -Wextra -Wpedantic -Werror

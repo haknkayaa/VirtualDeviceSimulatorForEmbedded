@@ -79,6 +79,19 @@ From the repository root:
 ./dev.sh
 ```
 
+For the usual local workflow, use the one-time-authorization launcher instead:
+
+```shell
+./run.sh
+```
+
+It requests your administrator password once through `sudo`, then uses that
+short-lived authorization to start the SPI, I²C, and GPIO adapter helpers as
+needed. Keep that terminal open: the authorization is tied to its development
+session. The VDS4E server and Web UI still run as your normal user. Use
+`VDS4E_ADAPTER_AUTH=pkexec ./run.sh` to retain separate Polkit prompts, or run
+`./dev.sh` directly.
+
 The script starts:
 
 - Web UI: `http://127.0.0.1:4174`
