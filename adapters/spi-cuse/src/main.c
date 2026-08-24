@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 
-#include "vds4e/client.h"
+#include "vds4e/adapter_bridge.h"
 
 #include <cuse_lowlevel.h>
 #include <errno.h>
@@ -56,7 +56,7 @@ typedef struct {
 typedef struct {
   pthread_mutex_t mutex;
   daemon_config_t *config;
-  vds_client_t client;
+  vds_adapter_bridge_t client;
   bool connected;
   uint8_t mode;
   uint8_t bits_per_word;
@@ -248,7 +248,7 @@ static int ensure_connected(spi_handle_t *handle) {
     return 0;
   }
   const vds_status_t status =
-      vds_client_connect(&handle->client, handle->config->socket_path);
+      vds_adapter_bridge_connect(&handle->client, handle->config->socket_path);
   if (status != VDS_OK) {
     handle->client.fd = -1;
     handle->connected = false;
@@ -347,7 +347,7 @@ static int execute_transfer(spi_handle_t *handle,
   free(zero_transmit);
   if (status != VDS_OK) {
     if (status == VDS_ERR_IO) {
-      vds_client_close(&handle->client);
+      vds_adapter_bridge_close(&handle->client);
       handle->connected = false;
     }
     free(payload);
@@ -391,7 +391,7 @@ static void spi_release(fuse_req_t request, struct fuse_file_info *file_info) {
   spi_handle_t *handle = request_handle(file_info);
   if (handle != NULL) {
     if (handle->connected) {
-      vds_client_close(&handle->client);
+      vds_adapter_bridge_close(&handle->client);
     }
     (void)pthread_mutex_destroy(&handle->mutex);
     free(handle);

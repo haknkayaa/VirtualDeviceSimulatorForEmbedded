@@ -300,6 +300,35 @@ impl SystemCuseDriver {
             .is_ok()
     }
 
+    fn uses_sudo_authorization() -> bool {
+        std::env::var("VDS4E_ADAPTER_AUTH").is_ok_and(|value| value == "sudo")
+    }
+
+    fn authorization_program() -> Result<&'static str, AdapterError> {
+        let program = if Self::uses_sudo_authorization() {
+            "/usr/bin/sudo"
+        } else {
+            "/usr/bin/pkexec"
+        };
+        if !Path::new(program).is_file() {
+            return Err(AdapterError::AuthorizationRequired(format!(
+                "authorization program '{program}' is unavailable"
+            )));
+        }
+        Ok(program)
+    }
+
+    fn elevated_command(program: impl AsRef<std::ffi::OsStr>) -> Result<Command, AdapterError> {
+        let mut command = Command::new(Self::authorization_program()?);
+        if Self::uses_sudo_authorization() {
+            // run.sh obtains the credential once with `sudo -v`; helpers must
+            // never prompt independently from the server process.
+            command.arg("-n");
+        }
+        command.arg(program);
+        Ok(command)
+    }
+
     fn stop_children(children: &mut [ManagedChild]) -> Result<(), AdapterError> {
         for managed in children {
             if managed
@@ -315,8 +344,7 @@ impl SystemCuseDriver {
                 continue;
             }
             if managed.privileged {
-                let status = Command::new("/usr/bin/pkexec")
-                    .arg("/bin/kill")
+                let status = Self::elevated_command("/bin/kill")?
                     .arg("-TERM")
                     .arg(managed.child.id().to_string())
                     .status()
@@ -399,8 +427,7 @@ impl SystemCuseDriver {
 
     fn stop_orphaned_endpoints(&self, adapter: &AdapterSnapshot) -> Result<(), AdapterError> {
         for pid in self.matching_daemon_pids(adapter)? {
-            let status = Command::new("/usr/bin/pkexec")
-                .arg("/bin/kill")
+            let status = Self::elevated_command("/bin/kill")?
                 .arg("-TERM")
                 .arg(pid.to_string())
                 .status()
@@ -432,14 +459,7 @@ impl SystemCuseDriver {
     }
 
     fn authorize_cuse() -> Result<(), AdapterError> {
-        if !Path::new("/usr/bin/pkexec").is_file() {
-            return Err(AdapterError::AuthorizationRequired(
-                "Polkit pkexec is unavailable; load cuse and grant /dev/cuse access outside VDS4E"
-                    .to_owned(),
-            ));
-        }
-        let status = Command::new("/usr/bin/pkexec")
-            .arg("/usr/sbin/modprobe")
+        let status = Self::elevated_command("/usr/sbin/modprobe")?
             .arg("cuse")
             .status()
             .map_err(|error| {
@@ -464,9 +484,7 @@ impl SystemCuseDriver {
     ) -> Result<ManagedChild, AdapterError> {
         let device_name = format!("spidev{}.{}", adapter.bus_number, binding.endpoint);
         let mut command = if privileged {
-            let mut command = Command::new("/usr/bin/pkexec");
-            command.arg(executable);
-            command
+            Self::elevated_command(executable)?
         } else {
             Command::new(executable)
         };
@@ -562,11 +580,8 @@ impl AdapterDriver for SystemCuseDriver {
                 "the CUSE kernel device did not appear after authorization".to_owned(),
             ));
         }
-        if privileged && !Path::new("/usr/bin/pkexec").is_file() {
-            return Err(AdapterError::AuthorizationRequired(
-                "Polkit pkexec is unavailable; run the CUSE adapter with operating-system privileges"
-                    .to_owned(),
-            ));
+        if privileged {
+            Self::authorization_program()?;
         }
         let executable = self.executable.canonicalize().map_err(|error| {
             AdapterError::DriverUnavailable(format!(
@@ -728,9 +743,7 @@ impl AdapterDriver for SystemI2cCuseDriver {
             ))
         })?;
         let mut command = if privileged {
-            let mut command = Command::new("/usr/bin/pkexec");
-            command.arg(&executable);
-            command
+            SystemCuseDriver::elevated_command(&executable)?
         } else {
             Command::new(&executable)
         };
@@ -889,13 +902,7 @@ impl SystemGpioSimDriver {
                     "modprobe is unavailable; load the gpio-sim kernel module manually".to_owned(),
                 )
             })?;
-        if !Path::new("/usr/bin/pkexec").is_file() {
-            return Err(AdapterError::AuthorizationRequired(
-                "Polkit pkexec is unavailable; run 'sudo modprobe gpio-sim' first".to_owned(),
-            ));
-        }
-        let status = Command::new("/usr/bin/pkexec")
-            .arg(modprobe)
+        let status = SystemCuseDriver::elevated_command(modprobe)?
             .arg("gpio-sim")
             .status()
             .map_err(|error| {
@@ -925,8 +932,7 @@ impl SystemGpioSimDriver {
             return Ok(());
         }
         if managed.privileged {
-            let status = Command::new("/usr/bin/pkexec")
-                .arg("/bin/kill")
+            let status = SystemCuseDriver::elevated_command("/bin/kill")?
                 .arg("-TERM")
                 .arg(managed.child.id().to_string())
                 .status()
@@ -989,11 +995,8 @@ impl AdapterDriver for SystemGpioSimDriver {
         }
         self.authorize_gpio_sim()?;
         let privileged = !self.configfs_accessible();
-        if privileged && !Path::new("/usr/bin/pkexec").is_file() {
-            return Err(AdapterError::AuthorizationRequired(
-                "Polkit pkexec is unavailable; start vds-server with access to gpio-sim configfs"
-                    .to_owned(),
-            ));
+        if privileged {
+            SystemCuseDriver::authorization_program()?;
         }
         let executable = self.executable.canonicalize().map_err(|error| {
             AdapterError::DriverUnavailable(format!(
@@ -1011,9 +1014,7 @@ impl AdapterDriver for SystemGpioSimDriver {
         })?;
         let helper_name = format!("vds4e-{}", adapter.id.replace('.', "-"));
         let mut command = if privileged {
-            let mut command = Command::new("/usr/bin/pkexec");
-            command.arg(&executable);
-            command
+            SystemCuseDriver::elevated_command(&executable)?
         } else {
             Command::new(&executable)
         };

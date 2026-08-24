@@ -26,8 +26,12 @@ The Phase 0 and first vertical-slice Cargo workspace members are:
   `device-package.yaml` manifest plus its model, flows, scenarios, fixtures,
   documentation, and assets.
 - `schemas/device-package.schema.json`: public, versioned DevicePackage contract
+- `adapters/spi-cuse`: Linux `spidev` CUSE adapter exposing `/dev/spidevX.Y` to
+  unmodified SPI applications and standard `spidev_test`
 - `adapters/i2c-cuse`: Linux `i2c-dev` CUSE adapter exposing `/dev/i2c-N` to
   unmodified I²C tools and applications
+- `adapters/bridge`: internal shared C transport bridge used by Linux host
+  adapters to communicate with the Unix-socket data plane
 - `adapters/gpio-sim`: privileged kernel gpio-sim lifecycle helper that exposes
   real `/dev/gpiochipX` devices to libgpiod applications
 

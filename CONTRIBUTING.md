@@ -13,7 +13,7 @@ Before submitting a change, run:
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-make -C adapters/common/client-c
+make -C adapters/bridge
 ```
 
 Core behavior changes require tests. Configuration changes require schema and

@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 
-#include "vds4e/client.h"
+#include "vds4e/adapter_bridge.h"
 
 #include <cuse_lowlevel.h>
 #include <errno.h>
@@ -40,7 +40,7 @@ typedef struct {
 typedef struct {
   pthread_mutex_t mutex;
   daemon_config_t *config;
-  vds_client_t client;
+  vds_adapter_bridge_t client;
   bool connected;
   uint16_t address;
   bool address_selected;
@@ -162,7 +162,7 @@ static int ensure_connected(i2c_handle_t *handle) {
   if (handle->connected) {
     return 0;
   }
-  if (vds_client_connect(&handle->client, handle->config->socket_path) !=
+  if (vds_adapter_bridge_connect(&handle->client, handle->config->socket_path) !=
       VDS_OK) {
     return ENOTCONN;
   }
@@ -199,7 +199,7 @@ static int execute(i2c_handle_t *handle, uint16_t address,
       vds_i2c_transfer(&handle->client, binding->device_id, address, messages,
                        count, reads, capacity, read_length, &error);
   if (status == VDS_ERR_IO) {
-    vds_client_close(&handle->client);
+    vds_adapter_bridge_close(&handle->client);
     handle->connected = false;
   }
   return status_errno(status, &error);
@@ -229,7 +229,7 @@ static void i2c_release(fuse_req_t request, struct fuse_file_info *info) {
   i2c_handle_t *handle = get_handle(info);
   if (handle != NULL) {
     if (handle->connected)
-      vds_client_close(&handle->client);
+      vds_adapter_bridge_close(&handle->client);
     pthread_mutex_destroy(&handle->mutex);
     free(handle);
   }

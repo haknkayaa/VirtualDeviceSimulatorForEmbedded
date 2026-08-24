@@ -13,6 +13,7 @@ I2C_CUSE_EXECUTABLE="$I2C_CUSE_BUILD_DIR/vds4e-i2c-cuse"
 LOCK_FILE="${TMPDIR:-/tmp}/vds4e-dev-${UID}.lock"
 SERVER_PID=""
 WEB_PID=""
+SERVER_OWN_PROCESS_GROUP=false
 
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
@@ -63,7 +64,11 @@ cleanup() {
     kill -TERM -- "-$WEB_PID" 2>/dev/null || true
   fi
   if [[ -n "$SERVER_PID" ]]; then
-    kill -TERM -- "-$SERVER_PID" 2>/dev/null || true
+    if [[ "$SERVER_OWN_PROCESS_GROUP" == true ]]; then
+      kill -TERM -- "-$SERVER_PID" 2>/dev/null || true
+    else
+      kill -TERM "$SERVER_PID" 2>/dev/null || true
+    fi
   fi
   wait "$WEB_PID" "$SERVER_PID" 2>/dev/null || true
 }
@@ -92,11 +97,24 @@ cmake \
   -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$I2C_CUSE_BUILD_DIR" --parallel
 
-setsid env \
-  VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
-  VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
-  cargo run -p vds-server -- --config config/vds-server.yaml &
-SERVER_PID=$!
+if [[ "${VDS4E_ADAPTER_AUTH:-pkexec}" == "sudo" ]]; then
+  # sudo's default credential cache is terminal-scoped. Keep the server in
+  # this terminal session so adapter helpers can use the one authorization
+  # acquired by run.sh, while still running the server itself unprivileged.
+  cargo build -p vds-server
+  env \
+    VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
+    VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
+    "$ROOT_DIR/target/debug/vds-server" --config config/vds-server.yaml &
+  SERVER_PID=$!
+else
+  setsid env \
+    VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
+    VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
+    cargo run -p vds-server -- --config config/vds-server.yaml &
+  SERVER_PID=$!
+  SERVER_OWN_PROCESS_GROUP=true
+fi
 
 wait_for_control_api
 

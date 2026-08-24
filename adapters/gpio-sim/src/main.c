@@ -14,7 +14,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "vds4e/client.h"
+#include "vds4e/adapter_bridge.h"
 
 #define DEFAULT_CONFIGFS_ROOT "/sys/kernel/config/gpio-sim"
 #define MAX_LINES 1024U
@@ -39,7 +39,7 @@ static void usage(FILE *stream, const char *program)
             program);
 }
 
-static int synchronize_lines(vds_client_t *client,
+static int synchronize_lines(vds_adapter_bridge_t *client,
                              const char *device_id,
                              const char *sysfs_root,
                              const char *platform_name,
@@ -207,7 +207,7 @@ int main(int argc, char **argv)
     int chip_fd = -1;
     int result = EXIT_FAILURE;
     bool live = false;
-    vds_client_t client = {.fd = -1, .next_request_id = 1U};
+    vds_adapter_bridge_t client = {.fd = -1, .next_request_id = 1U};
     uint8_t applied_values[MAX_LINES];
     const char *line_names[MAX_LINES];
     size_t supplied_line_names = 0U;
@@ -366,7 +366,7 @@ int main(int argc, char **argv)
                 device_path, strerror(errno));
         goto cleanup;
     }
-    if (vds_client_connect(&client, socket_path) != VDS_OK) {
+    if (vds_adapter_bridge_connect(&client, socket_path) != VDS_OK) {
         fprintf(stderr, "cannot connect to VDS4E data plane '%s'\n",
                 socket_path);
         goto cleanup;
@@ -397,7 +397,7 @@ cleanup:
     if (chip_fd >= 0) {
         (void)close(chip_fd);
     }
-    vds_client_close(&client);
+    vds_adapter_bridge_close(&client);
     (void)snprintf(attribute, sizeof(attribute), "%s/live", device_dir);
     if (live && write_attribute(attribute, "0") != 0) {
         fprintf(stderr, "cannot deactivate gpio-sim device: %s\n",
