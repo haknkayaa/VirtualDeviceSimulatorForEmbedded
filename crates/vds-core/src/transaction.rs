@@ -1,3 +1,5 @@
+//! Bus transaction records and their execution results.
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::device::RegisterTrace;

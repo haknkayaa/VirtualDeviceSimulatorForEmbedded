@@ -1,3 +1,5 @@
+//! Bus-neutral virtual-device traits and transaction types.
+
 use std::fmt;
 
 use crate::event::DeviceEvent;

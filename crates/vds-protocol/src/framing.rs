@@ -1,3 +1,5 @@
+//! Length-prefixed asynchronous framing for protobuf messages.
+
 use std::io::{Error, ErrorKind, Result};
 
 use prost::Message;

@@ -1,10 +1,13 @@
 CC ?= cc
 AR ?= ar
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror
-CPPFLAGS ?= -Iinclude
+CPPFLAGS ?= -I.
 
-BUILD_DIR := build
+BUILD_DIR ?= build
 LIBRARY := $(BUILD_DIR)/libvds4e_adapter_bridge.a
+SOURCES := adapter_bridge.c bridge_codec.c bridge_io.c spi_bridge.c \
+	i2c_bridge.c gpio_bridge.c
+OBJECTS := $(SOURCES:%.c=$(BUILD_DIR)/%.o)
 
 .PHONY: all clean
 
@@ -13,10 +16,10 @@ all: $(LIBRARY)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(BUILD_DIR)/adapter_bridge.o: src/adapter_bridge.c include/vds4e/adapter_bridge.h | $(BUILD_DIR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c src/adapter_bridge.c -o $@
+$(BUILD_DIR)/%.o: %.c adapter_bridge.h adapter_bridge_internal.h | $(BUILD_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-$(LIBRARY): $(BUILD_DIR)/adapter_bridge.o
+$(LIBRARY): $(OBJECTS)
 	$(AR) rcs $@ $^
 
 clean:

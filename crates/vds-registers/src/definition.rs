@@ -1,3 +1,5 @@
+//! Declarative register and bit-field definitions.
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};

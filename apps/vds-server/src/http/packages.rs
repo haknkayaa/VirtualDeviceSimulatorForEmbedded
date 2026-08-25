@@ -1,3 +1,5 @@
+//! HTTP endpoints for device-package discovery and installation.
+
 use super::*;
 
 const MAX_PACKAGE_FILES: usize = 1_024;

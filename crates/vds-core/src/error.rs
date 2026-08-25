@@ -1,3 +1,5 @@
+//! Shared error and result types for core VDS4E operations.
+
 use std::path::PathBuf;
 
 /// Error type for VDS4E core foundation services.

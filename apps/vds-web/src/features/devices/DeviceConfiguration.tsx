@@ -45,7 +45,7 @@ export function DeviceConfiguration({ device, adapters, adapter, binding, onSave
   const devicePath = selectedAdapter ? `/dev/spidev${selectedAdapter.bus_number}.${draft.endpoint}` : '—'
   const deviceName = devicePath.replace('/dev/', '')
   const adapterCommand = selectedAdapter
-    ? `sudo build/spi-cuse/vds4e-spi-cuse --name ${deviceName} --device-id ${device.id} --socket /tmp/vds4e.sock`
+    ? `sudo build/adapters/spi-cuse/vds4e-spi-cuse --name ${deviceName} --device-id ${device.id} --socket /tmp/vds4e.sock`
     : 'Assign an SPI adapter first.'
 
   const save = useCallback(async () => {

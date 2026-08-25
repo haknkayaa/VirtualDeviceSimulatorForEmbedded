@@ -1,3 +1,5 @@
+//! AT24C EEPROM runtime behavior.
+
 use std::sync::{Arc, Mutex};
 
 use vds_core::{

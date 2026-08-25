@@ -1,3 +1,5 @@
+//! Device-model deserialization and file loading.
+
 use super::{
     AccessType, Arc, At24cEepromDevice, CommandTimingDefinition, DeviceModel, DeviceState,
     EventScheduler, FaultEngine, FlashMemory, GenericGpioDevice, GenericI2cDevice,

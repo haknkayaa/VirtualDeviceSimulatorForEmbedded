@@ -1,3 +1,5 @@
+//! Semantic validation and compilation helpers for device models.
+
 use super::{
     AccessType, BTreeMap, DelayedEventDefinition, DeviceAction, DeviceError, DeviceGuard,
     DeviceState, DeviceStateMachineDefinition, EventId, EventScheduler, FaultAction,

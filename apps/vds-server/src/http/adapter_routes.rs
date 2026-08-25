@@ -1,3 +1,5 @@
+//! HTTP endpoints for adapter creation, binding, loading, and removal.
+
 use super::{
     AdapterError, AdapterSnapshot, ApiError, ApiResult, ApiState, Arc, Deserialize, Json, Path,
     State, StatusCode,

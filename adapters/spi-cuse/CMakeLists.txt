@@ -9,14 +9,18 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(FUSE3 REQUIRED IMPORTED_TARGET fuse3)
 
 set(VDS4E_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+add_subdirectory("${VDS4E_ROOT}/adapters/bridge"
+                 "${CMAKE_CURRENT_BINARY_DIR}/bridge")
 
 add_executable(vds4e-spi-cuse
-    src/main.c
-    "${VDS4E_ROOT}/adapters/bridge/src/adapter_bridge.c"
+    main.c
+    options.c
+    transaction.c
+    runtime.c
 )
 target_compile_definitions(vds4e-spi-cuse PRIVATE FUSE_USE_VERSION=31)
 target_include_directories(vds4e-spi-cuse PRIVATE
-    "${VDS4E_ROOT}/adapters/bridge/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 target_compile_options(vds4e-spi-cuse PRIVATE
     -Wall -Wextra -Wpedantic -Werror
@@ -24,6 +28,7 @@ target_compile_options(vds4e-spi-cuse PRIVATE
 target_link_libraries(vds4e-spi-cuse PRIVATE
     PkgConfig::FUSE3
     pthread
+    vds4e_adapter_bridge
 )
 
 enable_testing()

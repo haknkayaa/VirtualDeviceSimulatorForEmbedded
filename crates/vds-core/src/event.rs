@@ -1,3 +1,5 @@
+//! Deterministic virtual-time event scheduling.
+
 use std::collections::{BTreeMap, HashMap};
 
 use crate::device::RegisterTrace;

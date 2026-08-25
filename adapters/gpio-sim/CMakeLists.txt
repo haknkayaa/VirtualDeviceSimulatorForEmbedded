@@ -6,17 +6,22 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
 set(VDS4E_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+add_subdirectory("${VDS4E_ROOT}/adapters/bridge"
+                 "${CMAKE_CURRENT_BINARY_DIR}/bridge")
 
 add_executable(vds4e-gpio-sim
-    src/main.c
-    "${VDS4E_ROOT}/adapters/bridge/src/adapter_bridge.c"
+    main.c
+    options.c
+    configfs.c
+    runtime.c
 )
 target_include_directories(vds4e-gpio-sim PRIVATE
-    "${VDS4E_ROOT}/adapters/bridge/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
 )
 target_compile_options(vds4e-gpio-sim PRIVATE
     -Wall -Wextra -Wpedantic -Werror
 )
+target_link_libraries(vds4e-gpio-sim PRIVATE vds4e_adapter_bridge)
 
 enable_testing()
 add_test(NAME gpio-sim-help COMMAND vds4e-gpio-sim --help)

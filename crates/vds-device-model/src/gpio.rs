@@ -1,3 +1,5 @@
+//! Generic declarative GPIO device runtime.
+
 use std::sync::Mutex;
 
 use vds_core::device::{

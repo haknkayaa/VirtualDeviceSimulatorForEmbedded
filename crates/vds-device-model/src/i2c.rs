@@ -1,3 +1,5 @@
+//! Generic declarative I2C device runtime.
+
 use std::{collections::BTreeMap, sync::Mutex};
 
 use vds_core::device::{

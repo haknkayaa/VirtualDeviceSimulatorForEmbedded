@@ -5,6 +5,10 @@ The kernel assigns a real character device such as `/dev/gpiochip2`, so
 `gpiodetect`, `gpioinfo`, `gpioget`, `gpioset`, and applications using
 libgpiod work without wrappers or `LD_PRELOAD`.
 
+The source keeps CLI validation (`options.c`), kernel configfs provisioning
+(`configfs.c`), and runtime line synchronization (`runtime.c`) in separate
+modules. `main.c` coordinates their lifecycle.
+
 ## Requirements
 
 - Linux with the `gpio-sim` kernel module
@@ -15,11 +19,11 @@ libgpiod work without wrappers or `LD_PRELOAD`.
 ## Build and run
 
 ```sh
-cmake -S adapters/gpio-sim -B .vds4e-build/gpio-sim
-cmake --build .vds4e-build/gpio-sim
+cmake -S adapters/gpio-sim -B build/adapters/gpio-sim
+cmake --build build/adapters/gpio-sim
 
 sudo modprobe gpio-sim
-sudo .vds4e-build/gpio-sim/vds4e-gpio-sim \
+sudo build/adapters/gpio-sim/vds4e-gpio-sim \
   --name vds4e-gpio0 \
   --label "VDS4E GPIO 0" \
   --lines 32 \

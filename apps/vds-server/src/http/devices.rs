@@ -1,3 +1,5 @@
+//! HTTP endpoints for device inspection and register operations.
+
 use super::{
     ApiError, ApiResult, ApiState, Arc, Deserialize, Device, DeviceModel, DeviceSnapshot,
     EventDraft, EventPayload, Json, Path, Serialize, State, StatusCode,

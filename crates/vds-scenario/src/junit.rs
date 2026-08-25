@@ -1,3 +1,5 @@
+//! JUnit XML export for scenario results.
+
 use std::fmt::Write;
 
 use crate::{ResultStatus, ScenarioResult, StepFailureKind, StepResult};

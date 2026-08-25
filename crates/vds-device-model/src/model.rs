@@ -1,3 +1,5 @@
+//! Serializable definitions that form a declarative device model.
+
 use super::{
     BTreeMap, Deserialize, FaultDefinition, RegisterDefinition, Serialize, SignalGraphDefinition,
 };

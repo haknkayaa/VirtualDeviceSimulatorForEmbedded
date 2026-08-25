@@ -6,9 +6,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WEB_DIR="$ROOT_DIR/apps/vds-web"
 WEB_PORT="${VDS_WEB_PORT:-4174}"
 CONTROL_PORT=8080
-SPI_CUSE_BUILD_DIR="$ROOT_DIR/.vds4e-build/spi-cuse"
+SPI_CUSE_BUILD_DIR="$ROOT_DIR/build/adapters/spi-cuse"
 SPI_CUSE_EXECUTABLE="$SPI_CUSE_BUILD_DIR/vds4e-spi-cuse"
-I2C_CUSE_BUILD_DIR="$ROOT_DIR/.vds4e-build/i2c-cuse"
+I2C_CUSE_BUILD_DIR="$ROOT_DIR/build/adapters/i2c-cuse"
 I2C_CUSE_EXECUTABLE="$I2C_CUSE_BUILD_DIR/vds4e-i2c-cuse"
 LOCK_FILE="${TMPDIR:-/tmp}/vds4e-dev-${UID}.lock"
 SERVER_PID=""
@@ -105,7 +105,7 @@ if [[ "${VDS4E_ADAPTER_AUTH:-pkexec}" == "sudo" ]]; then
   env \
     VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
     VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
-    "$ROOT_DIR/target/debug/vds-server" --config config/vds-server.yaml &
+    "$ROOT_DIR/build/rust/debug/vds-server" --config config/vds-server.yaml &
   SERVER_PID=$!
 else
   setsid env \

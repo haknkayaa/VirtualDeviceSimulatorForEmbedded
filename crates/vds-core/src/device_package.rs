@@ -1,3 +1,5 @@
+//! Device-package manifests, discovery, installation, and validation.
+
 use std::{
     fs,
     path::{Component, Path, PathBuf},

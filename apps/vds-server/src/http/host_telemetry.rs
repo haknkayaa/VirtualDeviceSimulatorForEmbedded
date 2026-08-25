@@ -1,3 +1,5 @@
+//! Host CPU, memory, disk, and network telemetry sampling.
+
 use std::{
     fs,
     process::Command,

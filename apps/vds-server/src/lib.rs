@@ -1,3 +1,5 @@
+//! VDS4E control plane and Unix-socket transaction data-plane server.
+
 use std::{
     collections::HashMap,
     io::ErrorKind,
@@ -33,6 +35,7 @@ use vds_protocol::{
     },
 };
 
+/// HTTP control-plane routes and adapter management.
 pub mod http;
 
 /// Builds a registry from all configured declarative device models.
