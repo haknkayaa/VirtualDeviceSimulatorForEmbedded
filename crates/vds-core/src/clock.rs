@@ -1,3 +1,5 @@
+//! Real-time and manually controlled simulator clocks.
+
 use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, Instant},

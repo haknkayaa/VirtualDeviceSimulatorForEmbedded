@@ -1,3 +1,5 @@
+//! HTTP control-plane state, routing, and shared API responses.
+
 mod adapters;
 mod host_telemetry;
 mod runs;

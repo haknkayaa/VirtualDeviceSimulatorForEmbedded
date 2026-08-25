@@ -1,3 +1,5 @@
+//! Runtime abstraction used by the scenario executor.
+
 use std::{sync::Arc, time::Duration};
 
 use vds_core::{

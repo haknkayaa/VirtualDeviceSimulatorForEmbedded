@@ -1,3 +1,5 @@
+//! HTTP endpoints for device fault inspection and control.
+
 use super::{ApiError, ApiResult, ApiState, Json, Path, Serialize, State, StatusCode};
 
 #[derive(Serialize)]

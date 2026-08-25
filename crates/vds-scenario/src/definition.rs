@@ -1,3 +1,5 @@
+//! Serializable scenario documents, steps, and actions.
+
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};

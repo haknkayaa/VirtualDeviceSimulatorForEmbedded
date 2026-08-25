@@ -1,3 +1,5 @@
+//! Non-blocking in-memory event distribution and replay.
+
 use std::{
     collections::{HashSet, VecDeque},
     path::Path,

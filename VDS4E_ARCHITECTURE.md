@@ -791,13 +791,13 @@ production build pipeline.
 The ordered root pipeline is:
 
 ```text
-./configure -> ./build -> ./install
+./configure -> ./build.sh -> ./install
 ```
 
 - `./configure` checks prerequisites and prepares staged output.
-- `./build` refuses to run without successful configuration.
+- `./build.sh` refuses to run without successful configuration.
 - `./install` refuses to run without a successful build.
-- adapter and native outputs are staged under `.vds4e-build`.
+- all generated build output is staged under `build/`.
 - `PREFIX` selects the installation prefix.
 - `DESTDIR` supports package assembly without changing installed paths.
 

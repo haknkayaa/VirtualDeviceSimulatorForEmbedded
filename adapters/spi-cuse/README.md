@@ -6,6 +6,10 @@ node normally; no `LD_PRELOAD` configuration is required. Linux spidev ioctls
 are forwarded to a VDS4E runtime device over the existing Unix socket data
 plane.
 
+The source is separated by responsibility: `main.c` coordinates daemon
+lifecycle, `options.c` validates configuration, `runtime.c` implements the
+CUSE/spidev ABI, and `transaction.c` maps transfers onto the shared bridge.
+
 ## Requirements
 
 - Linux with the `cuse` kernel module
@@ -15,9 +19,9 @@ plane.
 ## Build
 
 ```sh
-cmake -S adapters/spi-cuse -B build/spi-cuse
-cmake --build build/spi-cuse
-ctest --test-dir build/spi-cuse --output-on-failure
+cmake -S adapters/spi-cuse -B build/adapters/spi-cuse
+cmake --build build/adapters/spi-cuse
+ctest --test-dir build/adapters/spi-cuse --output-on-failure
 ```
 
 ## Run
@@ -26,7 +30,7 @@ Start `vds-server`, then in a second terminal:
 
 ```sh
 sudo modprobe cuse
-sudo build/spi-cuse/vds4e-spi-cuse \
+sudo build/adapters/spi-cuse/vds4e-spi-cuse \
   --name spidev0.0 \
   --device-id micron-mt25ql256aba8esf-0sit \
   --socket /tmp/vds4e.sock

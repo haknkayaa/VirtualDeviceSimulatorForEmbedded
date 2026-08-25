@@ -1,3 +1,5 @@
+//! HTTP and WebSocket endpoints for domain events.
+
 use super::{
     ApiState, Arc, Deserialize, EventBus, Message, Query, Response, State, WebSocket,
     WebSocketUpgrade,

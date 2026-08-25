@@ -1,3 +1,5 @@
+//! Errors raised by register definition and access operations.
+
 use crate::AccessType;
 
 /// Structured validation and runtime errors produced by the register engine.

@@ -1,3 +1,5 @@
+//! Declarative fault definitions, matching, and activation state.
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]

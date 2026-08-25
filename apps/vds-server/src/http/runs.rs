@@ -1,3 +1,5 @@
+//! Scenario-run lifecycle and result retrieval endpoints.
+
 use std::{
     collections::HashMap,
     sync::{

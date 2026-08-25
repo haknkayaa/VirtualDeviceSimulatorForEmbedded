@@ -3,7 +3,8 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATE_DIR="$ROOT_DIR/.vds4e-build"
+STATE_DIR="$ROOT_DIR/build/.state"
+ADAPTER_BUILD_DIR="$ROOT_DIR/build/adapters"
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -33,19 +34,19 @@ npm --prefix "$ROOT_DIR/apps/vds-web" ci
 echo "Configuring SPI CUSE adapter..."
 cmake \
   -S "$ROOT_DIR/adapters/spi-cuse" \
-  -B "$STATE_DIR/spi-cuse" \
+  -B "$ADAPTER_BUILD_DIR/spi-cuse" \
   -DCMAKE_BUILD_TYPE=Release
 
 echo "Configuring I2C CUSE adapter..."
 cmake \
   -S "$ROOT_DIR/adapters/i2c-cuse" \
-  -B "$STATE_DIR/i2c-cuse" \
+  -B "$ADAPTER_BUILD_DIR/i2c-cuse" \
   -DCMAKE_BUILD_TYPE=Release
 
 echo "Configuring GPIO simulator adapter..."
 cmake \
   -S "$ROOT_DIR/adapters/gpio-sim" \
-  -B "$STATE_DIR/gpio-sim" \
+  -B "$ADAPTER_BUILD_DIR/gpio-sim" \
   -DCMAKE_BUILD_TYPE=Release
 
 printf 'configured_at=%(%Y-%m-%dT%H:%M:%S%z)T\n' -1 \
@@ -54,4 +55,4 @@ touch "$STATE_DIR/.configured"
 
 echo
 echo "Configuration complete."
-echo "Next step: ./build"
+echo "Next step: ./build.sh"

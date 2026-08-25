@@ -1,3 +1,5 @@
+//! Host-adapter lifecycle, persistence, and native driver management.
+
 use std::{
     collections::{HashMap, HashSet},
     fs::{self, OpenOptions},
@@ -274,14 +276,13 @@ impl SystemCuseDriver {
         let executable = std::env::var_os("VDS4E_SPI_CUSE_EXECUTABLE").map_or_else(
             || {
                 [
-                    PathBuf::from(".vds4e-build/spi-cuse/vds4e-spi-cuse"),
-                    PathBuf::from("build/spi-cuse/vds4e-spi-cuse"),
+                    PathBuf::from("build/adapters/spi-cuse/vds4e-spi-cuse"),
                     PathBuf::from("/usr/local/bin/vds4e-spi-cuse"),
                     PathBuf::from("/usr/bin/vds4e-spi-cuse"),
                 ]
                 .into_iter()
                 .find(|candidate| candidate.is_file())
-                .unwrap_or_else(|| PathBuf::from(".vds4e-build/spi-cuse/vds4e-spi-cuse"))
+                .unwrap_or_else(|| PathBuf::from("build/adapters/spi-cuse/vds4e-spi-cuse"))
             },
             PathBuf::from,
         );
@@ -688,14 +689,13 @@ impl SystemI2cCuseDriver {
         let executable = std::env::var_os("VDS4E_I2C_CUSE_EXECUTABLE").map_or_else(
             || {
                 [
-                    PathBuf::from(".vds4e-build/i2c-cuse/vds4e-i2c-cuse"),
-                    PathBuf::from("build/i2c-cuse/vds4e-i2c-cuse"),
+                    PathBuf::from("build/adapters/i2c-cuse/vds4e-i2c-cuse"),
                     PathBuf::from("/usr/local/bin/vds4e-i2c-cuse"),
                     PathBuf::from("/usr/bin/vds4e-i2c-cuse"),
                 ]
                 .into_iter()
                 .find(|candidate| candidate.is_file())
-                .unwrap_or_else(|| PathBuf::from(".vds4e-build/i2c-cuse/vds4e-i2c-cuse"))
+                .unwrap_or_else(|| PathBuf::from("build/adapters/i2c-cuse/vds4e-i2c-cuse"))
             },
             PathBuf::from,
         );
@@ -854,14 +854,13 @@ impl SystemGpioSimDriver {
         let executable = std::env::var_os("VDS4E_GPIO_SIM_EXECUTABLE").map_or_else(
             || {
                 [
-                    PathBuf::from(".vds4e-build/gpio-sim/vds4e-gpio-sim"),
-                    PathBuf::from("build/gpio-sim/vds4e-gpio-sim"),
+                    PathBuf::from("build/adapters/gpio-sim/vds4e-gpio-sim"),
                     PathBuf::from("/usr/local/bin/vds4e-gpio-sim"),
                     PathBuf::from("/usr/bin/vds4e-gpio-sim"),
                 ]
                 .into_iter()
                 .find(|candidate| candidate.is_file())
-                .unwrap_or_else(|| PathBuf::from(".vds4e-build/gpio-sim/vds4e-gpio-sim"))
+                .unwrap_or_else(|| PathBuf::from("build/adapters/gpio-sim/vds4e-gpio-sim"))
             },
             PathBuf::from,
         );

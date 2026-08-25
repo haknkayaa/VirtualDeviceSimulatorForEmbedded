@@ -7,6 +7,9 @@ const apiTarget = process.env.VDS_API_PROXY_TARGET ?? 'http://127.0.0.1:8080'
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    outDir: '../../build/web',
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,

@@ -1,3 +1,5 @@
+//! Typed signal-graph definitions and deterministic execution.
+
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
     fs,

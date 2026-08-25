@@ -249,7 +249,7 @@ describe('devices page', () => {
 
     expect(screen.getByRole('heading', { name: 'SPI configuration' })).toBeInTheDocument()
     expect(screen.getByText('/dev/spidev0.0')).toBeInTheDocument()
-    expect(screen.getByText('sudo build/spi-cuse/vds4e-spi-cuse --name spidev0.0 --device-id spi-flash-0 --socket /tmp/vds4e.sock')).toBeInTheDocument()
+    expect(screen.getByText('sudo build/adapters/spi-cuse/vds4e-spi-cuse --name spidev0.0 --device-id spi-flash-0 --socket /tmp/vds4e.sock')).toBeInTheDocument()
     expect(screen.getAllByText('Chip select').length).toBeGreaterThan(0)
     expect(screen.getByRole('heading', { name: 'Configuration Inspector' })).toBeInTheDocument()
     expect(screen.getAllByText('SPI topology').length).toBeGreaterThan(0)

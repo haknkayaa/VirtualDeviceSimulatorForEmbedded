@@ -1,3 +1,5 @@
+//! Compiled SPI commands and command behavior.
+
 use super::{CommandTimingDefinition, SpiCommandWireDefinition};
 
 pub(super) struct SpiCommand {

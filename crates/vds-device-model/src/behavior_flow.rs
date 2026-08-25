@@ -1,3 +1,5 @@
+//! Compilation of visual behavior flows into runtime model definitions.
+
 use std::{collections::BTreeMap, path::PathBuf};
 
 use serde::Deserialize;

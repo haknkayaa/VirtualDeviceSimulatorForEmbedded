@@ -1,3 +1,5 @@
+//! Server configuration loading, defaults, and validation.
+
 use std::{fs, path::Path, path::PathBuf};
 
 use serde::{Deserialize, Serialize};

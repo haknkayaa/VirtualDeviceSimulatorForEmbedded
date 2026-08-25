@@ -1,3 +1,5 @@
+//! Typed domain-event envelopes and payloads.
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};

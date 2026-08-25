@@ -3,38 +3,40 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATE_DIR="$ROOT_DIR/.vds4e-build"
+STATE_DIR="$ROOT_DIR/build/.state"
+ADAPTER_BUILD_DIR="$ROOT_DIR/build/adapters"
+EXAMPLE_BUILD_DIR="$ROOT_DIR/build/examples"
 PREFIX="${PREFIX:-/usr/local}"
 DESTDIR="${DESTDIR:-}"
 INSTALL_ROOT="${DESTDIR}${PREFIX}"
 
 if [[ ! -f "$STATE_DIR/.configured" ]]; then
   echo "The repository has not been configured." >&2
-  echo "Run ./configure and ./build before ./install." >&2
+  echo "Run ./configure and ./build.sh before ./install." >&2
   exit 1
 fi
 
 if [[ ! -f "$STATE_DIR/.built" ]]; then
   echo "The repository has not been built successfully." >&2
-  echo "Run ./build before ./install." >&2
+  echo "Run ./build.sh before ./install." >&2
   exit 1
 fi
 
 required_outputs=(
-  "$ROOT_DIR/target/release/vds-server"
-  "$ROOT_DIR/target/release/vds-cli"
-  "$ROOT_DIR/apps/vds-web/dist/index.html"
-  "$STATE_DIR/spi-cuse/vds4e-spi-cuse"
-  "$STATE_DIR/i2c-cuse/vds4e-i2c-cuse"
-  "$STATE_DIR/gpio-sim/vds4e-gpio-sim"
-  "$STATE_DIR/bin/mt25ql256_tool"
-  "$STATE_DIR/bin/at24c256_tool"
+  "$ROOT_DIR/build/rust/release/vds-server"
+  "$ROOT_DIR/build/rust/release/vds-cli"
+  "$ROOT_DIR/build/web/index.html"
+  "$ADAPTER_BUILD_DIR/spi-cuse/vds4e-spi-cuse"
+  "$ADAPTER_BUILD_DIR/i2c-cuse/vds4e-i2c-cuse"
+  "$ADAPTER_BUILD_DIR/gpio-sim/vds4e-gpio-sim"
+  "$EXAMPLE_BUILD_DIR/mt25ql256_tool"
+  "$EXAMPLE_BUILD_DIR/at24c256_tool"
 )
 
 for output in "${required_outputs[@]}"; do
   if [[ ! -e "$output" ]]; then
     echo "Required build output is missing: $output" >&2
-    echo "Run ./build again." >&2
+    echo "Run ./build.sh again." >&2
     exit 1
   fi
 done
@@ -55,22 +57,22 @@ install_tree() {
 
 echo "Installing into $INSTALL_ROOT..."
 
-install_file 0755 "$ROOT_DIR/target/release/vds-server" \
+install_file 0755 "$ROOT_DIR/build/rust/release/vds-server" \
   "$INSTALL_ROOT/bin/vds-server"
-install_file 0755 "$ROOT_DIR/target/release/vds-cli" \
+install_file 0755 "$ROOT_DIR/build/rust/release/vds-cli" \
   "$INSTALL_ROOT/bin/vds-cli"
-install_file 0755 "$STATE_DIR/spi-cuse/vds4e-spi-cuse" \
+install_file 0755 "$ADAPTER_BUILD_DIR/spi-cuse/vds4e-spi-cuse" \
   "$INSTALL_ROOT/bin/vds4e-spi-cuse"
-install_file 0755 "$STATE_DIR/i2c-cuse/vds4e-i2c-cuse" \
+install_file 0755 "$ADAPTER_BUILD_DIR/i2c-cuse/vds4e-i2c-cuse" \
   "$INSTALL_ROOT/bin/vds4e-i2c-cuse"
-install_file 0755 "$STATE_DIR/gpio-sim/vds4e-gpio-sim" \
+install_file 0755 "$ADAPTER_BUILD_DIR/gpio-sim/vds4e-gpio-sim" \
   "$INSTALL_ROOT/bin/vds4e-gpio-sim"
-install_file 0755 "$STATE_DIR/bin/mt25ql256_tool" \
+install_file 0755 "$EXAMPLE_BUILD_DIR/mt25ql256_tool" \
   "$INSTALL_ROOT/bin/mt25ql256_tool"
-install_file 0755 "$STATE_DIR/bin/at24c256_tool" \
+install_file 0755 "$EXAMPLE_BUILD_DIR/at24c256_tool" \
   "$INSTALL_ROOT/bin/at24c256_tool"
 
-install_tree "$ROOT_DIR/apps/vds-web/dist" \
+install_tree "$ROOT_DIR/build/web" \
   "$INSTALL_ROOT/share/vds4e/web"
 install_tree "$ROOT_DIR/device-models/examples" \
   "$INSTALL_ROOT/share/vds4e/device-models"

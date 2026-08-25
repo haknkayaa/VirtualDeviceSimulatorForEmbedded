@@ -1,3 +1,5 @@
+//! Deterministic register storage and access enforcement.
+
 use std::collections::BTreeMap;
 
 use crate::{AccessType, BitFieldDefinition, RegisterDefinition, RegisterError};

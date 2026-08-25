@@ -1,3 +1,5 @@
+//! Flash-memory storage and mutation primitives.
+
 use super::{
     CommandTimingDefinition, DeviceError, DeviceEvent, DeviceState, DeviceTransfer,
     GenericSpiDevice, PendingOperation, RegisterOperation, RegisterTrace, TimingErrorCode,

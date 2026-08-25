@@ -1,3 +1,5 @@
+//! HTTP endpoints for persisted transaction telemetry.
+
 use std::{
     collections::{HashMap, HashSet},
     time::{Duration, SystemTime, UNIX_EPOCH},

@@ -1,3 +1,5 @@
+//! Thread-safe registration and lookup of virtual-device instances.
+
 use std::{
     collections::HashMap,
     sync::{Arc, RwLock},

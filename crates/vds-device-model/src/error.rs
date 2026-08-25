@@ -1,3 +1,5 @@
+//! Errors produced while loading or executing device models.
+
 use vds_core::state_machine::StateMachineError;
 use vds_registers::RegisterError;
 

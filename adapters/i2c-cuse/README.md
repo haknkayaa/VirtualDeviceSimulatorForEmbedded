@@ -4,6 +4,10 @@
 userspace ABI. One daemon represents one bus and maps slave addresses to VDS4E
 device IDs.
 
+The source is separated into process orchestration (`main.c`), configuration
+validation (`options.c`), Linux CUSE/ioctl handling (`runtime.c`), and
+data-plane transaction routing (`transaction.c`).
+
 Supported ioctl families:
 
 - `I2C_FUNCS`, `I2C_SLAVE`, `I2C_SLAVE_FORCE`, `I2C_TENBIT`

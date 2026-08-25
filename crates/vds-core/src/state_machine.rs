@@ -1,3 +1,5 @@
+//! Deterministic declarative device state-machine execution.
+
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Eq, PartialEq)]

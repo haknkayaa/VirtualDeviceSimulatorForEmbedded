@@ -114,13 +114,13 @@ The root pipeline is deliberately ordered:
 
 ```shell
 ./configure
-./build
+./build.sh
 sudo ./install
 ```
 
-- `./build` refuses to run before a successful `./configure`.
-- `./install` refuses to run before a successful `./build`.
-- native intermediate output is stored under `.vds4e-build/`.
+- `./build.sh` refuses to run before a successful `./configure`.
+- `./install` refuses to run before a successful `./build.sh`.
+- all generated build output is stored under `build/`.
 - `PREFIX` selects the installation prefix.
 - `DESTDIR` stages a filesystem package.
 
@@ -445,8 +445,8 @@ kernel's `gpio-sim` controller. Build the helper for focused development if the
 root pipeline has not already built it:
 
 ```shell
-cmake -S adapters/gpio-sim -B .vds4e-build/gpio-sim
-cmake --build .vds4e-build/gpio-sim
+cmake -S adapters/gpio-sim -B build/adapters/gpio-sim
+cmake --build build/adapters/gpio-sim
 ```
 
 Create a 32-line GPIO adapter in the Web UI, attach
@@ -612,7 +612,7 @@ npm --prefix apps/vds-web run build
 ```
 
 Native adapters and examples have their own CMake or Make definitions. The root
-`./configure` and `./build` pipeline builds them together from staged output
+`./configure` and `./build.sh` pipeline builds them together from staged output
 directories.
 
 ## Architecture boundaries

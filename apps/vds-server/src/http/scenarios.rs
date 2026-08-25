@@ -1,3 +1,5 @@
+//! HTTP endpoints for scenario listing and validation.
+
 use super::*;
 
 #[derive(Serialize)]

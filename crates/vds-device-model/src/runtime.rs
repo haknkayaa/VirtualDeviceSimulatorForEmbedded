@@ -1,3 +1,5 @@
+//! Generic SPI runtime assembled from declarative model definitions.
+
 use super::{
     Arc, BusType, BusyDefinition, CommandTimingDefinition, Device, DeviceError, DeviceEvent,
     DeviceTransfer, EventId, EventScheduler, FaultAction, FaultContext, FaultEngine,

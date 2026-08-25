@@ -1,3 +1,5 @@
+//! Deterministic execution of scenario steps against a runtime.
+
 use std::{collections::HashMap, sync::Arc};
 
 use tracing::{info, warn};
