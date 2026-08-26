@@ -51,6 +51,7 @@ export function ValidationPanel({ issues, tabConfig }: ValidationPanelProps) {
   const visible = useFlowStore((state) => state.validationVisible)
   const select = useFlowStore((state) => state.select)
   const document = useFlowStore((state) => state.document)
+  const documentName = document.flow.kind === 'scenario' ? 'Test scenario' : document.flow.kind === 'device_behavior' ? 'Behavior model' : 'Document'
   const [clearedSignature, setClearedSignature] = useState<string | null>(null)
   const [focusedIssue, setFocusedIssue] = useState<string | null>(null)
   const signature = useMemo(
@@ -63,7 +64,7 @@ export function ValidationPanel({ issues, tabConfig }: ValidationPanelProps) {
   if (!visible) return null
   const copyIssues = () => {
     const output = issues.length === 0
-      ? 'Flow is valid. No validation issues.'
+      ? `${documentName} is valid. No validation issues.`
       : issues.map((issue) => `[${issue.severity.toUpperCase()}] ${issue.ruleId}: ${issue.message}`).join('\n')
     void navigator.clipboard.writeText(output)
   }
@@ -71,7 +72,7 @@ export function ValidationPanel({ issues, tabConfig }: ValidationPanelProps) {
     <aside className="flow-validation flow-frosted" aria-label="Validation terminal">
       <header>
         {tabConfig
-          ? <div aria-label="Flow output" className="flow-output-tabs" role="tablist">
+          ? <div aria-label={`${documentName} output`} className="flow-output-tabs" role="tablist">
               <button aria-selected={validationActive} className={validationActive ? 'active' : ''} onClick={() => tabConfig.onTabChange('validate')} role="tab" type="button">Validate</button>
               {tabConfig.tabs.map((tab) => <button aria-selected={tab.id === tabConfig.activeTab} className={tab.id === tabConfig.activeTab ? 'active' : ''} key={tab.id} onClick={() => tabConfig.onTabChange(tab.id)} role="tab" type="button">{tab.label}</button>)}
             </div>
@@ -84,7 +85,7 @@ export function ValidationPanel({ issues, tabConfig }: ValidationPanelProps) {
       </header>
       {validationActive && <div aria-label="Validate output" className="flow-output-tab-panel" role="tabpanel">
         {cleared && <div className="flow-panel-empty flow-terminal-cleared"><strong>Terminal cleared</strong></div>}
-        {!cleared && issues.length === 0 && <div className="flow-panel-empty flow-valid"><CheckCircle2 size={21} /><strong>Flow is valid</strong><span>No generic validation issues.</span></div>}
+        {!cleared && issues.length === 0 && <div className="flow-panel-empty flow-valid"><CheckCircle2 size={21} /><strong>{documentName} is valid</strong><span>No validation issues found.</span></div>}
         <div className="flow-issue-list">
           {!cleared && issues.map((issue, index) => {
           const key = `${issue.ruleId}-${issue.nodeId ?? ''}-${issue.edgeId ?? ''}-${index}`
@@ -93,7 +94,7 @@ export function ValidationPanel({ issues, tabConfig }: ValidationPanelProps) {
             ? document.nodes.find((node) => node.id === issue.nodeId)?.kind ?? 'node'
             : issue.edgeId
               ? document.edges.find((edge) => edge.id === issue.edgeId)?.kind ?? 'edge'
-              : 'flow'
+              : 'document'
           return (
           <button className={focusedIssue === key ? 'focused' : ''} key={key} onClick={() => {
             setFocusedIssue(key)
@@ -102,7 +103,7 @@ export function ValidationPanel({ issues, tabConfig }: ValidationPanelProps) {
             {issue.severity === 'error' ? <AlertCircle size={15} /> : <AlertTriangle size={15} />}
             <div><strong>{issue.message}</strong><small>{issue.ruleId}</small></div>
             <span className="flow-issue-target">
-              <b>{targetId ? `${issue.nodeId ? 'node' : 'edge'} · ${targetId}` : 'flow'}</b>
+              <b>{targetId ? `${issue.nodeId ? 'node' : 'edge'} · ${targetId}` : 'document'}</b>
               <code>{targetKind}</code>
               <em>{propertyLabel(issue.ruleId)}</em>
             </span>

@@ -10,6 +10,7 @@ pub enum Operation {
     SpiTransfer,
     I2cTransfer,
     GpioExchange,
+    UartTransfer,
 }
 
 impl Operation {
@@ -19,6 +20,7 @@ impl Operation {
             Self::SpiTransfer => "spi_transfer",
             Self::I2cTransfer => "i2c_transfer",
             Self::GpioExchange => "gpio_exchange",
+            Self::UartTransfer => "uart_transfer",
         }
     }
 }

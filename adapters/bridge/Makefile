@@ -6,7 +6,7 @@ CPPFLAGS ?= -I.
 BUILD_DIR ?= build
 LIBRARY := $(BUILD_DIR)/libvds4e_adapter_bridge.a
 SOURCES := adapter_bridge.c bridge_codec.c bridge_io.c spi_bridge.c \
-	i2c_bridge.c gpio_bridge.c
+	i2c_bridge.c gpio_bridge.c uart_bridge.c
 OBJECTS := $(SOURCES:%.c=$(BUILD_DIR)/%.o)
 
 .PHONY: all clean

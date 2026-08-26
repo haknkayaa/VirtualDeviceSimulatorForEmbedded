@@ -29,14 +29,14 @@ export function DeviceFlows({ deviceId }: { deviceId: string }) {
     : null)
 
   return (
-    <GlassPanel className="flows-catalog" eyebrow="Device behavior" title="Flows">
+    <GlassPanel className="flows-catalog" eyebrow="Always-on device logic" title="Behavior Model">
       <div className="flow-list">
-        {packagedFlow.isPending && !localFlow && <AsyncState kind="loading" title="Loading packaged device flow" />}
+        {packagedFlow.isPending && !localFlow && <AsyncState kind="loading" title="Loading packaged behavior model" />}
         {!packagedFlow.isPending && !item && <Link className="flow-list-new" to={`${editorBase}/new`}>
           <Plus size={21} />
           <div>
-            <strong>Create device flow</strong>
-            <span>Define states and transitions for {deviceId}.</span>
+            <strong>Define device behavior</strong>
+            <span>Create the runtime logic for {deviceId}.</span>
           </div>
         </Link>}
         {item && (
@@ -46,7 +46,7 @@ export function DeviceFlows({ deviceId }: { deviceId: string }) {
           >
             <span className="flow-list-icon"><Orbit size={18} /></span>
             <div className="flow-list-copy">
-              <span>{item.source} · device flow</span>
+              <span>{item.source === 'local' ? 'draft' : 'package'} · behavior model</span>
               <strong>{item.name}</strong>
               <small>{item.id}</small>
             </div>

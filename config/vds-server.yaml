@@ -20,6 +20,7 @@ event_store:
   register_read_sample_rate: 100
 
 device_packages:
+  - device-models/examples/generic-uart-responder
   # Repository examples are installed into ~/vds4e/devices/ before loading.
   - device-models/examples/generic-spidev
   - device-models/examples/micron-mt25ql256aba8esf-0sit

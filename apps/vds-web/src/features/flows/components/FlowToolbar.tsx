@@ -15,10 +15,11 @@ interface FlowToolbarProps {
 
 export function FlowToolbar({ fitView, autoLayout, onSave, onExport, onImport, toolbarActions }: FlowToolbarProps) {
   const state = useFlowStore()
+  const documentName = state.document.flow.kind === 'scenario' ? 'Test scenario' : state.document.flow.kind === 'device_behavior' ? 'Behavior model' : 'Document'
   return (
-    <div className="flow-toolbar flow-frosted" role="toolbar" aria-label="Flow editor toolbar">
+    <div className="flow-toolbar flow-frosted" role="toolbar" aria-label={`${documentName} editor toolbar`}>
       <div className="flow-toolbar-title">
-        <input aria-label="Flow name" disabled={state.readOnly} onChange={(event) => state.updateFlowName(event.target.value)} value={state.document.flow.name} />
+        <input aria-label={`${documentName} name`} disabled={state.readOnly} onChange={(event) => state.updateFlowName(event.target.value)} value={state.document.flow.name} />
         <span>{state.readOnly ? <><Eye size={13} /> Read only</> : state.isDirty ? 'Unsaved changes' : 'Saved locally'}</span>
       </div>
       <div className="flow-tool-group">

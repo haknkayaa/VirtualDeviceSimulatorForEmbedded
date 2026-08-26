@@ -13,7 +13,7 @@ export class FlowEditorBoundary extends Component<{ children: ReactNode }, { err
     if (!this.state.error) return this.props.children
     return (
       <div className="flow-editor-failure" role="alert">
-        <strong>Flow editor could not render</strong>
+        <strong>Visual editor could not render</strong>
         <span>{this.state.error.message}</span>
       </div>
     )

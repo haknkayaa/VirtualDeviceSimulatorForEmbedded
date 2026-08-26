@@ -1,4 +1,5 @@
 /build/
+/.vds4e-build/
 /examples/micron-mt25ql256-embedded/mt25ql256_tool
 /examples/atmel-at24c256-embedded/at24c256_tool
 *.db

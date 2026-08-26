@@ -1,0 +1,23 @@
+api_version: vds4e.dev/v1alpha1
+kind: DevicePackage
+metadata:
+  id: generic-uart-responder
+  display_name: Generic UART Responder
+  version: 1.0.0
+  license: Apache-2.0
+  authors: [VDS4E Contributors]
+  tags: [uart, serial, example]
+spec:
+  bus:
+    type: uart
+    profile: uart.115200-8n1
+    options:
+      baud_rate: 115200
+      data_bits: 8
+      parity: none
+      stop_bits: 1
+  runtime:
+    driver: generic-uart-responder
+    model: model/device.yaml
+  documentation: docs
+  extensions: {}

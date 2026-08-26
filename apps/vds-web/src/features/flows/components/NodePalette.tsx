@@ -12,6 +12,11 @@ export function NodePalette() {
   const setSearch = useFlowStore((state) => state.setPaletteSearch)
   const readOnly = useFlowStore((state) => state.readOnly)
   const flowKind = useFlowStore((state) => state.document.flow.kind)
+  const paletteHint = flowKind === 'scenario'
+    ? 'Drag test steps onto the canvas, then connect them in execution order.'
+    : flowKind === 'device_behavior'
+      ? 'Drag states and behavior actions onto the canvas to define runtime logic.'
+      : 'Drag an available node onto the canvas.'
   const reusableNodes = [...new Map(
     useFlowStore((state) => state.document.nodes)
       .filter((node) => typeof node.ui.reusable_id === 'string')
@@ -28,7 +33,7 @@ export function NodePalette() {
     <aside className="flow-palette flow-frosted" aria-label="Node palette">
       <header><div><span className="eyebrow">Registry</span><strong>Node palette</strong></div><span>{nodes.length}</span></header>
       <label className="flow-palette-search"><Search aria-hidden="true" size={14} /><input aria-label="Search nodes" onChange={(event) => setSearch(event.target.value)} placeholder="Search nodes" value={search} /></label>
-      <p>Drag a registered {flowKind} type onto the canvas.</p>
+      <p>{paletteHint}</p>
       <div className="flow-palette-list">
         {flowKind === 'device_behavior' && reusableNodes.length > 0 && <section className="flow-palette-category">
           <h3>Reusable nodes</h3>

@@ -31,6 +31,8 @@ pub struct DeviceDefinition {
     pub i2c: Option<I2cBusDefinition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gpio: Option<GpioBusDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uart: Option<UartBusDefinition>,
     #[serde(default)]
     pub commands: Vec<SpiCommandDefinition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -43,6 +45,42 @@ pub struct DeviceDefinition {
     pub state_machine: Option<DeviceStateMachineDefinition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub faults: Vec<FaultDefinition>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct UartBusDefinition {
+    pub baud_rate: u32,
+    #[serde(default = "default_uart_data_bits")]
+    pub data_bits: u8,
+    #[serde(default = "default_uart_stop_bits")]
+    pub stop_bits: u8,
+    #[serde(default)]
+    pub parity: UartParity,
+    pub responses: Vec<UartResponseDefinition>,
+}
+
+const fn default_uart_data_bits() -> u8 {
+    8
+}
+const fn default_uart_stop_bits() -> u8 {
+    1
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UartParity {
+    #[default]
+    None,
+    Even,
+    Odd,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct UartResponseDefinition {
+    pub request: Vec<u8>,
+    pub response: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

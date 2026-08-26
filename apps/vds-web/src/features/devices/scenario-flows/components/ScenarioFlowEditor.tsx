@@ -25,7 +25,7 @@ export function ScenarioFlowEditor({ onSave, onExport, onImport, onNotice }: { o
   const start = useStartScenarioDefinition()
   const settings = scenarioSettings(document)
   const compile = () => compileScenarioFlow(useFlowStore.getState().document, resources)
-  const validate = () => { const result = compile(); setPreview(result); onNotice(result.errors.length ? `${result.errors.length} blocking validation error(s).` : `Valid scenario flow${result.warnings.length ? ` with ${result.warnings.length} warning(s)` : ''}.`, result.errors.length > 0); return result }
+  const validate = () => { const result = compile(); setPreview(result); onNotice(result.errors.length ? `${result.errors.length} blocking validation error(s).` : `Valid test scenario${result.warnings.length ? ` with ${result.warnings.length} warning(s)` : ''}.`, result.errors.length > 0); return result }
   const run = () => {
     const result = compile()
     if (!result.document || result.errors.length) { setPreview(result); onNotice('Run blocked by scenario validation.', true); return }

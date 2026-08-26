@@ -10,6 +10,8 @@ SPI_CUSE_BUILD_DIR="$ROOT_DIR/build/adapters/spi-cuse"
 SPI_CUSE_EXECUTABLE="$SPI_CUSE_BUILD_DIR/vds4e-spi-cuse"
 I2C_CUSE_BUILD_DIR="$ROOT_DIR/build/adapters/i2c-cuse"
 I2C_CUSE_EXECUTABLE="$I2C_CUSE_BUILD_DIR/vds4e-i2c-cuse"
+UART_PTY_BUILD_DIR="$ROOT_DIR/build/adapters/uart-pty"
+UART_PTY_EXECUTABLE="$UART_PTY_BUILD_DIR/vds4e-uart-pty"
 LOCK_FILE="${TMPDIR:-/tmp}/vds4e-dev-${UID}.lock"
 SERVER_PID=""
 WEB_PID=""
@@ -24,6 +26,33 @@ fi
 
 port_is_open() {
   (exec 8<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
+}
+
+prepare_cmake_build_dir() {
+  local source_dir="$1"
+  local build_dir="$2"
+  local cache_file="$build_dir/CMakeCache.txt"
+  local directory_info="$build_dir/CMakeFiles/CMakeDirectoryInformation.cmake"
+  local cached_source=""
+  local cached_binary=""
+  local generated_binary=""
+
+  if [[ ! -f "$cache_file" ]]; then
+    return
+  fi
+
+  cached_source="$(sed -n 's#^CMAKE_HOME_DIRECTORY:INTERNAL=##p' "$cache_file")"
+  cached_binary="$(sed -n 's#^CMAKE_CACHEFILE_DIR:INTERNAL=##p' "$cache_file")"
+  if [[ -f "$directory_info" ]]; then
+    generated_binary="$(sed -n 's#^set(CMAKE_RELATIVE_PATH_TOP_BINARY "\(.*\)")#\1#p' "$directory_info")"
+  fi
+
+  if [[ "$cached_source" != "$source_dir" ||
+        "$cached_binary" != "$build_dir" ||
+        ( -n "$generated_binary" && "$generated_binary" != "$build_dir" ) ]]; then
+    echo "Discarding relocated CMake cache: $build_dir"
+    cmake -E remove_directory "$build_dir"
+  fi
 }
 
 wait_for_control_api() {
@@ -83,7 +112,11 @@ fi
 
 cd "$ROOT_DIR"
 
+echo "Building shared adapter transport..."
+make -C "$ROOT_DIR/adapters/bridge" BUILD_DIR="$ROOT_DIR/build/bridge" all
+
 echo "Configuring and building the SPI CUSE adapter..."
+prepare_cmake_build_dir "$ROOT_DIR/adapters/spi-cuse" "$SPI_CUSE_BUILD_DIR"
 cmake \
   -S "$ROOT_DIR/adapters/spi-cuse" \
   -B "$SPI_CUSE_BUILD_DIR" \
@@ -91,11 +124,20 @@ cmake \
 cmake --build "$SPI_CUSE_BUILD_DIR" --parallel
 
 echo "Configuring and building the I2C CUSE adapter..."
+prepare_cmake_build_dir "$ROOT_DIR/adapters/i2c-cuse" "$I2C_CUSE_BUILD_DIR"
 cmake \
   -S "$ROOT_DIR/adapters/i2c-cuse" \
   -B "$I2C_CUSE_BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$I2C_CUSE_BUILD_DIR" --parallel
+
+echo "Configuring and building the UART PTY adapter..."
+prepare_cmake_build_dir "$ROOT_DIR/adapters/uart-pty" "$UART_PTY_BUILD_DIR"
+cmake \
+  -S "$ROOT_DIR/adapters/uart-pty" \
+  -B "$UART_PTY_BUILD_DIR" \
+  -DCMAKE_BUILD_TYPE=Debug
+cmake --build "$UART_PTY_BUILD_DIR" --parallel
 
 if [[ "${VDS4E_ADAPTER_AUTH:-pkexec}" == "sudo" ]]; then
   # sudo's default credential cache is terminal-scoped. Keep the server in
@@ -105,12 +147,14 @@ if [[ "${VDS4E_ADAPTER_AUTH:-pkexec}" == "sudo" ]]; then
   env \
     VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
     VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
+    VDS4E_UART_PTY_EXECUTABLE="$UART_PTY_EXECUTABLE" \
     "$ROOT_DIR/build/rust/debug/vds-server" --config config/vds-server.yaml &
   SERVER_PID=$!
 else
   setsid env \
     VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
     VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
+    VDS4E_UART_PTY_EXECUTABLE="$UART_PTY_EXECUTABLE" \
     cargo run -p vds-server -- --config config/vds-server.yaml &
   SERVER_PID=$!
   SERVER_OWN_PROCESS_GROUP=true

@@ -146,6 +146,16 @@ vds_status_t vds_i2c_transfer(vds_adapter_bridge_t *client,
                               size_t *read_length,
                               vds_error_t *error);
 
+/// @brief Forward bytes received from a UART PTY and collect device bytes.
+vds_status_t vds_uart_transfer(vds_adapter_bridge_t *client,
+                               const char *device_id,
+                               const uint8_t *tx,
+                               size_t tx_length,
+                               uint8_t *rx,
+                               size_t rx_capacity,
+                               size_t *rx_length,
+                               vds_error_t *error);
+
 #ifdef __cplusplus
 }
 #endif

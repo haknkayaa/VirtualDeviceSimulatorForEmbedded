@@ -3,10 +3,10 @@
 use super::{
     AccessType, Arc, At24cEepromDevice, CommandTimingDefinition, DeviceModel, DeviceState,
     EventScheduler, FaultEngine, FlashMemory, GenericGpioDevice, GenericI2cDevice,
-    GenericSpiDevice, HashMap, ModelError, Mutex, Path, RealTimeClock, RegisterEngine, SignalGraph,
-    SimulatorClock, SpiBusDefinition, SpiCommand, SpiCommandBehavior, SpiCommandOperation,
-    StateActionDefinition, StateGuardDefinition, StateMachine, compile_state_machine, fs,
-    initialize_state_machine, uncompiled_state_machine, validate_faults,
+    GenericSpiDevice, GenericUartDevice, HashMap, ModelError, Mutex, Path, RealTimeClock,
+    RegisterEngine, SignalGraph, SimulatorClock, SpiBusDefinition, SpiCommand, SpiCommandBehavior,
+    SpiCommandOperation, StateActionDefinition, StateGuardDefinition, StateMachine,
+    compile_state_machine, fs, initialize_state_machine, uncompiled_state_machine, validate_faults,
     validate_register_reference,
 };
 use crate::{DEVICE_MODEL_SCHEMA, behavior_flow};
@@ -68,6 +68,39 @@ impl DeviceModel {
         }
 
         let model: Self = serde_json::from_value(instance)?;
+        if model.device.bus == "uart" {
+            let uart = model.device.uart.as_ref().ok_or_else(|| {
+                ModelError::Validation("UART device is missing device.uart".to_owned())
+            })?;
+            if !(5..=8).contains(&uart.data_bits) || !(1..=2).contains(&uart.stop_bits) {
+                return Err(ModelError::Validation(
+                    "UART data_bits must be 5..=8 and stop_bits must be 1..=2".to_owned(),
+                ));
+            }
+            let mut requests = std::collections::HashSet::new();
+            if uart.responses.is_empty()
+                || uart.responses.iter().any(|rule| rule.request.is_empty())
+                || uart
+                    .responses
+                    .iter()
+                    .any(|rule| !requests.insert(rule.request.clone()))
+            {
+                return Err(ModelError::Validation(
+                    "UART responses require unique, non-empty request byte sequences".to_owned(),
+                ));
+            }
+            if uart.responses.iter().enumerate().any(|(index, left)| {
+                uart.responses.iter().skip(index + 1).any(|right| {
+                    left.request.starts_with(&right.request)
+                        || right.request.starts_with(&left.request)
+                })
+            }) {
+                return Err(ModelError::Validation(
+                    "UART response requests must not be prefixes of one another".to_owned(),
+                ));
+            }
+            return Ok(model);
+        }
         if model.device.bus == "gpio" {
             let gpio = model.device.gpio.as_ref().ok_or_else(|| {
                 ModelError::Validation("GPIO device is missing device.gpio".to_owned())
@@ -322,6 +355,27 @@ impl DeviceModel {
                 model: "generic-i2c-register".to_owned(),
             })?;
         GenericI2cDevice::new(self.device.id, definition, self.device.registers)
+    }
+
+    /// Builds a declarative byte-oriented UART runtime.
+    ///
+    /// # Errors
+    /// Returns an error unless the model uses the generic UART responder driver.
+    pub fn into_uart_device(self) -> Result<GenericUartDevice, ModelError> {
+        if self.device.bus != "uart" || self.device.model != "generic-uart-responder" {
+            return Err(ModelError::UnsupportedModel {
+                bus: self.device.bus,
+                model: self.device.model,
+            });
+        }
+        let definition = self
+            .device
+            .uart
+            .ok_or_else(|| ModelError::UnsupportedModel {
+                bus: "uart".to_owned(),
+                model: "generic-uart-responder".to_owned(),
+            })?;
+        Ok(GenericUartDevice::new(self.device.id, definition))
     }
 
     /// Builds an AT24C128/AT24C256 EEPROM runtime using an injected clock.

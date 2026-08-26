@@ -52,7 +52,11 @@ export function AdapterTree({
             ? devicePaths.join(', ')
             : adapter.bus_type === 'gpio'
               ? adapter.device_path ?? `/dev/gpiochipX · ${adapter.line_count ?? 0} lines`
-              : `/dev/spidev${adapter.bus_number}.*`
+              : adapter.bus_type === 'i2c'
+                ? `/dev/i2c-${adapter.bus_number}`
+                : adapter.bus_type === 'uart'
+                  ? adapter.device_path ?? '/dev/pts/X'
+                  : `/dev/spidev${adapter.bus_number}.*`
           const loaded = adapter.state === 'loaded'
           const transitioning = adapter.state === 'loading' || adapter.state === 'unloading'
           const unloadable = loaded || adapter.state === 'error'
