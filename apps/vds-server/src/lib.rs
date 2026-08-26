@@ -1209,6 +1209,7 @@ mod tests {
     use vds_protocol::v1::GpioExchangeRequest;
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn gpio_exchange_routes_through_the_runtime_registry() {
         let model = DeviceModel::from_yaml(
             r"

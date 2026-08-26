@@ -260,6 +260,7 @@ describe('devices page', () => {
     expect(screen.queryByText('No adapter assigned')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     const save = screen.getByRole('button', { name: 'Save' })
+    expect(save).toBe(document.querySelector('.device-profile-card .configuration-save'))
     expect(save).toBeDisabled()
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'CPOL' }), '1')
     expect(save).toBeEnabled()

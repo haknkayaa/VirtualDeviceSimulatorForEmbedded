@@ -29,7 +29,7 @@ async fn event_socket(mut socket: WebSocket, events: Arc<EventBus>, after_event_
                             break;
                         }
                     }
-                    Some(Ok(Message::Close(_))) | Some(Err(_)) | None => break,
+                    Some(Ok(Message::Close(_)) | Err(_)) | None => break,
                     Some(Ok(_)) => {}
                 }
             }

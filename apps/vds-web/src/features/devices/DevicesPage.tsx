@@ -276,6 +276,11 @@ export function DevicesPage() {
   const adapterUnloadable = adapterAssignment?.adapter.state === 'loaded' || adapterAssignment?.adapter.state === 'error'
   const deviceActions = (
     <div aria-label="Device actions" className="device-page-actions" role="group">
+      {activeTab === 'configuration' && (
+        <button className={`button configuration-save${configurationDirty ? ' configuration-save-dirty' : ''}`} disabled={!configurationDirty || configurationBusy} onClick={() => configurationSave.current()} type="button">
+          <Save aria-hidden="true" size={15} /> {configurationBusy ? 'Saving…' : 'Save'}
+        </button>
+      )}
       {adapterAssignment
         ? <button
           className={`button ${adapterUnloadable ? 'button-danger' : 'button-primary'}`}
@@ -295,14 +300,6 @@ export function DevicesPage() {
       </button>
     </div>
   )
-
-  const workspaceUtilities = activeTab === 'configuration' ? (
-    <div aria-label="Device workspace tools" className="device-workspace-utilities" role="group">
-      <button className={`button configuration-save${configurationDirty ? ' configuration-save-dirty' : ''}`} disabled={!configurationDirty || configurationBusy} onClick={() => configurationSave.current()} type="button">
-        <Save aria-hidden="true" size={15} /> {configurationBusy ? 'Saving…' : 'Save'}
-      </button>
-    </div>
-  ) : null
 
   return (
     <div className="page-stack devices-page">
@@ -337,8 +334,6 @@ export function DevicesPage() {
           {device.isError && <GlassPanel><AsyncState detail={device.error.message} kind="error" title="Device unavailable" /></GlassPanel>}
           {device.data && <DeviceProfileCard actions={deviceActions} currentState={state.data?.state ?? device.data.state} device={device.data} />}
           {(reset.isError || loadAdapter.isError || unloadAdapter.isError) && <AsyncState detail={(reset.error ?? loadAdapter.error ?? unloadAdapter.error)?.message} kind="error" title="Device management failed" />}
-
-          {workspaceUtilities}
 
           <div className={`device-workspace-layout${activeTab === 'registers' ? ' register-workspace-layout' : ''}`}>
             <div className="device-workspace-main">

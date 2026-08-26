@@ -1851,51 +1851,7 @@ impl AdapterManager {
             let adapter = adapters.get(adapter_id).ok_or_else(|| {
                 AdapterError::NotFound(format!("adapter '{adapter_id}' was not found"))
             })?;
-            require_stable_topology(adapter)?;
-            if adapter.bus_type == "i2c" && adapter.state == AdapterState::Loaded {
-                return Err(AdapterError::Conflict(
-                    "unload the I2C adapter before changing address bindings".to_owned(),
-                ));
-            }
-            if adapter.bus_type == "gpio" && adapter.state == AdapterState::Loaded {
-                return Err(AdapterError::Conflict(
-                    "unload the GPIO adapter before changing its runtime binding".to_owned(),
-                ));
-            }
-            if adapter.bus_type == "uart" && adapter.state == AdapterState::Loaded {
-                return Err(AdapterError::Conflict(
-                    "unload the UART adapter before changing its runtime binding".to_owned(),
-                ));
-            }
-            if adapter
-                .bindings
-                .iter()
-                .any(|binding| binding.endpoint == endpoint)
-            {
-                return Err(AdapterError::Conflict(format!(
-                    "{} {endpoint:#x} is already occupied",
-                    if adapter.bus_type == "i2c" {
-                        "I2C address"
-                    } else {
-                        "chip-select"
-                    }
-                )));
-            }
-            if adapter.bus_type == "i2c" && endpoint > 0x3ff {
-                return Err(AdapterError::Invalid(
-                    "I2C addresses must be between 0x00 and 0x3ff".to_owned(),
-                ));
-            }
-            if adapter.bus_type == "gpio" && !adapter.bindings.is_empty() {
-                return Err(AdapterError::Conflict(
-                    "a GPIO adapter can bind exactly one GPIO bank device".to_owned(),
-                ));
-            }
-            if adapter.bus_type == "uart" && (endpoint != 0 || !adapter.bindings.is_empty()) {
-                return Err(AdapterError::Conflict(
-                    "a UART adapter binds exactly one device at endpoint zero".to_owned(),
-                ));
-            }
+            validate_new_binding(adapter, endpoint)?;
             (
                 adapter.clone(),
                 AdapterBinding {
@@ -2214,6 +2170,51 @@ fn require_stable_topology(adapter: &AdapterSnapshot) -> Result<(), AdapterError
             "adapter '{}' cannot change topology while it is transitioning",
             adapter.id
         )));
+    }
+    Ok(())
+}
+
+fn validate_new_binding(adapter: &AdapterSnapshot, endpoint: u16) -> Result<(), AdapterError> {
+    require_stable_topology(adapter)?;
+    if adapter.state == AdapterState::Loaded {
+        let message = match adapter.bus_type.as_str() {
+            "i2c" => Some("unload the I2C adapter before changing address bindings"),
+            "gpio" => Some("unload the GPIO adapter before changing its runtime binding"),
+            "uart" => Some("unload the UART adapter before changing its runtime binding"),
+            _ => None,
+        };
+        if let Some(message) = message {
+            return Err(AdapterError::Conflict(message.to_owned()));
+        }
+    }
+    if adapter
+        .bindings
+        .iter()
+        .any(|binding| binding.endpoint == endpoint)
+    {
+        let endpoint_name = if adapter.bus_type == "i2c" {
+            "I2C address"
+        } else {
+            "chip-select"
+        };
+        return Err(AdapterError::Conflict(format!(
+            "{endpoint_name} {endpoint:#x} is already occupied"
+        )));
+    }
+    if adapter.bus_type == "i2c" && endpoint > 0x3ff {
+        return Err(AdapterError::Invalid(
+            "I2C addresses must be between 0x00 and 0x3ff".to_owned(),
+        ));
+    }
+    if adapter.bus_type == "gpio" && !adapter.bindings.is_empty() {
+        return Err(AdapterError::Conflict(
+            "a GPIO adapter can bind exactly one GPIO bank device".to_owned(),
+        ));
+    }
+    if adapter.bus_type == "uart" && (endpoint != 0 || !adapter.bindings.is_empty()) {
+        return Err(AdapterError::Conflict(
+            "a UART adapter binds exactly one device at endpoint zero".to_owned(),
+        ));
     }
     Ok(())
 }

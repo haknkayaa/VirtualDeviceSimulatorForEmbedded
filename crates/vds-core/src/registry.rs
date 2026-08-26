@@ -92,6 +92,9 @@ impl DeviceRegistry {
     }
 
     /// Routes bytes received from a UART PTY to a registered device.
+    ///
+    /// # Errors
+    /// Returns an error when the device is unknown or rejects the byte stream.
     pub fn transfer_uart(
         &self,
         device_id: &str,
