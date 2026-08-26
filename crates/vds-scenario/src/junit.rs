@@ -1,4 +1,4 @@
-//! JUnit XML export for scenario results.
+//! `JUnit` XML export for scenario results.
 
 use std::fmt::Write;
 

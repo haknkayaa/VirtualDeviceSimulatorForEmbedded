@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   rust:
+    name: Core Runtime and Host Adapters
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,4 +27,4 @@ jobs:
       - name: Validate example configuration
         run: cargo run --locked -p vds-server -- --config config/vds-server.yaml --check-config
       - name: Build shared adapter transport
-        run: make -C adapters/common/client-c
+        run: make -C adapters/bridge BUILD_DIR="$RUNNER_TEMP/vds4e-bridge"
