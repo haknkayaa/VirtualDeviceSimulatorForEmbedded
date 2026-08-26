@@ -23,10 +23,10 @@
           "minLength": 1
         },
         "bus": {
-          "enum": ["spi", "i2c", "gpio"]
+          "enum": ["spi", "i2c", "gpio", "uart"]
         },
         "model": {
-          "enum": ["generic-spi-command", "generic-i2c-register", "at24c-eeprom", "generic-gpio-bank"]
+          "enum": ["generic-spi-command", "generic-i2c-register", "at24c-eeprom", "generic-gpio-bank", "generic-uart-responder"]
         },
         "spi": {
           "type": "object",
@@ -72,6 +72,39 @@
             "auto_increment": { "type": "boolean" },
             "write_cycle_us": { "type": "integer", "minimum": 1 },
             "write_protect": { "type": "boolean" }
+          }
+        },
+        "uart": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baud_rate", "responses"],
+          "properties": {
+            "baud_rate": { "type": "integer", "minimum": 1 },
+            "data_bits": { "type": "integer", "minimum": 5, "maximum": 8 },
+            "stop_bits": { "type": "integer", "minimum": 1, "maximum": 2 },
+            "parity": { "enum": ["none", "even", "odd"] },
+            "responses": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["request", "response"],
+                "properties": {
+                  "request": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 2048,
+                    "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+                  },
+                  "response": {
+                    "type": "array",
+                    "maxItems": 2048,
+                    "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+                  }
+                }
+              }
+            }
           }
         },
         "commands": {
@@ -294,6 +327,16 @@
             "required": ["gpio"],
             "properties": {
               "model": { "const": "generic-gpio-bank" },
+              "commands": { "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "bus": { "const": "uart" } } },
+          "then": {
+            "required": ["uart"],
+            "properties": {
+              "model": { "const": "generic-uart-responder" },
               "commands": { "maxItems": 0 }
             }
           }

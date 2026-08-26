@@ -10,6 +10,7 @@ pub enum BusType {
     Spi,
     I2c,
     Gpio,
+    Uart,
 }
 
 /// One Linux-compatible I2C message within an atomic transfer.
@@ -77,6 +78,7 @@ impl fmt::Display for BusType {
             Self::Spi => formatter.write_str("spi"),
             Self::I2c => formatter.write_str("i2c"),
             Self::Gpio => formatter.write_str("gpio"),
+            Self::Uart => formatter.write_str("uart"),
         }
     }
 }
@@ -242,6 +244,18 @@ pub trait Device: Send + Sync {
     fn exchange_gpio(&self, _host_values: &[bool]) -> Result<Vec<bool>, DeviceError> {
         Err(DeviceError::InvalidRequest(format!(
             "device '{}' does not support GPIO exchange",
+            self.id()
+        )))
+    }
+
+    /// Consumes bytes written by a UART peer and returns bytes made available
+    /// to that peer. Framing and termios handling belong to the PTY adapter.
+    ///
+    /// # Errors
+    /// Returns a device error when the stream is unsupported or malformed.
+    fn transfer_uart(&self, _request: &[u8]) -> Result<DeviceTransfer, DeviceError> {
+        Err(DeviceError::InvalidRequest(format!(
+            "device '{}' does not support UART transfers",
             self.id()
         )))
     }

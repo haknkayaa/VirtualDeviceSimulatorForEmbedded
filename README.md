@@ -16,7 +16,7 @@ in [docs/ROADMAP.md](docs/ROADMAP.md).
 | Area | Implemented support |
 | --- | --- |
 | Device packages | Versioned package manifest, runtime model, behavior flow, scenarios, fixtures, documentation, and assets |
-| Runtime drivers | `generic-spi-command`, `generic-i2c-register`, `generic-gpio-bank` |
+| Runtime drivers | `generic-spi-command`, `generic-i2c-register`, `generic-gpio-bank`, `generic-uart-responder` |
 | Device behavior | Registers, bitfields, memory, state machines, virtual time, scheduled operations, faults, reset |
 | Automation | CLI package validation/scaffolding, SPI transfer, scenario execution, JSON and JUnit results |
 | Control plane | REST API, WebSocket replay/live events, React Web UI |
@@ -24,6 +24,7 @@ in [docs/ROADMAP.md](docs/ROADMAP.md).
 | Linux SPI | Managed CUSE `/dev/spidevX.Y` adapter |
 | Linux I²C | Privileged CUSE `/dev/i2c-N` adapter with `I2C_RDWR` and common SMBus operations |
 | Linux GPIO | Kernel `gpio-sim` integration exposing a real `/dev/gpiochipX` |
+| Linux UART | Unprivileged PTY adapter exposing a standard `/dev/pts/N` TTY |
 | Observability | Transactions, registers, state, faults, runs, telemetry, bounded replay, optional SQLite persistence |
 
 ## Interface support
@@ -34,7 +35,7 @@ in [docs/ROADMAP.md](docs/ROADMAP.md).
 | I²C / i2c-dev | `generic-i2c-register` | `/dev/i2c-N` through CUSE | `i2cdetect`, `i2cget`, `i2cset`, `i2ctransfer`, libi2c applications | Supported |
 | GPIO | `generic-gpio-bank` | Real `/dev/gpiochipX` through kernel `gpio-sim` | `gpiodetect`, `gpioinfo`, `gpioget`, `gpioset`, `gpiomon`, libgpiod applications | Supported |
 | QSPI multi-lane / DTR | SPI command and wire-setting validation | No dedicated host adapter | VDS4E native transaction clients | Runtime only |
-| UART | None | No `/dev/tty*` endpoint | — | Not implemented |
+| UART / TTY | `generic-uart-responder` | Kernel-assigned `/dev/pts/N` through PTY | Normal applications using `open`, `read`, `write`, and termios | Supported (functional byte stream) |
 | Ethernet | None | No TAP or socket endpoint | — | Not implemented |
 | CAN | None | No SocketCAN endpoint | — | Not implemented |
 | USB | None | No USB gadget or host endpoint | — | Not implemented |
@@ -47,6 +48,57 @@ MT25QL256 model when device-specific flash behavior is required.
 VDS4E provides functional simulation. It does not simulate electrical
 characteristics, controller DMA/IRQ timing, CPU execution, or a complete target
 board, and it does not replace real-target or hardware-in-the-loop testing.
+
+## Comparison with other simulation approaches
+
+These tools solve related but different problems. The matrix is evaluated for
+Embedded Linux development and peripheral testing; it is not a general product
+ranking.
+
+| Feature | **Renode** | **QEMU** | **Simics** | **Synopsys Virtualizer** | **Arm Fast Models** | **VDS4E** |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: |
+| Embedded-focused virtual platform | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ |
+| Full Linux boot | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Bare-metal / RTOS support | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Custom peripheral modeling | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Declarative hardware description | ✅ | ❌ | ✅ | ✅ | ⚠️ | ⚠️ |
+| Device Tree import | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | Planned |
+| Automatic virtual board generation from DTS | ❌ | ❌ | ❌ | ⚠️ | ❌ | Planned |
+| Yocto-oriented workflow | ⚠️ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
+| Browser-based UI | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Visual hardware designer | ⚠️ | ❌ | ⚠️ | ✅ | ⚠️ | ⚠️ |
+| Drag-and-drop peripheral composition | ❌ | ❌ | ⚠️ | ⚠️ | ⚠️ | Planned |
+| Live peripheral / register inspector | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ |
+| Bus / protocol tracing | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Fault injection | ✅ | ⚠️ | ✅ | ✅ | ✅ | ✅ |
+| One-click fault injection workflow | ⚠️ | ❌ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| Snapshot / checkpoint | ✅ | ✅ | ✅ | ✅ | ✅ | Planned |
+| Deterministic execution | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Record / replay | ✅ | ✅ | ✅ | ✅ | ✅ | Planned |
+| Multi-node simulation | ✅ | ✅ | ✅ | ✅ | ✅ | Planned |
+| HIL / real hardware bridge | ✅ | ✅ | ✅ | ✅ | ✅ | Planned |
+| RTL / SystemC co-simulation | ✅ | ⚠️ | ✅ | ✅ | ✅ | Planned |
+| CI / regression automation | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| AI-assisted peripheral generation | ❌ | ❌ | ❌ | ❌ | ❌ | Planned |
+| Datasheet-to-model generation | ❌ | ❌ | ❌ | ❌ | ❌ | Planned |
+| Driver-to-hardware-model assistance | ❌ | ❌ | ❌ | ❌ | ❌ | Planned |
+| Shareable reproducible simulation sessions | ⚠️ | ❌ | ⚠️ | ⚠️ | ⚠️ | Planned |
+| Open-source friendly | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Developer-first UX | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+
+**Legend:** ✅ Supported · ⚠️ Partial / workflow-dependent · ❌ Not a primary feature · Planned = on the VDS4E roadmap
+
+VDS4E occupies a narrower layer than CPU or full-board emulators. It runs an
+x86_64 build of the production application natively on the workstation and
+provides standard Linux endpoints such as `/dev/spidevX.Y`, `/dev/i2c-N`, and
+`/dev/gpiochipX`. This makes it a lightweight fit when the goal is deterministic
+application and device-behavior testing without modeling a CPU, booting a guest
+kernel, or changing the application to call simulator-specific APIs.
+
+Choose Renode, QEMU, Simics, Synopsys Virtualizer, or Arm Fast Models when
+CPU/SoC behavior, boot flow, kernel drivers, interrupts, DMA, or board-level
+integration is part of the test. These approaches can complement VDS4E rather
+than replace it; optional full-system integration is tracked in the roadmap.
 
 ## Prerequisites
 
@@ -544,6 +596,23 @@ The runtime updates gpio-sim and the normal kernel edge event wakes `gpiomon`.
 libgpiod 2.x uses `-c gpiochip2` to select the chip. Use the syntax shown by the
 installed command's `--help`. Never assume the `gpiochipX` number before the
 kernel creates it.
+
+### UART example
+
+The [UART PTY adapter](adapters/uart-pty/README.md) creates an unprivileged
+standard TTY endpoint. Create a UART adapter in the Web UI, attach
+`generic-uart-responder`, and load it. Use the reported PTY slave path rather
+than assuming its numeric suffix:
+
+```shell
+stty -F /dev/pts/7 115200 raw -echo
+build/examples/uart_ping /dev/pts/7
+# PONG
+```
+
+The PTY is an unprivileged standard TTY endpoint. Its baud/framing settings are
+accepted through termios for application compatibility, but the first UART
+runtime models a deterministic byte stream rather than physical bit timing.
 
 ## Web control plane
 

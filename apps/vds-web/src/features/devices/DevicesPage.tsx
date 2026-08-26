@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Ellipsis, Pencil, Plus, Power, RadioTower, RefreshCw, RotateCcw, Save } from 'lucide-react'
+import { Cable, Plus, Power, PowerOff, RotateCcw, Save } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import {
   useCreateDevice,
   useAdapters,
+  useDeviceCommands,
   useDevice,
   useDeviceTemplates,
   useDevices,
@@ -13,6 +14,8 @@ import {
   useRegisters,
   useResetDevice,
   useSetFault,
+  useLoadAdapter,
+  useUnloadAdapter,
   useWriteRegister,
 } from '../../api/queries'
 import { AsyncState } from '../../components/AsyncState'
@@ -24,7 +27,7 @@ import { humanize } from '../../utils/format'
 import { AddDeviceDialog } from './AddDeviceDialog'
 import { BitfieldInspector } from './BitfieldInspector'
 import { DeviceConfiguration } from './DeviceConfiguration'
-import { DeviceCommandConsole } from './DeviceCommandConsole'
+import { DeviceCommandConsole, DeviceCommandInspector } from './DeviceCommandConsole'
 import { DeviceFooterPanels } from './DeviceFooterPanels'
 import { DeviceFlows } from './DeviceFlows'
 import { DeviceInstanceList } from './DeviceInstanceList'
@@ -36,8 +39,8 @@ import { RegisterMapOverview } from './RegisterMapOverview'
 const deviceTabs = [
   { id: 'registers', label: 'Registers' },
   { id: 'commands', label: 'Commands' },
-  { id: 'flows', label: 'Flows' },
-  { id: 'scenarios', label: 'Scenarios' },
+  { id: 'flows', label: 'Device Behavior' },
+  { id: 'scenarios', label: 'Test Scenarios' },
   { id: 'faults', label: 'Faults' },
   { id: 'events', label: 'Events' },
   { id: 'configuration', label: 'Configuration' },
@@ -65,9 +68,10 @@ export function DevicesPage() {
       : 'registers'
   const [selectedTab, setActiveTab] = useState<DeviceTab>(routeTab)
   const activeTab = routeTab === 'registers' ? selectedTab : routeTab
-  const [liveRead, setLiveRead] = useState(false)
   const [showAddDevice, setShowAddDevice] = useState(false)
   const [selectedRegisterAddress, setSelectedRegisterAddress] = useState<number | null>(null)
+  const [scenarioInspectorTarget, setScenarioInspectorTarget] = useState<HTMLDivElement | null>(null)
+  const [selectedCommandName, setSelectedCommandName] = useState<string>()
   const [configurationDirty, setConfigurationDirty] = useState(false)
   const [configurationBusy, setConfigurationBusy] = useState(false)
   const [configurationSummary, setConfigurationSummary] = useState<{
@@ -94,19 +98,18 @@ export function DevicesPage() {
   const createDevice = useCreateDevice()
   const deviceId = routeDeviceId ?? devices.data?.[0]?.id
   const device = useDevice(deviceId)
+  const commands = useDeviceCommands(activeTab === 'commands' ? deviceId : undefined)
   const state = useDeviceState(deviceId)
   const registers = useRegisters(deviceId)
   const faults = useFaults()
   const reset = useResetDevice()
+  const loadAdapter = useLoadAdapter()
+  const unloadAdapter = useUnloadAdapter()
   const writeRegister = useWriteRegister()
   const faultToggle = useSetFault()
   const events = useEventStore((store) => store.events)
   const deviceFaults = faults.data?.filter((fault) => fault.device_id === deviceId) ?? []
-  const refetchDevices = devices.refetch
-  const refetchDevice = device.refetch
-  const refetchState = state.refetch
   const refetchRegisters = registers.refetch
-  const refetchFaults = faults.refetch
   const deviceEvents = useMemo(
     () => events.filter((event) => event.device_id === deviceId).slice(-100).reverse(),
     [deviceId, events],
@@ -114,26 +117,10 @@ export function DevicesPage() {
   const registerList = registers.data ?? []
   const selectedRegister = registerList.find((register) => register.address === selectedRegisterAddress) ?? registerList[0]
   const effectiveSelectedAddress = selectedRegister?.address ?? null
-  const isRefreshing = devices.isFetching || device.isFetching || state.isFetching || registers.isFetching || faults.isFetching
+  const selectedCommand = commands.data?.find((command) => command.name === selectedCommandName) ?? commands.data?.[0]
   const adapterAssignment = adapters.data
     ?.flatMap((adapter) => adapter.bindings.map((binding) => ({ adapter, binding })))
     .find(({ binding }) => binding.device_id === deviceId)
-
-  const refresh = useCallback(() => {
-    void Promise.all([
-      refetchDevices(),
-      refetchDevice(),
-      refetchState(),
-      refetchRegisters(),
-      refetchFaults(),
-    ])
-  }, [refetchDevice, refetchDevices, refetchFaults, refetchRegisters, refetchState])
-
-  useEffect(() => {
-    if (!liveRead) return
-    const interval = window.setInterval(refresh, 1_000)
-    return () => window.clearInterval(interval)
-  }, [liveRead, refresh])
 
   const renderTabContent = () => {
     if (activeTab === 'registers') {
@@ -185,11 +172,11 @@ export function DevicesPage() {
     }
 
     if (activeTab === 'commands') {
-      return deviceId ? <DeviceCommandConsole deviceId={deviceId} /> : null
+      return deviceId ? <DeviceCommandConsole commands={commands.data} errorMessage={commands.error?.message} isLoading={commands.isPending} onSelect={setSelectedCommandName} selectedName={selectedCommand?.name} /> : null
     }
 
     if (activeTab === 'scenarios') {
-      return deviceId ? <DeviceScenarios deviceId={deviceId} /> : null
+      return deviceId ? <DeviceScenarios deviceId={deviceId} inspectorTarget={scenarioInspectorTarget} /> : null
     }
 
     if (activeTab === 'events') {
@@ -254,6 +241,29 @@ export function DevicesPage() {
       )
     }
 
+    if (activeTab === 'flows') {
+      return (
+        <GlassPanel className="device-context-inspector behavior-overview" eyebrow="Runtime model" title="Behavior Overview">
+          <p className="behavior-overview-intro">
+            Describes how this device behaves whenever the virtual runtime is active.
+          </p>
+          <dl className="behavior-overview-parts">
+            <div><dt>States</dt><dd>The operating modes the device can occupy.</dd></div>
+            <div><dt>Transitions</dt><dd>The events and conditions that move it between states.</dd></div>
+            <div><dt>Responses</dt><dd>The register, memory, and event effects produced by each interaction.</dd></div>
+          </dl>
+        </GlassPanel>
+      )
+    }
+
+    if (activeTab === 'commands') {
+      return <DeviceCommandInspector command={selectedCommand} />
+    }
+
+    if (activeTab === 'scenarios') {
+      return <div className="scenario-inspector-host" ref={setScenarioInspectorTarget} />
+    }
+
     const label = deviceTabs.find((tab) => tab.id === activeTab)?.label ?? activeTab
     return (
       <GlassPanel className="device-context-inspector" title={`${label} Inspector`}>
@@ -262,38 +272,37 @@ export function DevicesPage() {
     )
   }
 
+  const adapterLifecyclePending = loadAdapter.isPending || unloadAdapter.isPending
+  const adapterUnloadable = adapterAssignment?.adapter.state === 'loaded' || adapterAssignment?.adapter.state === 'error'
   const deviceActions = (
     <div aria-label="Device actions" className="device-page-actions" role="group">
-      <button className="button button-secondary" disabled={!deviceId || isRefreshing} onClick={refresh} type="button">
-        <RefreshCw aria-hidden="true" className={isRefreshing ? 'spin' : ''} size={15} />
-        {isRefreshing ? 'Refreshing' : 'Refresh'}
-      </button>
-      <button
-        aria-pressed={liveRead}
-        className={`button button-secondary${liveRead ? ' active' : ''}`}
-        disabled={!deviceId}
-        onClick={() => setLiveRead((enabled) => !enabled)}
-        type="button"
-      >
-        <RadioTower aria-hidden="true" size={15} /> Live Read
-      </button>
-      {activeTab === 'configuration'
-        ? <button className={`button configuration-save${configurationDirty ? ' configuration-save-dirty' : ''}`} disabled={!configurationDirty || configurationBusy} onClick={() => configurationSave.current()} type="button">
-          <Save aria-hidden="true" size={15} /> {configurationBusy ? 'Saving…' : 'Save'}
+      {adapterAssignment
+        ? <button
+          className={`button ${adapterUnloadable ? 'button-danger' : 'button-primary'}`}
+          disabled={adapterLifecyclePending || adapterAssignment.adapter.state === 'loading' || adapterAssignment.adapter.state === 'unloading' || (!adapterUnloadable && adapterAssignment.adapter.readiness !== 'ready')}
+          onClick={() => adapterUnloadable ? unloadAdapter.mutate(adapterAssignment.adapter.id) : loadAdapter.mutate(adapterAssignment.adapter.id)}
+          title={`${adapterAssignment.adapter.id} serves ${adapterAssignment.adapter.bindings.length} attached device${adapterAssignment.adapter.bindings.length === 1 ? '' : 's'}.`}
+          type="button"
+        >
+          {adapterUnloadable ? <PowerOff aria-hidden="true" size={15} /> : <Power aria-hidden="true" size={15} />}
+          {adapterLifecyclePending ? 'Working…' : adapterUnloadable ? 'Unload adapter' : 'Load adapter'}
         </button>
-        : <button className="button button-secondary" disabled title="Device editing is not available in this phase." type="button">
-          <Pencil aria-hidden="true" size={15} /> Edit
+        : <button className="button button-secondary" disabled={!deviceId} onClick={() => { setActiveTab('configuration'); if (deviceId) navigate(`/devices/${encodeURIComponent(deviceId)}`, { replace: true }) }} type="button">
+          <Cable aria-hidden="true" size={15} /> Assign adapter
         </button>}
-      <details className="device-more-menu">
-        <summary className="button button-secondary"><Ellipsis aria-hidden="true" size={16} /> More</summary>
-        <div className="device-more-popover">
-          <button disabled={!deviceId || reset.isPending} onClick={() => deviceId && reset.mutate(deviceId)} type="button">
-            <RotateCcw aria-hidden="true" size={15} /> {reset.isPending ? 'Resetting device' : 'Reset device'}
-          </button>
-        </div>
-      </details>
+      <button className="button button-secondary" disabled={!deviceId || reset.isPending} onClick={() => deviceId && reset.mutate(deviceId)} type="button">
+        <RotateCcw aria-hidden="true" size={15} /> {reset.isPending ? 'Resetting…' : 'Reset device'}
+      </button>
     </div>
   )
+
+  const workspaceUtilities = activeTab === 'configuration' ? (
+    <div aria-label="Device workspace tools" className="device-workspace-utilities" role="group">
+      <button className={`button configuration-save${configurationDirty ? ' configuration-save-dirty' : ''}`} disabled={!configurationDirty || configurationBusy} onClick={() => configurationSave.current()} type="button">
+        <Save aria-hidden="true" size={15} /> {configurationBusy ? 'Saving…' : 'Save'}
+      </button>
+    </div>
+  ) : null
 
   return (
     <div className="page-stack devices-page">
@@ -327,7 +336,9 @@ export function DevicesPage() {
           {device.isPending && deviceId && <GlassPanel><AsyncState kind="loading" title="Loading device profile" /></GlassPanel>}
           {device.isError && <GlassPanel><AsyncState detail={device.error.message} kind="error" title="Device unavailable" /></GlassPanel>}
           {device.data && <DeviceProfileCard actions={deviceActions} currentState={state.data?.state ?? device.data.state} device={device.data} />}
-          {reset.isError && <AsyncState detail={reset.error.message} kind="error" title="Reset failed" />}
+          {(reset.isError || loadAdapter.isError || unloadAdapter.isError) && <AsyncState detail={(reset.error ?? loadAdapter.error ?? unloadAdapter.error)?.message} kind="error" title="Device management failed" />}
+
+          {workspaceUtilities}
 
           <div className={`device-workspace-layout${activeTab === 'registers' ? ' register-workspace-layout' : ''}`}>
             <div className="device-workspace-main">
@@ -374,8 +385,6 @@ export function DevicesPage() {
               device={device.data}
               events={deviceEvents}
               isRefreshing={registers.isFetching}
-              liveRead={liveRead}
-              onLiveReadChange={setLiveRead}
               onRefreshRegisters={() => void refetchRegisters()}
               onSelectRegister={setSelectedRegisterAddress}
               registers={registerList}

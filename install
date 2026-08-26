@@ -29,8 +29,10 @@ required_outputs=(
   "$ADAPTER_BUILD_DIR/spi-cuse/vds4e-spi-cuse"
   "$ADAPTER_BUILD_DIR/i2c-cuse/vds4e-i2c-cuse"
   "$ADAPTER_BUILD_DIR/gpio-sim/vds4e-gpio-sim"
+  "$ADAPTER_BUILD_DIR/uart-pty/vds4e-uart-pty"
   "$EXAMPLE_BUILD_DIR/mt25ql256_tool"
   "$EXAMPLE_BUILD_DIR/at24c256_tool"
+  "$EXAMPLE_BUILD_DIR/uart_ping"
 )
 
 for output in "${required_outputs[@]}"; do
@@ -67,10 +69,14 @@ install_file 0755 "$ADAPTER_BUILD_DIR/i2c-cuse/vds4e-i2c-cuse" \
   "$INSTALL_ROOT/bin/vds4e-i2c-cuse"
 install_file 0755 "$ADAPTER_BUILD_DIR/gpio-sim/vds4e-gpio-sim" \
   "$INSTALL_ROOT/bin/vds4e-gpio-sim"
+install_file 0755 "$ADAPTER_BUILD_DIR/uart-pty/vds4e-uart-pty" \
+  "$INSTALL_ROOT/bin/vds4e-uart-pty"
 install_file 0755 "$EXAMPLE_BUILD_DIR/mt25ql256_tool" \
   "$INSTALL_ROOT/bin/mt25ql256_tool"
 install_file 0755 "$EXAMPLE_BUILD_DIR/at24c256_tool" \
   "$INSTALL_ROOT/bin/at24c256_tool"
+install_file 0755 "$EXAMPLE_BUILD_DIR/uart_ping" \
+  "$INSTALL_ROOT/bin/uart_ping"
 
 install_tree "$ROOT_DIR/build/web" \
   "$INSTALL_ROOT/share/vds4e/web"

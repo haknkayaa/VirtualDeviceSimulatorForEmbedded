@@ -31,7 +31,7 @@ use vds_protocol::{
     framing::{read_message, write_message},
     v1::{
         ClientRequest, ErrorCode, ErrorResponse, GpioExchangeResponse, I2cTransferResponse,
-        ServerResponse, SpiTransferResponse, client_request, server_response,
+        ServerResponse, SpiTransferResponse, UartTransferResponse, client_request, server_response,
     },
 };
 
@@ -66,6 +66,7 @@ pub fn load_registry_with_clock(
                 Arc::new(model.into_at24c_device_with_clock(Arc::clone(&clock))?)
             }
             "i2c" => Arc::new(model.into_i2c_device()?),
+            "uart" => Arc::new(model.into_uart_device()?),
             _ => Arc::new(model.into_spi_device_with_clock(Arc::clone(&clock))?),
         };
         registry.register(device)?;
@@ -319,11 +320,88 @@ fn handle_request(
         Some(client_request::Payload::I2cTransfer(i2c)) => {
             handle_i2c_request(request_id, i2c, registry, transaction_ids, events)
         }
+        Some(client_request::Payload::UartTransfer(uart)) => {
+            handle_uart_request(request_id, uart, registry, transaction_ids, events)
+        }
         None => error_response(
             request_id,
             ErrorCode::InvalidRequest,
             "request payload is missing".to_owned(),
         ),
+    }
+}
+
+fn handle_uart_request(
+    request_id: u64,
+    uart: vds_protocol::v1::UartTransferRequest,
+    registry: &DeviceRegistry,
+    transaction_ids: &AtomicU64,
+    events: &EventBus,
+) -> ServerResponse {
+    let transaction_id = transaction_ids.fetch_add(1, Ordering::Relaxed);
+    let mut transaction = Transaction::now(
+        transaction_id,
+        "uart".to_owned(),
+        uart.device_id.clone(),
+        Operation::UartTransfer,
+        uart.tx.clone(),
+    );
+    let virtual_time_ns = registry.virtual_time_ns(&uart.device_id).unwrap_or(0);
+    let _ = events.publish(EventDraft {
+        virtual_time_ns,
+        device_id: Some(uart.device_id.clone()),
+        scenario_run_id: None,
+        payload: EventPayload::TransactionStarted {
+            transaction_id: Some(transaction_id),
+            request: uart.tx.clone(),
+            gpio_output_lines: None,
+        },
+    });
+    let result = registry.transfer_uart(&uart.device_id, &uart.tx);
+    match result {
+        Ok(transfer) => {
+            transaction.response.clone_from(&transfer.response);
+            let _ = events.publish(EventDraft {
+                virtual_time_ns,
+                device_id: Some(uart.device_id),
+                scenario_run_id: None,
+                payload: EventPayload::TransactionCompleted {
+                    transaction_id: Some(transaction_id),
+                    response: transfer.response.clone(),
+                    result: "success".to_owned(),
+                    error_code: None,
+                },
+            });
+            log_transaction(&transaction);
+            ServerResponse {
+                request_id,
+                result: Some(server_response::Result::UartTransfer(
+                    UartTransferResponse {
+                        rx: transfer.response,
+                    },
+                )),
+            }
+        }
+        Err(error) => {
+            let (code, code_name) = protocol_error_code(&error);
+            transaction.result = TransactionResult::Error {
+                code: code_name,
+                message: error.to_string(),
+            };
+            let _ = events.publish(EventDraft {
+                virtual_time_ns,
+                device_id: Some(uart.device_id),
+                scenario_run_id: None,
+                payload: EventPayload::TransactionCompleted {
+                    transaction_id: Some(transaction_id),
+                    response: Vec::new(),
+                    result: "error".to_owned(),
+                    error_code: Some(code_name.to_owned()),
+                },
+            });
+            log_transaction(&transaction);
+            error_response(request_id, code, error.to_string())
+        }
     }
 }
 

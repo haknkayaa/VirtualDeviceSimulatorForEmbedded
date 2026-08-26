@@ -62,6 +62,7 @@ The repository currently implements:
 - a managed Linux SPI CUSE adapter
 - a Linux I²C CUSE adapter
 - kernel `gpio-sim` integration exposing real `/dev/gpiochipX` devices
+- an unprivileged UART PTY adapter exposing a standard `/dev/pts/N` TTY
 - a device-scoped Web workspace for configuration, behavior, and scenarios
 - bounded in-memory events with optional SQLite persistence and retention
 
@@ -150,6 +151,7 @@ and documentation together.
   SPI CUSE adapter ------- /tmp/vds4e.sock ------> | Drivers     |
   I2C CUSE adapter ------------------------------> |             |
   GPIO sync helper ------------------------------> +------+------+
+  UART PTY adapter ------------------------------> |             |
                                                           |
                                                           v
                                              Declarative device packages
@@ -199,7 +201,7 @@ plane client but not on model-specific code.
   generic device traits, the runtime registry, state machines, faults,
   transactions, and core errors.
 - `crates/vds-device-model` parses declarative models and builds the generic
-  SPI, I²C, and GPIO runtime implementations. It also compiles behavior flows,
+  SPI, I²C, GPIO, and UART runtime implementations. It also compiles behavior flows,
   validates signal graphs, and integrates registers, memory, state, timing, and
   faults.
 - `crates/vds-registers` owns register definitions, widths, access modes,
@@ -219,6 +221,8 @@ plane client but not on model-specific code.
 - `adapters/i2c-cuse` exposes privileged `/dev/i2c-N` buses.
 - `adapters/gpio-sim` provisions kernel-owned `/dev/gpiochipX` devices and
   synchronizes line values with the runtime.
+- `adapters/uart-pty` exposes a kernel-assigned PTY slave and forwards its byte
+  stream to the runtime.
 - `examples/micron-mt25ql256-embedded` is a flat Embedded Linux C example using
   normal spidev operations; it is not part of a device package.
 - `examples/atmel-at24c256-embedded` is a flat Embedded Linux C example using
@@ -390,7 +394,7 @@ A runtime device has:
 - reset, fault, event, and virtual-time behavior.
 
 The common device trait exposes generic inspection/control operations plus
-bus-specific SPI, I²C, and GPIO entry points. Unsupported operations return
+bus-specific SPI, I²C, GPIO, and UART entry points. Unsupported operations return
 structured device errors instead of silently succeeding.
 
 ### 8.2 Device registry
@@ -401,6 +405,7 @@ The registry maps device IDs to shared runtime instances and provides:
 - SPI transaction routing;
 - atomic I²C message-sequence routing;
 - GPIO line exchange and line metadata;
+- UART byte-stream routing;
 - register reads/writes;
 - reset and state inspection;
 - fault control;
@@ -647,6 +652,18 @@ The VDS4E helper synchronizes kernel line values with one attached declarative
 GPIO runtime. The kernel chooses `X`; clients must use the actual path reported
 by the adapter snapshot rather than assuming a number.
 
+### 12.5 UART through pseudoterminals
+
+Each UART adapter binds one runtime device and creates an unprivileged PTY pair.
+The managed helper retains the master side and reports the kernel-assigned slave
+path such as `/dev/pts/7`. Applications use ordinary TTY reads, writes, and
+termios configuration on that path. The generic UART runtime buffers the byte
+stream and matches deterministic, prefix-free declarative request patterns;
+device semantics do not live in the helper.
+
+PTY integration does not model electrical bit timing, parity/framing errors,
+break signaling, modem-control lines, or a physical UART controller.
+
 ### 12.6 Compatibility rule
 
 VDS4E does not maintain replacements for distribution tools. Adapter
@@ -655,6 +672,7 @@ acceptance is measured with unmodified host tools:
 - SPI: normal spidev applications and supported `spi-tools`
 - I²C: `i2cdetect`, `i2cget`, `i2cset`, `i2ctransfer`
 - GPIO: `gpiodetect`, `gpioinfo`, `gpioget`, `gpioset`, `gpiomon`
+- UART: normal TTY applications using `open`, `read`, `write`, and termios
 
 Passing these tests establishes Linux userspace ABI compatibility only. It does
 not validate physical controllers, DMA, interrupts, or electrical behavior.
@@ -669,6 +687,7 @@ typed payloads for:
 - SPI transfer;
 - I²C transfer containing an ordered message list;
 - GPIO host/device line exchange;
+- UART byte-stream transfer;
 - structured error response.
 
 Messages are length-prefixed. Clients must bound frame and payload sizes,

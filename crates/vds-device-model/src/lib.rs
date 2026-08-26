@@ -11,6 +11,7 @@ mod memory;
 mod model;
 mod runtime;
 mod signal_graph;
+mod uart;
 mod validation;
 pub use at24c::At24cEepromDevice;
 use command::{SpiCommand, SpiCommandBehavior};
@@ -24,6 +25,7 @@ pub use signal_graph::{
     FileFormat, FileWriteMode, ScheduledSignal, SignalEdge, SignalExecution, SignalGraph,
     SignalGraphDefinition, SignalNode, SignalValue, StateSignalRoot,
 };
+pub use uart::GenericUartDevice;
 use validation::{
     apply_actions, apply_stuck, compile_state_machine, decode_unsigned, encode_unsigned,
     evaluate_guard, initialize_state_machine, map_access, map_register_error, map_scheduler_error,

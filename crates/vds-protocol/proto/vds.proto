@@ -10,7 +10,13 @@ message ClientRequest {
     SpiTransferRequest spi_transfer = 10;
     GpioExchangeRequest gpio_exchange = 11;
     I2cTransferRequest i2c_transfer = 12;
+    UartTransferRequest uart_transfer = 13;
   }
+}
+
+message UartTransferRequest {
+  string device_id = 1;
+  bytes tx = 2;
 }
 
 message GpioExchangeRequest {
@@ -75,7 +81,12 @@ message ServerResponse {
     ErrorResponse error = 11;
     GpioExchangeResponse gpio_exchange = 12;
     I2cTransferResponse i2c_transfer = 13;
+    UartTransferResponse uart_transfer = 14;
   }
+}
+
+message UartTransferResponse {
+  bytes rx = 1;
 }
 
 message GpioExchangeResponse {

@@ -109,16 +109,26 @@ pub(super) async fn create_device(
             )
         })?;
     model.device.id.clone_from(&request.device_id);
-    let device: Arc<dyn Device> = (if model.device.bus == "gpio" {
-        model
+    let bus = model.device.bus.clone();
+    let driver = model.device.model.clone();
+    let runtime = match (bus.as_str(), driver.as_str()) {
+        ("gpio", _) => model
             .into_gpio_device()
-            .map(|device| Arc::new(device) as Arc<dyn Device>)
-    } else {
-        model
+            .map(|device| Arc::new(device) as Arc<dyn Device>),
+        ("i2c", "at24c-eeprom") => model
+            .into_at24c_device_with_clock(Arc::clone(&state.clock))
+            .map(|device| Arc::new(device) as Arc<dyn Device>),
+        ("i2c", _) => model
+            .into_i2c_device()
+            .map(|device| Arc::new(device) as Arc<dyn Device>),
+        ("uart", _) => model
+            .into_uart_device()
+            .map(|device| Arc::new(device) as Arc<dyn Device>),
+        _ => model
             .into_spi_device_with_clock(Arc::clone(&state.clock))
-            .map(|device| Arc::new(device) as Arc<dyn Device>)
-    })
-    .map_err(|error| {
+            .map(|device| Arc::new(device) as Arc<dyn Device>),
+    };
+    let device: Arc<dyn Device> = runtime.map_err(|error| {
         ApiError::bad_request(
             "device_instance_create_failed",
             format!("device instance could not be created: {error}"),

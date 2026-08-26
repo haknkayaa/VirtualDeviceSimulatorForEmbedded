@@ -48,7 +48,7 @@ describe('adapters page', () => {
     renderRoute(<AdaptersPage />, '/adapters', '/adapters')
 
     expect(await screen.findByRole('heading', { name: 'SPI 0' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Attach' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Connect device' }))
     expect((await screen.findAllByText('/dev/spidev0.0')).length).toBeGreaterThan(0)
     await userEvent.click(screen.getByRole('treeitem', { name: /SPI 0/i }))
     expect(await screen.findByRole('heading', { name: 'SPI 0' })).toBeInTheDocument()
@@ -139,5 +139,54 @@ describe('adapters page', () => {
     await waitFor(() => expect(loadButton).toBeEnabled())
     await userEvent.click(loadButton)
     expect((await screen.findAllByText('/dev/gpiochip4')).length).toBeGreaterThan(0)
+  })
+
+  it('explains when a loaded UART port is already assigned', async () => {
+    const current = adapter({
+      id: 'uart0',
+      name: 'UART 0',
+      bus_type: 'uart',
+      driver: 'pty',
+      state: 'loaded',
+      device_path: '/dev/pts/7',
+      bindings: [{ device_id: 'serial-sensor-0', endpoint: 0, device_path: '/dev/pts/7' }],
+    })
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/v1/adapters') return jsonResponse([current])
+      if (url === '/api/v1/devices') return jsonResponse([{ id: 'serial-sensor-0', bus: 'uart', state: 'ready' }])
+      throw new Error(`Unexpected request GET ${url}`)
+    }))
+    renderRoute(<AdaptersPage />, '/adapters', '/adapters')
+
+    expect(await screen.findByText('This UART port is fully assigned.')).toBeInTheDocument()
+    expect(screen.getByText(/another UART adapter/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Connect device' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Detach serial-sensor-0' })).toBeDisabled()
+  })
+
+  it('explains that a loaded I2C topology must be unloaded before editing', async () => {
+    const current = adapter({
+      id: 'i2c0',
+      name: 'I2C 0',
+      bus_type: 'i2c',
+      state: 'loaded',
+      bindings: [{ device_id: 'temperature-0', endpoint: 0x48, device_path: '/dev/i2c-0' }],
+    })
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/v1/adapters') return jsonResponse([current])
+      if (url === '/api/v1/devices') return jsonResponse([
+        { id: 'temperature-0', bus: 'i2c', state: 'ready' },
+        { id: 'eeprom-0', bus: 'i2c', state: 'ready' },
+      ])
+      throw new Error(`Unexpected request GET ${url}`)
+    }))
+    renderRoute(<AdaptersPage />, '/adapters', '/adapters')
+
+    expect(await screen.findByText('Topology is locked while loaded.')).toBeInTheDocument()
+    expect(screen.getByText(/Unload the I²C adapter/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Connect device' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Detach temperature-0' })).toBeDisabled()
   })
 })

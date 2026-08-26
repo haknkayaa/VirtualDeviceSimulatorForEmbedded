@@ -8,6 +8,7 @@ add_library(vds4e_adapter_bridge STATIC
     spi_bridge.c
     i2c_bridge.c
     gpio_bridge.c
+    uart_bridge.c
 )
 target_include_directories(vds4e_adapter_bridge PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"

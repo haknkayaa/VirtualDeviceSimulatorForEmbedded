@@ -1,0 +1,18 @@
+schema_version: 1
+device:
+  id: generic-uart-responder
+  name: Generic UART Responder
+  bus: uart
+  model: generic-uart-responder
+  uart:
+    baud_rate: 115200
+    data_bits: 8
+    parity: none
+    stop_bits: 1
+    responses:
+      - request: [80, 73, 78, 71, 13, 10]
+        response: [80, 79, 78, 71, 13, 10]
+      - request: [65, 84, 13]
+        response: [79, 75, 13, 10]
+  commands: []
+  registers: []

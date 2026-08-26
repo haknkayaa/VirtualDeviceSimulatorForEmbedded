@@ -140,6 +140,9 @@ export interface DeviceCommand {
   operation?: 'register_read' | 'register_write' | 'memory_read' | 'page_program' | 'sector_erase' | 'chip_erase'
   address_bytes?: number
   register?: string
+  event?: string
+  event_delay_us?: number
+  timing?: { latency_us: number; busy_during_operation: boolean }
   allowed_states: string[]
   shortcut?: {
     tx: number[]

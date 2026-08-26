@@ -46,7 +46,7 @@ export function DeviceBehaviorEditorPage() {
     const state = useFlowStore.getState()
     if (state.readOnly) { setNotice({ message: 'Read-only documents cannot be saved.', error: true }); return }
     const document = state.prepareLocalSave(); localFlowRepository.save(document)
-    setNotice({ message: `Saved behavior revision ${document.flow.revision} locally.`, error: false })
+    setNotice({ message: `Saved behavior model revision ${document.flow.revision} locally.`, error: false })
     if (!flowId && deviceId) {
       navigate(`/devices/${encodeURIComponent(deviceId)}/flows/${encodeURIComponent(document.flow.id)}`, { replace: true })
     }
@@ -56,9 +56,9 @@ export function DeviceBehaviorEditorPage() {
     const before = structuredClone(useFlowStore.getState().document)
     const result = useFlowStore.getState().importJson(await file.text())
     if (result.ok && useFlowStore.getState().document.flow.kind !== 'device_behavior') {
-      useFlowStore.getState().loadDocument(before); setNotice({ message: 'Import rejected: document kind must be device_behavior.', error: true }); return
+      useFlowStore.getState().loadDocument(before); setNotice({ message: 'Import rejected: this file is not a behavior model.', error: true }); return
     }
     setNotice({ message: result.ok ? 'Device behavior imported.' : result.error, error: !result.ok })
   }, [])
-  return <div className="flow-editor-page device-behavior-page"><div className="flow-editor-nav"><Link to={`/devices/${encodeURIComponent(deviceId ?? '')}/flows`}><ArrowLeft size={15} /> Device flows</Link><span>Runtime device · {deviceId}</span></div>{notice && <div className={`flow-notice flow-notice-${notice.error ? 'error' : 'success'}`} role="status">{notice.error ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}<span>{notice.message}</span><button aria-label="Dismiss message" onClick={() => setNotice(null)} type="button">×</button></div>}<FlowEditorBoundary><DeviceBehaviorEditor onExport={exportFlow} onImport={importFlow} onNotice={(message, error = false) => setNotice({ message, error })} onSave={save} /></FlowEditorBoundary></div>
+  return <div className="flow-editor-page device-behavior-page"><div className="flow-editor-nav"><Link to={`/devices/${encodeURIComponent(deviceId ?? '')}/flows`}><ArrowLeft size={15} /> Behavior model</Link><span>Runtime device · {deviceId}</span></div>{notice && <div className={`flow-notice flow-notice-${notice.error ? 'error' : 'success'}`} role="status">{notice.error ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}<span>{notice.message}</span><button aria-label="Dismiss message" onClick={() => setNotice(null)} type="button">×</button></div>}<FlowEditorBoundary><DeviceBehaviorEditor onExport={exportFlow} onImport={importFlow} onNotice={(message, error = false) => setNotice({ message, error })} onSave={save} /></FlowEditorBoundary></div>
 }

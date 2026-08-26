@@ -13,6 +13,33 @@ require_command() {
   fi
 }
 
+prepare_cmake_build_dir() {
+  local source_dir="$1"
+  local build_dir="$2"
+  local cache_file="$build_dir/CMakeCache.txt"
+  local directory_info="$build_dir/CMakeFiles/CMakeDirectoryInformation.cmake"
+  local cached_source=""
+  local cached_binary=""
+  local generated_binary=""
+
+  if [[ ! -f "$cache_file" ]]; then
+    return
+  fi
+
+  cached_source="$(sed -n 's#^CMAKE_HOME_DIRECTORY:INTERNAL=##p' "$cache_file")"
+  cached_binary="$(sed -n 's#^CMAKE_CACHEFILE_DIR:INTERNAL=##p' "$cache_file")"
+  if [[ -f "$directory_info" ]]; then
+    generated_binary="$(sed -n 's#^set(CMAKE_RELATIVE_PATH_TOP_BINARY "\(.*\)")#\1#p' "$directory_info")"
+  fi
+
+  if [[ "$cached_source" != "$source_dir" ||
+        "$cached_binary" != "$build_dir" ||
+        ( -n "$generated_binary" && "$generated_binary" != "$build_dir" ) ]]; then
+    echo "Discarding relocated CMake cache: $build_dir"
+    cmake -E remove_directory "$build_dir"
+  fi
+}
+
 for required in cargo cmake npm make cc pkg-config; do
   require_command "$required"
 done
@@ -32,21 +59,31 @@ echo "Installing locked Web dependencies..."
 npm --prefix "$ROOT_DIR/apps/vds-web" ci
 
 echo "Configuring SPI CUSE adapter..."
+prepare_cmake_build_dir "$ROOT_DIR/adapters/spi-cuse" "$ADAPTER_BUILD_DIR/spi-cuse"
 cmake \
   -S "$ROOT_DIR/adapters/spi-cuse" \
   -B "$ADAPTER_BUILD_DIR/spi-cuse" \
   -DCMAKE_BUILD_TYPE=Release
 
 echo "Configuring I2C CUSE adapter..."
+prepare_cmake_build_dir "$ROOT_DIR/adapters/i2c-cuse" "$ADAPTER_BUILD_DIR/i2c-cuse"
 cmake \
   -S "$ROOT_DIR/adapters/i2c-cuse" \
   -B "$ADAPTER_BUILD_DIR/i2c-cuse" \
   -DCMAKE_BUILD_TYPE=Release
 
 echo "Configuring GPIO simulator adapter..."
+prepare_cmake_build_dir "$ROOT_DIR/adapters/gpio-sim" "$ADAPTER_BUILD_DIR/gpio-sim"
 cmake \
   -S "$ROOT_DIR/adapters/gpio-sim" \
   -B "$ADAPTER_BUILD_DIR/gpio-sim" \
+  -DCMAKE_BUILD_TYPE=Release
+
+echo "Configuring UART PTY adapter..."
+prepare_cmake_build_dir "$ROOT_DIR/adapters/uart-pty" "$ADAPTER_BUILD_DIR/uart-pty"
+cmake \
+  -S "$ROOT_DIR/adapters/uart-pty" \
+  -B "$ADAPTER_BUILD_DIR/uart-pty" \
   -DCMAKE_BUILD_TYPE=Release
 
 printf 'configured_at=%(%Y-%m-%dT%H:%M:%S%z)T\n' -1 \

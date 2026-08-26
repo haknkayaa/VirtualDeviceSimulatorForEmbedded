@@ -59,6 +59,16 @@ pub(super) async fn create_adapter(
                 )
             })?,
         ),
+        "uart" => state.adapters.create_uart(
+            request.id,
+            request.name,
+            request.bus_number.ok_or_else(|| {
+                ApiError::bad_request(
+                    "adapter_bus_number_required",
+                    "UART adapters require bus_number".to_owned(),
+                )
+            })?,
+        ),
         _ => {
             return Err(ApiError::bad_request(
                 "adapter_bus_unsupported",

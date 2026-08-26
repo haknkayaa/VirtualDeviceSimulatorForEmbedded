@@ -91,6 +91,15 @@ impl DeviceRegistry {
         self.device(device_id)?.exchange_gpio(host_values)
     }
 
+    /// Routes bytes received from a UART PTY to a registered device.
+    pub fn transfer_uart(
+        &self,
+        device_id: &str,
+        request: &[u8],
+    ) -> Result<DeviceTransfer, DeviceError> {
+        self.device(device_id)?.transfer_uart(request)
+    }
+
     /// Returns declarative GPIO line metadata for adapter provisioning.
     ///
     /// # Errors

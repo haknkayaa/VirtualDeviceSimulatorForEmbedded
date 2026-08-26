@@ -169,6 +169,24 @@ function AdapterCard({ adapter, availableDevices, attachDraft, busy, onAttach, o
   const loaded = adapter.state === 'loaded'
   const unloadable = loaded || adapter.state === 'error'
   const transitioning = adapter.state === 'loading' || adapter.state === 'unloading'
+  const topologyLocked = loaded && adapter.bus_type !== 'spi'
+  const singleDevicePortFull = adapter.bus_type === 'uart' && adapter.bindings.length > 0
+  const busName = adapter.bus_type === 'i2c' ? 'I²C' : adapter.bus_type.toUpperCase()
+  const endpointLabel = adapter.bus_type === 'i2c'
+    ? `Slave 0x${Number(attachDraft.endpoint || 0).toString(16).padStart(2, '0')}`
+    : adapter.bus_type === 'uart'
+      ? 'Dedicated serial port'
+      : `Chip select ${attachDraft.endpoint || '0'}`
+  const expectedDevicePath = adapter.bus_type === 'i2c'
+    ? `/dev/i2c-${adapter.bus_number}`
+    : adapter.bus_type === 'uart'
+      ? adapter.device_path ?? '/dev/pts/N after load'
+      : `/dev/spidev${adapter.bus_number}.${attachDraft.endpoint || '0'}`
+  const connectionDescription = adapter.bus_type === 'i2c'
+    ? 'The selected runtime device will answer at a unique slave address on this shared Linux bus.'
+    : adapter.bus_type === 'uart'
+      ? 'One UART adapter represents one point-to-point serial port and accepts exactly one runtime device.'
+      : 'The selected runtime device gets its own chip-select endpoint on this SPI controller.'
   return (
     <article className="glass-panel adapter-card">
       <header className="adapter-card-header">
@@ -207,12 +225,12 @@ function AdapterCard({ adapter, availableDevices, attachDraft, busy, onAttach, o
             </div>
           </section>
           <section className="adapter-attach-pane">
-            <header><strong>GPIO runtime</strong><span>Bind one declarative GPIO bank before loading.</span></header>
+            <header><strong>Virtual GPIO bank</strong><span>{loaded ? 'Unload this adapter before changing its runtime binding.' : 'Connect one declarative GPIO bank to these kernel lines.'}</span></header>
             {adapter.bindings.length > 0 ? (
               <div className="adapter-binding-row">
                 <span className="adapter-binding-icon"><Link2 aria-hidden="true" size={15} /></span>
                 <div><strong>{adapter.bindings[0].device_id}</strong><code>{adapter.bindings[0].device_path}</code></div>
-                <button aria-label={`Detach ${adapter.bindings[0].device_id}`} disabled={busy} onClick={() => onDetach(adapter.bindings[0].device_id)} type="button">
+                <button aria-label={`Detach ${adapter.bindings[0].device_id}`} disabled={busy || loaded} onClick={() => onDetach(adapter.bindings[0].device_id)} title={loaded ? 'Unload the adapter before disconnecting this device.' : undefined} type="button">
                   <Unlink aria-hidden="true" size={14} />
                 </button>
               </div>
@@ -231,14 +249,14 @@ function AdapterCard({ adapter, availableDevices, attachDraft, busy, onAttach, o
         </div>
       ) : <div className="adapter-device-management">
         <section className="adapter-bindings adapter-device-pane">
-          <header><strong>Device endpoints</strong><span>{adapter.bindings.length} attached</span></header>
-          {adapter.bindings.length === 0 && <p className="adapter-empty">No devices attached to this adapter.</p>}
+          <header><strong>Connected virtual devices</strong><span>{adapter.bindings.length} connected</span></header>
+          {adapter.bindings.length === 0 && <div className="adapter-empty adapter-empty-explained"><strong>No runtime connected yet</strong><span>Choose a compatible {busName} device on the right to expose it through Linux.</span></div>}
           {adapter.bindings.map((binding) => (
             <div className="adapter-binding-row" key={binding.device_id}>
               <span className="adapter-binding-icon"><Link2 aria-hidden="true" size={15} /></span>
               <div><strong>{binding.device_id}</strong><code>{binding.device_path}</code></div>
-              <span>{adapter.bus_type === 'i2c' ? `0x${binding.endpoint.toString(16).padStart(2, '0')}` : `CS${binding.endpoint}`}</span>
-              <button aria-label={`Detach ${binding.device_id}`} disabled={busy} onClick={() => onDetach(binding.device_id)} type="button">
+              <span>{adapter.bus_type === 'i2c' ? `0x${binding.endpoint.toString(16).padStart(2, '0')}` : adapter.bus_type === 'uart' ? 'PTY' : `CS${binding.endpoint}`}</span>
+              <button aria-label={`Detach ${binding.device_id}`} disabled={busy || topologyLocked} onClick={() => onDetach(binding.device_id)} title={topologyLocked ? 'Unload the adapter before disconnecting this device.' : undefined} type="button">
                 <Unlink aria-hidden="true" size={14} />
               </button>
             </div>
@@ -246,17 +264,29 @@ function AdapterCard({ adapter, availableDevices, attachDraft, busy, onAttach, o
         </section>
 
         <section className="adapter-attach-pane">
-          <header><strong>Attach device</strong><span>Assign an available device to this adapter.</span></header>
-          <div className="adapter-attach-form">
-            <label><span>Device</span><select disabled={busy || availableDevices.length === 0} onChange={(event) => onDraft({ ...attachDraft, deviceId: event.target.value })} value={attachDraft.deviceId}>
-              {availableDevices.length === 0 && <option value="">No unassigned devices</option>}
-              {availableDevices.map((device) => <option key={device.id} value={device.id}>{device.id}</option>)}
-            </select></label>
-            <label><span>{adapter.bus_type === 'i2c' ? 'Slave address' : 'Chip select'}</span><input disabled={busy} min="0" onChange={(event) => onDraft({ ...attachDraft, endpoint: event.target.value })} value={attachDraft.endpoint} /></label>
-            <button className="button button-secondary" disabled={busy || !attachDraft.deviceId || !attachDraft.endpoint} onClick={onAttach} type="button">
-              <Link2 aria-hidden="true" size={14} /> Attach
-            </button>
+          <header><strong>{singleDevicePortFull ? 'Serial port assignment' : `Connect a ${busName} device`}</strong><span>{connectionDescription}</span></header>
+          <div className="adapter-connection-preview" aria-label="Adapter connection preview">
+            <div><span>Linux endpoint</span><code>{expectedDevicePath}</code></div>
+            <span aria-hidden="true" className="adapter-connection-arrow">→</span>
+            <div><span>Virtual runtime</span><strong>{singleDevicePortFull ? adapter.bindings[0].device_id : attachDraft.deviceId || 'Select a device'}</strong><small>{singleDevicePortFull ? 'Connected' : endpointLabel}</small></div>
           </div>
+          {singleDevicePortFull ? (
+            <div className="adapter-attach-guidance"><strong>This UART port is fully assigned.</strong><span>Create another UART adapter when you need a second independent serial device.</span></div>
+          ) : topologyLocked ? (
+            <div className="adapter-attach-guidance adapter-attach-guidance-locked"><strong>Topology is locked while loaded.</strong><span>Unload the {busName} adapter to connect or disconnect devices. Existing Linux clients will temporarily lose this endpoint.</span></div>
+          ) : availableDevices.length === 0 ? (
+            <div className="adapter-attach-guidance"><strong>No compatible unassigned devices.</strong><span>Add a {busName} device from Device Library, or disconnect one from another adapter.</span></div>
+          ) : (
+            <div className="adapter-attach-form">
+              <label><span>Virtual device</span><select disabled={busy} onChange={(event) => onDraft({ ...attachDraft, deviceId: event.target.value })} value={attachDraft.deviceId}>
+                {availableDevices.map((device) => <option key={device.id} value={device.id}>{device.id}</option>)}
+              </select></label>
+              {adapter.bus_type !== 'uart' && <label><span>{adapter.bus_type === 'i2c' ? 'Slave address' : 'Chip select'}</span><input disabled={busy} min="0" onChange={(event) => onDraft({ ...attachDraft, endpoint: event.target.value })} type="number" value={attachDraft.endpoint} /></label>}
+              <button className="button button-secondary" disabled={busy || !attachDraft.deviceId || !attachDraft.endpoint} onClick={onAttach} type="button">
+                <Link2 aria-hidden="true" size={14} /> Connect device
+              </button>
+            </div>
+          )}
         </section>
       </div>}
 
@@ -276,22 +306,23 @@ function CreateAdapterPanel({ isPending, onCancel, onCreate }: {
   onCancel: () => void
   onCreate: (input: { id: string; name: string; bus_type: string; bus_number?: number; line_count?: number; max_frequency_hz?: number }) => void
 }) {
-  const [busType, setBusType] = useState<'spi' | 'i2c' | 'gpio'>('spi')
+  const [busType, setBusType] = useState<'spi' | 'i2c' | 'gpio' | 'uart'>('spi')
   const [id, setId] = useState('spi1')
   const [name, setName] = useState('SPI 1')
   const [busNumber, setBusNumber] = useState('1')
   const [lineCount, setLineCount] = useState('32')
   const [maxFrequency, setMaxFrequency] = useState('10000000')
-  const changeBusType = (next: 'spi' | 'i2c' | 'gpio') => {
+  const changeBusType = (next: 'spi' | 'i2c' | 'gpio' | 'uart') => {
     setBusType(next)
-    setId(next === 'gpio' ? 'gpio0' : next === 'i2c' ? 'i2c0' : 'spi1')
-    setName(next === 'gpio' ? 'GPIO 0' : next === 'i2c' ? 'I2C 0' : 'SPI 1')
+    setId(next === 'gpio' ? 'gpio0' : next === 'i2c' ? 'i2c0' : next === 'uart' ? 'uart0' : 'spi1')
+    setName(next === 'gpio' ? 'GPIO 0' : next === 'i2c' ? 'I2C 0' : next === 'uart' ? 'UART 0' : 'SPI 1')
     setMaxFrequency(next === 'i2c' ? '400000' : '10000000')
   }
   const adapterTypes = [
     { id: 'spi' as const, label: 'SPI Adapter', driver: 'CUSE', path: '/dev/spidevX.Y' },
     { id: 'i2c' as const, label: 'I2C Adapter', driver: 'CUSE', path: '/dev/i2c-N' },
     { id: 'gpio' as const, label: 'GPIO Adapter', driver: 'gpio-sim', path: '/dev/gpiochipX' },
+    { id: 'uart' as const, label: 'UART Adapter', driver: 'PTY', path: '/dev/pts/X' },
   ]
   return (
     <GlassPanel className="adapter-create-panel" eyebrow="Topology" title="New Adapter">
@@ -299,10 +330,11 @@ function CreateAdapterPanel({ isPending, onCancel, onCreate }: {
         <div className="adapter-create-form">
           <label>
             <span>Bus type</span>
-            <select onChange={(event) => changeBusType(event.target.value as 'spi' | 'i2c' | 'gpio')} value={busType}>
+            <select onChange={(event) => changeBusType(event.target.value as 'spi' | 'i2c' | 'gpio' | 'uart')} value={busType}>
               <option value="spi">SPI</option>
               <option value="i2c">I2C</option>
               <option value="gpio">GPIO</option>
+              <option value="uart">UART</option>
             </select>
           </label>
           <label><span>Name</span><input onChange={(event) => setName(event.target.value)} value={name} /></label>
@@ -311,7 +343,7 @@ function CreateAdapterPanel({ isPending, onCancel, onCreate }: {
           <section className="adapter-bus-configuration">
             <header>
               <span>{busType.toUpperCase()} configuration</span>
-              <small>{busType === 'spi' ? '/dev/spidevX.Y' : busType === 'i2c' ? '/dev/i2c-N' : '/dev/gpiochipX'}</small>
+              <small>{busType === 'spi' ? '/dev/spidevX.Y' : busType === 'i2c' ? '/dev/i2c-N' : busType === 'uart' ? '/dev/pts/X' : '/dev/gpiochipX'}</small>
             </header>
             {busType !== 'gpio'
               ? <>
@@ -319,10 +351,10 @@ function CreateAdapterPanel({ isPending, onCancel, onCreate }: {
                     <span>Bus number</span>
                     <input min="0" onChange={(event) => setBusNumber(event.target.value)} type="number" value={busNumber} />
                   </label>
-                  <label>
+                  {busType !== 'uart' && <label>
                     <span>Maximum frequency (Hz)</span>
                     <input min="1" onChange={(event) => setMaxFrequency(event.target.value)} type="number" value={maxFrequency} />
-                  </label>
+                  </label>}
                 </>
               : <label>
                   <span>Line count</span>
@@ -355,8 +387,8 @@ function CreateAdapterPanel({ isPending, onCancel, onCreate }: {
           <p>Standard Linux device interfaces with server-owned runtime topology.</p>
         </aside>
       </div>
-      <footer><button className="button button-secondary" onClick={onCancel} type="button">Cancel</button><button className="button button-primary" disabled={isPending || !id || !name || (busType !== 'gpio' && !maxFrequency)} onClick={() => onCreate(busType !== 'gpio'
-        ? { id, name, bus_type: busType, bus_number: Number(busNumber), max_frequency_hz: Number(maxFrequency) }
+      <footer><button className="button button-secondary" onClick={onCancel} type="button">Cancel</button><button className="button button-primary" disabled={isPending || !id || !name || (busType !== 'gpio' && busType !== 'uart' && !maxFrequency)} onClick={() => onCreate(busType !== 'gpio'
+        ? { id, name, bus_type: busType, bus_number: Number(busNumber), ...(busType === 'uart' ? {} : { max_frequency_hz: Number(maxFrequency) }) }
         : { id, name, bus_type: busType, line_count: Number(lineCount) })} type="button">Create Adapter</button></footer>
     </GlassPanel>
   )

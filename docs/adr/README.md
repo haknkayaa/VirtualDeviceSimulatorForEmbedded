@@ -18,3 +18,4 @@ update `VDS4E_ARCHITECTURE.md` before implementing the change.
 - [0007: Compile behavior flows into typed runtime graphs](0007-compile-device-behavior-flows-into-typed-runtime-graphs.md)
 - [0008: Use kernel gpio-sim for libgpiod integration](0008-use-kernel-gpio-sim-for-libgpiod-integration.md)
 - [0009: Retire the Linux SPI preload adapter](0009-retire-linux-spi-preload-adapter.md)
+- [0010: Use PTY endpoints for UART integration](0010-use-pty-endpoints-for-uart.md)

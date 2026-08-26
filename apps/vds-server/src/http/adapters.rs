@@ -117,6 +117,24 @@ impl AdapterSnapshot {
             error: None,
         }
     }
+
+    fn uart(id: String, name: String, port_number: u16) -> Self {
+        Self {
+            id,
+            name,
+            bus_type: "uart".to_owned(),
+            driver: "pty".to_owned(),
+            state: AdapterState::Unloaded,
+            readiness: DriverReadiness::Unavailable,
+            bus_number: port_number,
+            line_count: None,
+            max_frequency_hz: None,
+            device_path: None,
+            bindings: Vec::new(),
+            daemon_pids: Vec::new(),
+            error: None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -194,6 +212,7 @@ pub struct SystemAdapterDriver {
     spi: SystemCuseDriver,
     i2c: SystemI2cCuseDriver,
     gpio: SystemGpioSimDriver,
+    uart: SystemUartPtyDriver,
 }
 
 impl SystemAdapterDriver {
@@ -202,6 +221,7 @@ impl SystemAdapterDriver {
             spi: SystemCuseDriver::from_config(config),
             i2c: SystemI2cCuseDriver::from_config(config),
             gpio: SystemGpioSimDriver::from_config(config),
+            uart: SystemUartPtyDriver::from_config(config),
         }
     }
 
@@ -210,10 +230,179 @@ impl SystemAdapterDriver {
             "spi" => Ok(&self.spi),
             "i2c" => Ok(&self.i2c),
             "gpio" => Ok(&self.gpio),
+            "uart" => Ok(&self.uart),
             bus => Err(AdapterError::DriverUnavailable(format!(
                 "no host adapter driver is registered for bus '{bus}'"
             ))),
         }
+    }
+}
+
+pub struct SystemUartPtyDriver {
+    executable: PathBuf,
+    socket_path: PathBuf,
+    children: Mutex<HashMap<String, ManagedUartPty>>,
+}
+
+struct ManagedUartPty {
+    child: Child,
+    device_path: String,
+}
+
+impl SystemUartPtyDriver {
+    fn from_config(config: &ServerConfig) -> Self {
+        let executable = std::env::var_os("VDS4E_UART_PTY_EXECUTABLE").map_or_else(
+            || {
+                [
+                    PathBuf::from("build/adapters/uart-pty/vds4e-uart-pty"),
+                    PathBuf::from("/usr/local/bin/vds4e-uart-pty"),
+                    PathBuf::from("/usr/bin/vds4e-uart-pty"),
+                ]
+                .into_iter()
+                .find(|candidate| candidate.is_file())
+                .unwrap_or_else(|| PathBuf::from("build/adapters/uart-pty/vds4e-uart-pty"))
+            },
+            PathBuf::from,
+        );
+        Self {
+            executable,
+            socket_path: config.data_plane.unix_socket.clone(),
+            children: Mutex::new(HashMap::new()),
+        }
+    }
+}
+
+impl AdapterDriver for SystemUartPtyDriver {
+    fn readiness(&self) -> DriverReadiness {
+        if self.executable.is_file() {
+            DriverReadiness::Ready
+        } else {
+            DriverReadiness::Unavailable
+        }
+    }
+
+    fn loaded_device_path(&self, adapter: &AdapterSnapshot) -> Option<String> {
+        self.children
+            .lock()
+            .ok()?
+            .get(&adapter.id)
+            .map(|managed| managed.device_path.clone())
+    }
+
+    fn load(&self, adapter: &AdapterSnapshot) -> Result<Vec<u32>, AdapterError> {
+        if !self.executable.is_file() {
+            return Err(AdapterError::DriverUnavailable(format!(
+                "UART PTY executable '{}' is unavailable",
+                self.executable.display()
+            )));
+        }
+        let binding = adapter.bindings.first().ok_or_else(|| {
+            AdapterError::Conflict("attach a UART device before loading the adapter".to_owned())
+        })?;
+        let mut child = Command::new(&self.executable)
+            .arg("--device-id")
+            .arg(&binding.device_id)
+            .arg("--socket")
+            .arg(&self.socket_path)
+            .arg("--parent-pid")
+            .arg(std::process::id().to_string())
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| {
+                AdapterError::Process(format!("failed to start UART PTY adapter: {error}"))
+            })?;
+        let mut path = String::new();
+        let read = child.stdout.take().ok_or_else(|| {
+            AdapterError::Process("UART PTY adapter stdout is unavailable".to_owned())
+        })?;
+        BufReader::new(read).read_line(&mut path).map_err(|error| {
+            AdapterError::Process(format!("failed to read UART PTY path: {error}"))
+        })?;
+        let path = path.trim().to_owned();
+        if !path.starts_with("/dev/pts/") || !Path::new(&path).exists() {
+            let mut stderr = String::new();
+            if let Some(mut output) = child.stderr.take() {
+                let _ = output.read_to_string(&mut stderr);
+            }
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(AdapterError::Process(format!(
+                "UART PTY adapter did not report a valid slave path{}",
+                if stderr.trim().is_empty() {
+                    String::new()
+                } else {
+                    format!(": {}", stderr.trim())
+                }
+            )));
+        }
+        if let Some(stderr) = child.stderr.take() {
+            let adapter_id = adapter.id.clone();
+            let _ = thread::Builder::new()
+                .name(format!("vds4e-uart-log-{adapter_id}"))
+                .spawn(move || {
+                    for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                        tracing::warn!(adapter_id = %adapter_id, message = %line, "UART PTY adapter message");
+                    }
+                });
+        }
+        let pid = child.id();
+        self.children
+            .lock()
+            .map_err(|_| AdapterError::Process("UART adapter lock is poisoned".to_owned()))?
+            .insert(
+                adapter.id.clone(),
+                ManagedUartPty {
+                    child,
+                    device_path: path,
+                },
+            );
+        Ok(vec![pid])
+    }
+
+    fn attach_endpoint(
+        &self,
+        _adapter: &AdapterSnapshot,
+        _binding: &AdapterBinding,
+    ) -> Result<u32, AdapterError> {
+        Err(AdapterError::Conflict(
+            "unload the UART adapter before changing its binding".to_owned(),
+        ))
+    }
+
+    fn detach_endpoint(
+        &self,
+        _adapter: &AdapterSnapshot,
+        _binding: &AdapterBinding,
+    ) -> Result<u32, AdapterError> {
+        Err(AdapterError::Conflict(
+            "unload the UART adapter before changing its binding".to_owned(),
+        ))
+    }
+
+    fn unload(&self, adapter: &AdapterSnapshot) -> Result<(), AdapterError> {
+        if let Some(mut managed) = self
+            .children
+            .lock()
+            .map_err(|_| AdapterError::Process("UART adapter lock is poisoned".to_owned()))?
+            .remove(&adapter.id)
+        {
+            if managed
+                .child
+                .try_wait()
+                .map_err(|error| {
+                    AdapterError::Process(format!("failed to inspect UART PTY adapter: {error}"))
+                })?
+                .is_none()
+            {
+                managed.child.kill().map_err(|error| {
+                    AdapterError::Process(format!("failed to stop UART PTY adapter: {error}"))
+                })?;
+            }
+            let _ = managed.child.wait();
+        }
+        Ok(())
     }
 }
 
@@ -1189,7 +1378,7 @@ impl AdapterManager {
                     persisted.id
                 )));
             }
-            if matches!(persisted.bus_type.as_str(), "spi" | "i2c")
+            if matches!(persisted.bus_type.as_str(), "spi" | "i2c" | "uart")
                 && !assigned_buses.insert((persisted.bus_type.clone(), persisted.bus_number))
             {
                 return Err(AdapterError::Persistence(format!(
@@ -1220,6 +1409,11 @@ impl AdapterManager {
                             persisted.id
                         ))
                     })?,
+                ),
+                "uart" => AdapterSnapshot::uart(
+                    persisted.id.clone(),
+                    persisted.name,
+                    persisted.bus_number,
                 ),
                 bus => {
                     return Err(AdapterError::Persistence(format!(
@@ -1270,6 +1464,18 @@ impl AdapterManager {
                     persisted.id
                 )));
             }
+            if persisted.bus_type == "uart"
+                && (persisted.bindings.len() > 1
+                    || persisted
+                        .bindings
+                        .iter()
+                        .any(|binding| binding.endpoint != 0))
+            {
+                return Err(AdapterError::Persistence(format!(
+                    "persisted UART adapter '{}' must have at most one binding at endpoint zero",
+                    persisted.id
+                )));
+            }
             adapter.bindings = persisted
                 .bindings
                 .into_iter()
@@ -1277,6 +1483,7 @@ impl AdapterManager {
                     device_path: match adapter.bus_type.as_str() {
                         "gpio" => "/dev/gpiochipX".to_owned(),
                         "i2c" => format!("/dev/i2c-{}", adapter.bus_number),
+                        "uart" => "/dev/pts/X".to_owned(),
                         _ => format!("/dev/spidev{}.{}", adapter.bus_number, binding.endpoint),
                     },
                     device_id: binding.device_id,
@@ -1536,6 +1743,48 @@ impl AdapterManager {
         Ok(adapter)
     }
 
+    /// Creates an unloaded logical UART port backed by a pseudoterminal.
+    ///
+    /// # Errors
+    /// Returns an error for invalid IDs or duplicate UART port assignments.
+    pub fn create_uart(
+        &self,
+        id: String,
+        name: String,
+        port_number: u16,
+    ) -> Result<AdapterSnapshot, AdapterError> {
+        if !valid_id(&id) {
+            return Err(AdapterError::Invalid(
+                "adapter id must contain 1-64 letters, numbers, '.', '_' or '-' and start with a letter or number".to_owned(),
+            ));
+        }
+        let adapter = {
+            let mut adapters = self
+                .adapters
+                .lock()
+                .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
+            if adapters.contains_key(&id) {
+                return Err(AdapterError::Duplicate(format!(
+                    "adapter '{id}' already exists"
+                )));
+            }
+            if adapters
+                .values()
+                .any(|adapter| adapter.bus_type == "uart" && adapter.bus_number == port_number)
+            {
+                return Err(AdapterError::Conflict(format!(
+                    "UART port number {port_number} is already assigned"
+                )));
+            }
+            let mut adapter = AdapterSnapshot::uart(id.clone(), name, port_number);
+            adapter.readiness = self.driver.readiness_for(&adapter);
+            adapters.insert(id, adapter.clone());
+            adapter
+        };
+        self.persist()?;
+        Ok(adapter)
+    }
+
     /// Attaches one runtime device to a unique adapter endpoint.
     ///
     /// # Errors
@@ -1613,6 +1862,11 @@ impl AdapterManager {
                     "unload the GPIO adapter before changing its runtime binding".to_owned(),
                 ));
             }
+            if adapter.bus_type == "uart" && adapter.state == AdapterState::Loaded {
+                return Err(AdapterError::Conflict(
+                    "unload the UART adapter before changing its runtime binding".to_owned(),
+                ));
+            }
             if adapter
                 .bindings
                 .iter()
@@ -1637,6 +1891,11 @@ impl AdapterManager {
                     "a GPIO adapter can bind exactly one GPIO bank device".to_owned(),
                 ));
             }
+            if adapter.bus_type == "uart" && (endpoint != 0 || !adapter.bindings.is_empty()) {
+                return Err(AdapterError::Conflict(
+                    "a UART adapter binds exactly one device at endpoint zero".to_owned(),
+                ));
+            }
             (
                 adapter.clone(),
                 AdapterBinding {
@@ -1645,6 +1904,7 @@ impl AdapterManager {
                     device_path: match adapter.bus_type.as_str() {
                         "gpio" => "/dev/gpiochipX".to_owned(),
                         "i2c" => format!("/dev/i2c-{}", adapter.bus_number),
+                        "uart" => "/dev/pts/X".to_owned(),
                         _ => format!("/dev/spidev{}.{}", adapter.bus_number, endpoint),
                     },
                     line_names,
@@ -1704,6 +1964,11 @@ impl AdapterManager {
             if adapter.bus_type == "gpio" && adapter.state == AdapterState::Loaded {
                 return Err(AdapterError::Conflict(
                     "unload the GPIO adapter before changing its runtime binding".to_owned(),
+                ));
+            }
+            if adapter.bus_type == "uart" && adapter.state == AdapterState::Loaded {
+                return Err(AdapterError::Conflict(
+                    "unload the UART adapter before changing its runtime binding".to_owned(),
                 ));
             }
             let binding = adapter
@@ -1815,7 +2080,7 @@ impl AdapterManager {
         } else {
             None
         };
-        if adapter.bus_type == "gpio" {
+        if matches!(adapter.bus_type.as_str(), "gpio" | "uart") {
             if let (Some(binding), Some(device_path)) =
                 (adapter.bindings.first_mut(), adapter.device_path.as_ref())
             {
@@ -2005,6 +2270,7 @@ mod tests {
             match adapter.bus_type.as_str() {
                 "gpio" => Some("/dev/gpiochip7".to_owned()),
                 "i2c" => Some(format!("/dev/i2c-{}", adapter.bus_number)),
+                "uart" => Some("/dev/pts/7".to_owned()),
                 _ => None,
             }
         }
@@ -2095,6 +2361,24 @@ mod tests {
         assert_eq!(loaded.state, AdapterState::Loaded);
         assert_eq!(loaded.daemon_pids, vec![2000]);
         assert_eq!(loaded.device_path.as_deref(), Some("/dev/gpiochip7"));
+    }
+
+    #[test]
+    fn manages_one_uart_device_on_a_dynamic_pty_path() {
+        let manager = AdapterManager::new(Arc::new(FakeDriver));
+        let created = manager
+            .create_uart("uart0".to_owned(), "UART 0".to_owned(), 0)
+            .unwrap();
+        assert_eq!(created.driver, "pty");
+        manager.attach("uart0", "serial-0".to_owned(), 0).unwrap();
+
+        let loaded = manager.load("uart0").unwrap();
+        assert_eq!(loaded.device_path.as_deref(), Some("/dev/pts/7"));
+        assert_eq!(loaded.bindings[0].device_path, "/dev/pts/7");
+        assert!(matches!(
+            manager.attach("uart0", "serial-1".to_owned(), 1),
+            Err(AdapterError::Conflict(_))
+        ));
     }
 
     #[test]
