@@ -266,15 +266,17 @@ A real Linux ABI E2E harness is available under `tests/e2e/` for privileged inte
 
 | Document | Purpose |
 | --- | --- |
+| [Documentation index](docs/README.md) | map of user, contributor and architecture documentation |
 | [Getting started](docs/guides/getting-started.md) | prerequisites, development workspace, staged build and installation |
 | [Architecture](VDS4E_ARCHITECTURE.md) | authoritative system architecture and boundaries |
-| [Roadmap](docs/ROADMAP.md) | planned capabilities |
-| [SPI guide](docs/guides/spi.md) | spidev adapter and SPI examples |
-| [I²C guide](docs/guides/i2c.md) | i2c-dev adapter and EEPROM examples |
-| [GPIO guide](docs/guides/gpio.md) | gpio-sim integration and line semantics |
-| [UART guide](docs/guides/uart.md) | PTY adapter |
+| [Testing](docs/guides/testing.md) | local checks, native adapters, real Linux ABI E2E and CI scope |
+| [Releases](docs/guides/releases.md) | version/tag rules and Debian release workflow |
+| [Troubleshooting](docs/guides/troubleshooting.md) | common CUSE, gpio-sim, permissions, PTY and configuration issues |
+| [SPI / I²C / GPIO / UART](docs/guides/) | Linux host-interface guides and examples |
 | [Topology guide](docs/guides/topology.md) | cross-device signal routing |
+| [Device Package SDK](docs/development/device-package-sdk.md) | package contract and author workflow |
 | [ADRs](docs/adr/README.md) | architecture decisions |
+| [Roadmap](docs/ROADMAP.md) | planned capabilities |
 | [Contributing](CONTRIBUTING.md) | development and contribution guidance |
 | [Security](SECURITY.md) | security policy |
 
