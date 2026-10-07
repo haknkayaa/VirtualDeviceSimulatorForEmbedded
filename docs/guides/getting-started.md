@@ -1,0 +1,90 @@
+# Getting started
+
+This guide covers prerequisites, the development workspace, and the staged
+build. Return to the [README](../../README.md) for the project overview.
+
+## Prerequisites
+
+- Rust 1.91.1, selected by `rust-toolchain.toml`
+- Node.js and npm
+- Protocol Buffers compiler (`protoc`)
+- C11 compiler, Make, CMake, and pkg-config
+- FUSE3 development files for CUSE adapters
+- optional host compatibility tools: `i2c-tools`, `gpiod`, and `spi-tools`
+
+Ubuntu/Debian:
+
+```shell
+sudo apt-get update
+sudo apt-get install -y \
+  build-essential cmake pkg-config libfuse3-dev protobuf-compiler \
+  i2c-tools libi2c-dev \
+  gpiod libgpiod-dev \
+  spi-tools
+```
+
+Kernel-backed adapters additionally require the host's `cuse` or `gpio-sim`
+module and operating-system authorization.
+
+## Start the development workspace
+
+From the repository root:
+
+```shell
+./dev.sh
+```
+
+For the usual local workflow, use the one-time-authorization launcher instead:
+
+```shell
+./run.sh
+```
+
+It requests your administrator password once through `sudo`, then uses that
+short-lived authorization to start the SPI, I²C, and GPIO adapter helpers as
+needed. Keep that terminal open: the authorization is tied to its development
+session. The VDS4E server and Web UI still run as your normal user. Use
+`VDS4E_ADAPTER_AUTH=pkexec ./run.sh` to retain separate Polkit prompts, or run
+`./dev.sh` directly.
+
+The script starts:
+
+- Web UI: `http://127.0.0.1:4174`
+- Control API: `http://127.0.0.1:8080/api/v1/health`
+- Transaction data plane: `/tmp/vds4e.sock`
+
+Keep the terminal open and press `Ctrl+C` to stop both processes. If port 4174
+is occupied, either stop the existing workspace or select another UI port:
+
+```shell
+VDS_WEB_PORT=4200 ./dev.sh
+```
+
+`dev.sh` installs missing Web dependencies and prepares the development SPI and
+I²C CUSE helpers. It is not the staged production build.
+
+## Staged build and installation
+
+The root pipeline is deliberately ordered:
+
+```shell
+./configure
+./build.sh
+sudo ./install
+```
+
+- `./build.sh` refuses to run before a successful `./configure`.
+- `./install` refuses to run before a successful `./build.sh`.
+- all generated build output is stored under `build/`.
+- `PREFIX` selects the installation prefix.
+- `DESTDIR` stages a filesystem package.
+
+Examples:
+
+```shell
+PREFIX="$HOME/.local" ./install
+DESTDIR="$PWD/package-root" PREFIX=/usr ./install
+```
+
+Focused module builds remain available during development; the full root
+pipeline does not need to run after every isolated change.
