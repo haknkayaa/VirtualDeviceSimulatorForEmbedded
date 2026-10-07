@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-07
+
+### Added
+- The packaged server serves the bundled React Web UI from the same control-plane
+  address, including SPA route fallback.
+- The Debian package installs a `vds4e` launcher and a `vds4e.service` systemd
+  unit. The service is installed but is not enabled automatically.
+
+### Fixed
+- Debian installs no longer leave Web UI assets unused under
+  `/usr/share/vds4e/web`; opening `http://127.0.0.1:8080/` now loads the UI.
+- Release smoke testing starts the installed server and verifies both the REST
+  health endpoint and Web UI routes.
+
+
 ### Added
 - Debian `amd64` package builder and tag-driven GitHub Release workflow that
   publishes the `.deb` and SHA-256 checksum.
