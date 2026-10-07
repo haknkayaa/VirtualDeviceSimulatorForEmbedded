@@ -1,0 +1,33 @@
+schema_version: 1
+
+device:
+  id: i2c-sensor-drdy
+  name: I2C Sensor with DRDY Output
+  bus: i2c
+  model: generic-i2c-register
+  i2c:
+    register_address_bytes: 1
+    auto_increment: true
+  commands: []
+
+  registers:
+    - { name: DEVICE_ID, address: 0x00, width_bits: 8, reset_value: 0x42, access: ro, description: Deterministic device identification register. }
+    - name: STATUS
+      address: 0x01
+      width_bits: 8
+      reset_value: 0x00
+      access: rw
+      description: Sample status. The control plane sets DRDY to simulate a finished conversion; a bus read clears it.
+      bitfields:
+        - { name: DRDY, lsb: 0, width: 1, access: rw, read_clear: true, description: New sample available; cleared when STATUS is read. }
+    - { name: SAMPLE, address: 0x02, width_bits: 8, reset_value: 0x5A, access: rw, description: Latest sample byte. }
+
+  # Public signal port. Topology connects to `i2c-sensor-drdy.drdy`.
+  signals:
+    outputs:
+      - { name: drdy, type: bool, description: Asserted while STATUS.DRDY is set. }
+  signal_bindings:
+    - signal: drdy
+      source: { register: STATUS, bit: 0 }
+
+  faults: []

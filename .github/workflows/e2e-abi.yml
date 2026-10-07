@@ -1,0 +1,69 @@
+name: Device ABI E2E
+
+# Privileged tests against the real Linux ABI: unmodified spidev_test, i2c-tools,
+# libgpiod tools and the kernel gpio-sim / CUSE drivers (ADR 0011). They are not part
+# of the regular "Build and Test" workflow and only run when started by hand:
+#
+#   qemu-hosted  boots a stock Ubuntu kernel in QEMU on a GitHub-hosted runner. Hosted
+#                kernels lack gpio-sim and CUSE, and there is no KVM, so this uses
+#                software emulation (about 10 minutes).
+#   self-hosted  runs directly on a privileged runner labelled `vds4e-privileged`
+#                whose kernel provides gpio-sim, cuse and configfs.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to run the ABI tests
+        type: choice
+        options:
+          - qemu-hosted
+          - self-hosted
+        default: qemu-hosted
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-abi-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  qemu-hosted:
+    name: Signal E2E in QEMU
+    if: inputs.target == 'qemu-hosted'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.1
+      - uses: Swatinem/rust-cache@v2
+      - name: Install QEMU, debootstrap and a distribution kernel
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qemu-system-x86 debootstrap e2fsprogs gcc cmake pkg-config libfuse3-dev curl \
+            python3 linux-image-generic
+          kver="$(ls /lib/modules | grep -E -- '-generic$' | sort -V | tail -1)"
+          sudo apt-get install -y --no-install-recommends "linux-modules-extra-${kver}" || true
+          echo "KVER=${kver}" >> "$GITHUB_ENV"
+      - name: Run the E2E scripts in the guest
+        run: sudo -E env "PATH=$PATH" tests/e2e/drdy/run-qemu.sh
+      - name: Upload the guest log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-abi-qemu-guest-log
+          path: build/e2e-drdy/guest.log
+          if-no-files-found: ignore
+
+  self-hosted:
+    name: Signal E2E on a privileged runner
+    if: inputs.target == 'self-hosted'
+    runs-on: [self-hosted, linux, x64, vds4e-privileged]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run the E2E scripts
+        run: sudo -E env "PATH=$PATH" tests/e2e/drdy/run-native.sh

@@ -1,0 +1,22 @@
+api_version: vds4e.dev/v1alpha1
+kind: DevicePackage
+
+metadata:
+  id: i2c-sensor-drdy
+  display_name: I2C Sensor with DRDY Output
+  version: 1.0.0
+  description: Example generic I2C register sensor that publishes a data-ready signal for board topology wiring.
+  license: Apache-2.0
+  authors: [VDS4E Contributors]
+  tags: [i2c, sensor, drdy, topology, example]
+
+spec:
+  bus:
+    type: i2c
+    profile: i2c.standard
+  runtime:
+    driver: generic-i2c-register
+    model: model/device.yaml
+  documentation: docs
+  extensions:
+    purpose: cross-device-signal-example
