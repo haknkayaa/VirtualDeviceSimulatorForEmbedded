@@ -175,3 +175,83 @@ fn keeps_the_same_part_on_two_buses_as_two_devices() {
         "a repeated node on one bus is one device; another bus is another device"
     );
 }
+
+#[test]
+fn routes_gpio_interrupts_and_drafts_the_controller_bank() {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    use vds_importer::{
+        GpioInterruptDraft, IRQ_REGISTER, IRQ_SIGNAL, add_interrupt_output, interrupt_topology_yaml,
+    };
+
+    let board = import_dts(
+        r#"
+/dts-v1/;
+gpio0: gpio@48000000 {
+    compatible = "ti,omap4-gpio";
+    gpio-controller;
+    ngpios = <8>;
+};
+&i2c1 {
+    status = "okay";
+    imu@68 { compatible = "tdk,icm20948"; reg = <0x68>; interrupt-parent = <&gpio0>; interrupts = <10 1>; };
+    rtc@51 { compatible = "nxp,pcf85063"; reg = <0x51>; interrupt-parent = <&intc>; interrupts = <3>; };
+    eeprom@50 { compatible = "atmel,24c256"; reg = <0x50>; };
+};
+"#,
+    )
+    .expect("importing DTS succeeds");
+
+    let interrupts = board.gpio_interrupts();
+    assert_eq!(
+        interrupts,
+        [GpioInterruptDraft {
+            device_id: "icm20948-68".to_owned(),
+            controller: "gpio0".to_owned(),
+            line: 10,
+        }],
+        "only interrupts whose parent is a GPIO controller are lines"
+    );
+
+    // ngpios = 8, extended to cover line 10; only the interrupt line is device-driven.
+    let bank = board.gpio_bank_model("gpio0", "gpio0", &BTreeSet::from([10]));
+    let lines = &bank.device.gpio.as_ref().expect("gpio lines").lines;
+    assert_eq!(lines.len(), 11);
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|line| line.direction == vds_device_model::GpioLineDirection::Output)
+            .map(|line| line.name.as_str())
+            .collect::<Vec<_>>(),
+        ["GPIO10"]
+    );
+    DeviceModel::from_yaml(&vds_importer::export_model_yaml(&bank).unwrap())
+        .expect("bank draft is a valid model");
+
+    let stub = board.device("icm20948-68").expect("imu stub");
+    let mut model = stub.to_device_model().expect("model");
+    let highest = model.device.registers.iter().map(|r| r.address).max();
+    add_interrupt_output(&mut model);
+    let irq = model
+        .device
+        .registers
+        .iter()
+        .find(|register| register.name == IRQ_REGISTER)
+        .expect("IRQ register");
+    assert_eq!(Some(irq.address), highest.map(|address| address + 1));
+    assert_eq!(
+        model.device.signals.as_ref().unwrap().outputs[0].name,
+        IRQ_SIGNAL
+    );
+    DeviceModel::from_yaml(&vds_importer::export_model_yaml(&model).unwrap())
+        .expect("model with irq output is valid");
+
+    let ids = BTreeMap::from([
+        ("icm20948-68".to_owned(), "imu".to_owned()),
+        ("gpio0".to_owned(), "bank".to_owned()),
+    ]);
+    assert!(
+        interrupt_topology_yaml(&interrupts, &ids)
+            .ends_with("connections:\n  - { from: imu.irq, to: bank.GPIO10 }\n")
+    );
+}

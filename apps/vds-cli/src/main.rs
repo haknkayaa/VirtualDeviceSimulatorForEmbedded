@@ -532,13 +532,31 @@ struct ImportedStub {
     id: String,
     bus: DeviceBusKind,
     bus_name: String,
-    address: Option<u64>,
+    /// SPI chip select, I2C address, or GPIO line count, ready to print.
+    endpoint: String,
     compatible: String,
     interrupts: String,
 }
 
-/// Drafts one device package per supported, enabled Device Tree peripheral and
-/// verifies that the server can load every draft.
+/// Peripheral `irq` output wired to a GPIO bank line, by package ID.
+struct ImportedWire {
+    device: String,
+    bank: String,
+    line: u32,
+}
+
+const DRAFT_HEADER: &str = "# The behavior below is a placeholder: review commands, registers and states\n# against the datasheet before relying on this model.\n";
+
+/// Package IDs handed out so far, and draft ID (or GPIO controller) -> package ID.
+#[derive(Default)]
+struct DraftIds {
+    used: std::collections::BTreeSet<String>,
+    by_draft: std::collections::BTreeMap<String, String>,
+}
+
+/// Drafts one device package per supported, enabled Device Tree peripheral, a
+/// GPIO bank and `topology.yaml` for interrupts routed to GPIO controllers, and
+/// verifies that the server can load the result.
 fn import_dts(arguments: &ImportDtsArguments) -> Result<(), String> {
     let board =
         vds_importer::import_dts_file(&arguments.source).map_err(|error| error.to_string())?;
@@ -554,9 +572,96 @@ fn import_dts(arguments: &ImportDtsArguments) -> Result<(), String> {
     }
     fs::create_dir_all(&arguments.output)
         .map_err(|error| format!("failed to create output directory: {error}"))?;
+    let interrupts = board.gpio_interrupts();
+    let mut ids = DraftIds::default();
+    let (mut imported, skipped) = draft_peripherals(arguments, &board, &interrupts, &mut ids)?;
+    let wired = interrupts
+        .into_iter()
+        .filter(|interrupt| ids.by_draft.contains_key(&interrupt.device_id))
+        .collect::<Vec<_>>();
+    imported.extend(draft_interrupt_banks(
+        &arguments.output,
+        &board,
+        &wired,
+        &mut ids,
+    )?);
+    let topology = if wired.is_empty() {
+        None
+    } else {
+        let path = arguments.output.join("topology.yaml");
+        fs::write(
+            &path,
+            vds_importer::interrupt_topology_yaml(&wired, &ids.by_draft),
+        )
+        .map_err(|error| format!("failed to write topology draft: {error}"))?;
+        Some(path)
+    };
+    let connections = wired
+        .iter()
+        .filter_map(|interrupt| {
+            Some(ImportedWire {
+                device: ids.by_draft.get(&interrupt.device_id)?.clone(),
+                bank: ids.by_draft.get(&interrupt.controller)?.clone(),
+                line: interrupt.line,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    verify_imported_packages(&arguments.output, &imported, topology.as_deref())?;
+    let controllers = board
+        .buses
+        .iter()
+        .map(|bus| format!("{} ({})", bus.name, bus.bus_type))
+        .collect::<Vec<_>>();
+    let summary = board_summary(
+        &BoardSummary {
+            board: &board.name,
+            source: &arguments.source,
+            output: &arguments.output,
+            controllers: &controllers,
+            topology: topology.as_deref(),
+        },
+        &imported,
+        &connections,
+        &skipped,
+    );
+    fs::write(arguments.output.join("board.md"), summary)
+        .map_err(|error| format!("failed to write board summary: {error}"))?;
+    println!(
+        "imported {} device package draft(s) from {} into {}",
+        imported.len(),
+        arguments.source.display(),
+        arguments.output.display()
+    );
+    for stub in &imported {
+        println!("  {} ({}, {})", stub.id, stub.bus.as_str(), stub.endpoint);
+    }
+    for connection in &connections {
+        println!(
+            "  wired {}.{} -> {}.GPIO{}",
+            connection.device,
+            vds_importer::IRQ_SIGNAL,
+            connection.bank,
+            connection.line
+        );
+    }
+    for reason in &skipped {
+        println!("  skipped {reason}");
+    }
+    println!("review {}", arguments.output.join("board.md").display());
+    Ok(())
+}
+
+/// Writes a package per enabled peripheral on a supported bus; returns the
+/// drafts and the reasons other nodes were skipped.
+fn draft_peripherals(
+    arguments: &ImportDtsArguments,
+    board: &vds_importer::VirtualBoardDraft,
+    interrupts: &[vds_importer::GpioInterruptDraft],
+    ids: &mut DraftIds,
+) -> Result<(Vec<ImportedStub>, Vec<String>), String> {
     let mut imported = Vec::new();
     let mut skipped = Vec::new();
-    let mut used = std::collections::BTreeSet::new();
     for stub in &board.devices {
         let enabled = matches!(stub.status.as_str(), "okay" | "ok");
         if !enabled && !arguments.include_disabled {
@@ -575,68 +680,119 @@ fn import_dts(arguments: &ImportDtsArguments) -> Result<(), String> {
                 continue;
             }
         };
-        let mut id = package_id(&stub.id);
-        if !used.insert(id.clone()) {
-            id = package_id(&format!("{}-{}", stub.bus_name, stub.id));
-            used.insert(id.clone());
-        }
+        let id = unique_package_id(&mut ids.used, &stub.id, &stub.bus_name);
         let mut draft = stub.clone();
         draft.id.clone_from(&id);
-        let model = draft.export_yaml().map_err(|error| error.to_string())?;
+        let mut model = draft.to_device_model().map_err(|error| error.to_string())?;
+        if interrupts
+            .iter()
+            .any(|interrupt| interrupt.device_id == stub.id)
+        {
+            vds_importer::add_interrupt_output(&mut model);
+        }
         let header = format!(
-            "# Draft generated by `vds-cli import dts` for {} on {}.\n# The behavior below is a placeholder: review commands, registers and states\n# against the datasheet before relying on this model.\n",
+            "# Draft generated by `vds-cli import dts` for {} on {}.\n{DRAFT_HEADER}",
             stub.name, stub.bus_name
         );
-        write_device_package(
-            &DevicePackageNewArguments {
-                path: arguments.output.join(&id),
-                id: id.clone(),
-                name: stub.name.clone(),
-                bus,
-            },
-            &format!("{header}{model}"),
-        )?;
+        write_draft_package(&arguments.output, &id, &stub.name, bus, &header, &model)?;
+        ids.by_draft.insert(stub.id.clone(), id.clone());
         imported.push(ImportedStub {
+            endpoint: match (bus, stub.address) {
+                (DeviceBusKind::Spi, Some(address)) => format!("chip select {address}"),
+                (DeviceBusKind::I2c, Some(address)) => format!("address {address:#04x}"),
+                (_, Some(address)) => format!("reg {address:#x}"),
+                (_, None) => "no reg".to_owned(),
+            },
             id,
             bus,
             bus_name: stub.bus_name.clone(),
-            address: stub.address,
             compatible: stub.compatible.join(", "),
             interrupts: interrupt_summary(&stub.interrupts, stub.interrupt_parent.as_deref()),
         });
     }
-    verify_imported_packages(&arguments.output, &imported)?;
-    let controllers = board
-        .buses
-        .iter()
-        .map(|bus| format!("{} ({})", bus.name, bus.bus_type))
-        .collect::<Vec<_>>();
-    let summary = board_summary(
-        &BoardSummary {
-            board: &board.name,
-            source: &arguments.source,
-            output: &arguments.output,
-            controllers: &controllers,
+    Ok((imported, skipped))
+}
+
+/// Writes a GPIO bank draft per controller that receives a wired interrupt,
+/// with those lines driven by the device.
+fn draft_interrupt_banks(
+    output: &std::path::Path,
+    board: &vds_importer::VirtualBoardDraft,
+    wired: &[vds_importer::GpioInterruptDraft],
+    ids: &mut DraftIds,
+) -> Result<Vec<ImportedStub>, String> {
+    let mut lines = std::collections::BTreeMap::<String, std::collections::BTreeSet<u32>>::new();
+    for interrupt in wired {
+        lines
+            .entry(interrupt.controller.clone())
+            .or_default()
+            .insert(interrupt.line);
+    }
+    let mut banks = Vec::new();
+    for (controller, driven) in &lines {
+        let id = unique_package_id(&mut ids.used, controller, "bank");
+        let model = board.gpio_bank_model(controller, &id, driven);
+        let count = model
+            .device
+            .gpio
+            .as_ref()
+            .map_or(0, |gpio| gpio.lines.len());
+        let name = model.device.name.clone();
+        let header = format!(
+            "# Draft generated by `vds-cli import dts` for GPIO controller {controller}.\n# Lines that carry peripheral interrupts are outputs driven through topology.yaml.\n"
+        );
+        write_draft_package(output, &id, &name, DeviceBusKind::Gpio, &header, &model)?;
+        ids.by_draft.insert(controller.clone(), id.clone());
+        banks.push(ImportedStub {
+            id,
+            bus: DeviceBusKind::Gpio,
+            bus_name: controller.clone(),
+            endpoint: format!("{count} lines"),
+            compatible: String::new(),
+            interrupts: String::new(),
+        });
+    }
+    Ok(banks)
+}
+
+/// A package ID not used yet; on collision the `qualifier` is prefixed.
+fn unique_package_id(
+    used: &mut std::collections::BTreeSet<String>,
+    raw: &str,
+    qualifier: &str,
+) -> String {
+    let mut id = package_id(raw);
+    if used.contains(&id) {
+        id = package_id(&format!("{qualifier}-{raw}"));
+    }
+    let base = id.clone();
+    let mut suffix = 2;
+    while used.contains(&id) {
+        id = format!("{base}-{suffix}");
+        suffix += 1;
+    }
+    used.insert(id.clone());
+    id
+}
+
+fn write_draft_package(
+    output: &std::path::Path,
+    id: &str,
+    name: &str,
+    bus: DeviceBusKind,
+    header: &str,
+    model: &vds_importer::DeviceModel,
+) -> Result<(), String> {
+    let yaml = vds_importer::export_model_yaml(model).map_err(|error| error.to_string())?;
+    write_device_package(
+        &DevicePackageNewArguments {
+            path: output.join(id),
+            id: id.to_owned(),
+            name: name.to_owned(),
+            bus,
         },
-        &imported,
-        &skipped,
-    );
-    fs::write(arguments.output.join("board.md"), summary)
-        .map_err(|error| format!("failed to write board summary: {error}"))?;
-    println!(
-        "imported {} device package draft(s) from {} into {}",
-        imported.len(),
-        arguments.source.display(),
-        arguments.output.display()
-    );
-    for stub in &imported {
-        println!("  {} ({}, {})", stub.id, stub.bus.as_str(), endpoint(stub));
-    }
-    for reason in &skipped {
-        println!("  skipped {reason}");
-    }
-    println!("review {}", arguments.output.join("board.md").display());
-    Ok(())
+        &format!("{header}{yaml}"),
+    )
 }
 
 /// Lower-case package ID allowed by the manifest schema (`^[a-z0-9][a-z0-9-]*$`).
@@ -672,19 +828,12 @@ fn interrupt_summary(interrupts: &[u32], parent: Option<&str>) -> String {
     }
 }
 
-fn endpoint(stub: &ImportedStub) -> String {
-    match (stub.bus, stub.address) {
-        (DeviceBusKind::Spi, Some(address)) => format!("chip select {address}"),
-        (DeviceBusKind::I2c, Some(address)) => format!("address {address:#04x}"),
-        (_, Some(address)) => format!("reg {address:#x}"),
-        (_, None) => "no reg".to_owned(),
-    }
-}
-
-/// Loads every draft exactly as the server would, so a broken draft fails here.
+/// Loads every draft, and the topology draft when there is one, exactly as the
+/// server would, so a broken draft fails here.
 fn verify_imported_packages(
     output: &std::path::Path,
     imported: &[ImportedStub],
+    topology: Option<&std::path::Path>,
 ) -> Result<(), String> {
     if imported.is_empty() {
         return Ok(());
@@ -699,8 +848,16 @@ fn verify_imported_packages(
                 .map_err(|error| error.to_string())
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let topology = topology
+        .map(|path| {
+            path.canonicalize()
+                .map(|path| format!("topology: '{}'\n", path.display()))
+                .map_err(|error| error.to_string())
+        })
+        .transpose()?
+        .unwrap_or_default();
     let config = ServerConfig::from_yaml(&format!(
-        "schema_version: 1\nserver: {{ control_address: '127.0.0.1:0' }}\ndata_plane: {{ unix_socket: /tmp/vds4e-import-check.sock }}\nobservability: {{ log_level: info }}\ndevice_packages: [{}]\n",
+        "schema_version: 1\nserver: {{ control_address: '127.0.0.1:0' }}\ndata_plane: {{ unix_socket: /tmp/vds4e-import-check.sock }}\nobservability: {{ log_level: info }}\ndevice_packages: [{}]\n{topology}",
         packages.join(", ")
     ))
     .map_err(|error| error.to_string())?;
@@ -714,11 +871,13 @@ struct BoardSummary<'a> {
     source: &'a std::path::Path,
     output: &'a std::path::Path,
     controllers: &'a [String],
+    topology: Option<&'a std::path::Path>,
 }
 
 fn board_summary(
     summary: &BoardSummary<'_>,
     imported: &[ImportedStub],
+    wires: &[ImportedWire],
     skipped: &[String],
 ) -> String {
     let BoardSummary {
@@ -726,6 +885,7 @@ fn board_summary(
         source,
         output,
         controllers,
+        topology,
     } = summary;
     let mut text = format!(
         "# {board}\n\nDevice package drafts imported from `{}` by `vds-cli import dts`.\nEach model is a placeholder that loads in VDS4E; replace its commands,\nregisters and behavior with the device's datasheet semantics.\n\n| Package | Bus | Controller | Endpoint | Compatible | Interrupts |\n| --- | --- | --- | --- | --- | --- |\n",
@@ -748,17 +908,31 @@ fn board_summary(
             stub.id,
             stub.bus.as_str(),
             stub.bus_name,
-            endpoint(stub),
+            stub.endpoint,
         )
         .expect("writing to String cannot fail");
     }
     if !controllers.is_empty() {
         writeln!(
             text,
-            "\nBus controllers found: {}. VDS4E exposes them through host adapters;\nGPIO controllers map to a `generic-gpio-bank` package.",
+            "\nBus controllers found: {}. VDS4E exposes them through host adapters.",
             controllers.join(", ")
         )
         .expect("writing to String cannot fail");
+    }
+    if !wires.is_empty() {
+        text.push_str("\n## Interrupt wiring\n\n`topology.yaml` connects each interrupt to the GPIO line the Device Tree\nnames. The peripheral's `irq` output follows bit 0 of its draft `IRQ_STATE`\nregister; write 1 to it to assert the line, then replace the binding with the\ndevice's real interrupt condition.\n\n");
+        for wire in wires {
+            writeln!(
+                text,
+                "- `{}.{}` → `{}.GPIO{}`",
+                wire.device,
+                vds_importer::IRQ_SIGNAL,
+                wire.bank,
+                wire.line
+            )
+            .expect("writing to String cannot fail");
+        }
     }
     if !skipped.is_empty() {
         text.push_str("\n## Skipped nodes\n\n");
@@ -766,10 +940,13 @@ fn board_summary(
             writeln!(text, "- {reason}").expect("writing to String cannot fail");
         }
     }
-    text.push_str("\n## Next steps\n\n1. Review each `model/device.yaml` and add scenarios.\n2. Add the packages to `vds-server.yaml`:\n\n```yaml\ndevice_packages:\n");
+    text.push_str("\n## Next steps\n\n1. Review each `model/device.yaml` and add scenarios.\n2. Add the drafts to `vds-server.yaml`:\n\n```yaml\ndevice_packages:\n");
     for stub in imported {
         writeln!(text, "  - {}", output.join(&stub.id).display())
             .expect("writing to String cannot fail");
+    }
+    if let Some(topology) = topology {
+        writeln!(text, "topology: {}", topology.display()).expect("writing to String cannot fail");
     }
     text.push_str("```\n\n3. Bind each device to a host adapter at the endpoint above (SPI chip select\n   or I2C address) so the application reaches it through `/dev/spidevX.Y`,\n   `/dev/i2c-N` or `/dev/gpiochipN`.\n");
     text
@@ -974,6 +1151,11 @@ mod tests {
         reg = <0x76>;
     };
 };
+gpio0: gpio@48000000 {
+    compatible = "ti,omap4-gpio";
+    gpio-controller;
+    #gpio-cells = <2>;
+};
 &spi0 {
     status = "okay";
     flash@1 {
@@ -993,7 +1175,7 @@ mod tests {
         })
         .unwrap();
 
-        for id in ["bme280-76", "i2c2-bme280-76", "spi-nor-1"] {
+        for id in ["bme280-76", "i2c2-bme280-76", "spi-nor-1", "gpio0"] {
             let package = DevicePackage::load(output.join(id)).unwrap();
             assert_eq!(package.manifest().metadata.id, id);
         }
@@ -1009,6 +1191,15 @@ mod tests {
         assert!(summary.contains("| `spi-nor-1` | spi | spi0 | chip select 1 |"));
         assert!(summary.contains("24c256-50: status \"disabled\""));
 
+        assert!(summary.contains("- `bme280-76.irq` → `gpio0.GPIO12`"));
+        assert!(
+            fs::read_to_string(output.join("topology.yaml"))
+                .unwrap()
+                .contains("  - { from: bme280-76.irq, to: gpio0.GPIO12 }\n")
+        );
+
+        assert_draft_interrupt_drives_the_line(&output);
+
         let again = import_dts(&ImportDtsArguments {
             source,
             output,
@@ -1016,6 +1207,33 @@ mod tests {
         });
         assert!(again.unwrap_err().contains("is not empty"));
         fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Writing the draft `IRQ_STATE` bit raises the wired GPIO line.
+    fn assert_draft_interrupt_drives_the_line(output: &std::path::Path) {
+        let config = vds_core::config::ServerConfig::from_yaml(&format!(
+            "schema_version: 1\nserver: {{ control_address: '127.0.0.1:0' }}\ndata_plane: {{ unix_socket: /tmp/vds4e-cli-dts.sock }}\nobservability: {{ log_level: info }}\ndevice_packages: ['{}', '{}']\ntopology: '{}'\n",
+            output.join("bme280-76").display(),
+            output.join("gpio0").display(),
+            output.join("topology.yaml").display(),
+        ))
+        .unwrap();
+        let registry = vds_server::load_registry_with_clock(
+            &config,
+            std::sync::Arc::new(vds_core::clock::ManualClock::default()),
+        )
+        .unwrap();
+        assert_eq!(registry.read_register("gpio0", "GPIO12_STATE").unwrap(), 0);
+        let irq = registry
+            .registers("bme280-76")
+            .unwrap()
+            .into_iter()
+            .find(|register| register.name == "IRQ_STATE")
+            .unwrap();
+        registry
+            .write_register("bme280-76", irq.address, 1)
+            .unwrap();
+        assert_eq!(registry.read_register("gpio0", "GPIO12_STATE").unwrap(), 1);
     }
 
     #[test]

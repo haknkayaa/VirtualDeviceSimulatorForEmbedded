@@ -20,7 +20,8 @@ Out of scope for version 1 and candidates for follow-up ADRs:
 - editing connections from the control plane or Web UI (a read-only view and
   `GET /api/v1/topology` exist);
 - attaching a topology to devices created at runtime;
-- Device Tree driven topology generation.
+- Device Tree driven topology generation beyond GPIO-routed interrupts
+  (`vds-cli import dts` covers `interrupt-parent` GPIO controllers).
 
 ## Additional host adapters and buses
 
@@ -67,9 +68,9 @@ responsibilities of the VDS4E device runtime.
 ### Platform import and generation
 
 - Import Device Tree sources and overlays into a reviewable topology draft.
-  (`vds-cli import dts` already drafts loadable device packages per
-  peripheral; interrupt and GPIO connections are not yet turned into
-  `topology.yaml`.)
+  (`vds-cli import dts` drafts loadable device packages and turns interrupts
+  routed to GPIO controllers into `topology.yaml`; `*-gpios` properties and
+  non-GPIO interrupt controllers are not mapped yet.)
 - Generate a virtual-board draft from DTS connectivity, addresses, interrupts,
   and compatible strings without claiming unsupported device behavior.
 - Import relevant Yocto machine and distribution metadata. `SDKMACHINE=x86_64`

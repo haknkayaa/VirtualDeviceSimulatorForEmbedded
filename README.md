@@ -243,8 +243,12 @@ Draft one device package per enabled SPI, I2C and GPIO peripheral of a board's D
 vds-cli import dts board.dts --output drafts/
 ```
 
-Every draft is loaded the way the server loads packages before the command
-succeeds. `drafts/board.md` lists each package with its bus controller,
+When a peripheral's `interrupt-parent` is a GPIO controller of the board, the
+import also drafts that controller as a GPIO bank and writes
+`drafts/topology.yaml`, connecting the peripheral's new `irq` output (driven by
+bit 0 of a placeholder `IRQ_STATE` register) to the line its `interrupts`
+names. Every draft, and the topology, is loaded the way the server loads them
+before the command succeeds. `drafts/board.md` lists each package with its bus controller,
 endpoint (SPI chip select or I2C address), compatible strings and interrupts,
 the nodes that were skipped (disabled, or a bus without a VDS4E runtime), and
 the `device_packages` entries to add to `vds-server.yaml`. Pass
