@@ -101,6 +101,13 @@ static void handle_configuration_ioctl(fuse_req_t request,
     reply_read_ioctl(request, argument, &handle->mode, sizeof(handle->mode),
                      output_size);
     return;
+  case SPI_IOC_RD_MODE32:
+    /* spidev_test and libraries use the 32-bit mode ioctls; the low byte is
+     * the same value that SPI_IOC_RD_MODE reports. */
+    value32 = handle->mode;
+    reply_read_ioctl(request, argument, &value32, sizeof(value32),
+                     output_size);
+    return;
   case SPI_IOC_RD_BITS_PER_WORD:
     reply_read_ioctl(request, argument, &handle->bits_per_word,
                      sizeof(handle->bits_per_word), output_size);
@@ -143,6 +150,22 @@ static void handle_configuration_ioctl(fuse_req_t request,
       handle->lsb_first = value8;
     }
     reply_error_or_success(request, error);
+    return;
+  }
+
+  if (command == SPI_IOC_WR_MODE32) {
+    if (!acquire_write_value(request, argument, input, input_size,
+                             sizeof(value32))) {
+      return;
+    }
+    (void)memcpy(&value32, input, sizeof(value32));
+    /* Same contract as SPI_IOC_WR_MODE: only mode 0 without extra flags. */
+    if (value32 != 0U) {
+      fuse_reply_err(request, EINVAL);
+    } else {
+      handle->mode = 0U;
+      fuse_reply_ioctl(request, 0, NULL, 0U);
+    }
     return;
   }
 
