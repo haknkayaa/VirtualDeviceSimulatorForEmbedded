@@ -1,10 +1,5 @@
 use vds_device_model::DeviceModel;
-use vds_importer::{
-    dts::BusType,
-    import_dts,
-    merge_stub_and_svd,
-    svd::SvdPeripheral,
-};
+use vds_importer::{dts::BusType, import_dts, merge_stub_and_svd, svd::SvdPeripheral};
 
 const SAMPLE_BOARD_DTS: &str = r#"
 /dts-v1/;
@@ -72,19 +67,31 @@ fn parses_dts_and_extracts_peripherals() {
     assert_eq!(board.devices.len(), 3);
 
     // Verify AD7991
-    let ad7991 = board.devices.iter().find(|d| d.id.starts_with("ad7991")).expect("ad7991 stub");
+    let ad7991 = board
+        .devices
+        .iter()
+        .find(|d| d.id.starts_with("ad7991"))
+        .expect("ad7991 stub");
     assert_eq!(ad7991.bus_type, BusType::I2c);
     assert_eq!(ad7991.address, Some(0x28));
     assert_eq!(ad7991.compatible, vec!["adi,ad7991"]);
 
     // Verify BME280
-    let bme280 = board.devices.iter().find(|d| d.id.starts_with("bme280")).expect("bme280 stub");
+    let bme280 = board
+        .devices
+        .iter()
+        .find(|d| d.id.starts_with("bme280"))
+        .expect("bme280 stub");
     assert_eq!(bme280.bus_type, BusType::I2c);
     assert_eq!(bme280.address, Some(0x76));
     assert_eq!(bme280.interrupts, vec![12, 2]);
 
     // Verify spidev
-    let spidev = board.devices.iter().find(|d| d.id.starts_with("spidev")).expect("spidev stub");
+    let spidev = board
+        .devices
+        .iter()
+        .find(|d| d.id.starts_with("spidev"))
+        .expect("spidev stub");
     assert_eq!(spidev.bus_type, BusType::Spi);
     assert_eq!(spidev.address, Some(0));
     assert_eq!(spidev.spi_max_frequency_hz, Some(25_000_000));
@@ -96,7 +103,8 @@ fn generates_schema_valid_device_models_from_stubs() {
 
     for stub in &board.devices {
         let yaml = stub.export_yaml().expect("exports YAML stub");
-        let validated = DeviceModel::from_yaml(&yaml).expect("validates against DEVICE_MODEL_SCHEMA");
+        let validated =
+            DeviceModel::from_yaml(&yaml).expect("validates against DEVICE_MODEL_SCHEMA");
         assert_eq!(validated.schema_version, 1);
         assert!(!validated.device.id.is_empty());
     }
@@ -105,7 +113,11 @@ fn generates_schema_valid_device_models_from_stubs() {
 #[test]
 fn merges_dts_stub_with_svd_registers_and_validates() {
     let board = import_dts(SAMPLE_BOARD_DTS).expect("importing DTS");
-    let ad7991_stub = board.devices.iter().find(|d| d.id.starts_with("ad7991")).unwrap();
+    let ad7991_stub = board
+        .devices
+        .iter()
+        .find(|d| d.id.starts_with("ad7991"))
+        .unwrap();
 
     let svd_content = r#"
       <peripheral>

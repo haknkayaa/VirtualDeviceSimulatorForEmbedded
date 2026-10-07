@@ -222,7 +222,10 @@ impl VirtualBoardDraft {
     /// Returns all devices connected to a given bus name.
     #[must_use]
     pub fn devices_on_bus(&self, bus_name: &str) -> Vec<&DeviceStubDraft> {
-        self.devices.iter().filter(|d| d.bus_name == bus_name).collect()
+        self.devices
+            .iter()
+            .filter(|d| d.bus_name == bus_name)
+            .collect()
     }
 }
 
@@ -242,7 +245,10 @@ impl DeviceStubDraft {
                         width_bits: 8,
                         reset_value: 0x00,
                         access: AccessType::Ro,
-                        description: format!("Deterministic device identification for {}", self.name),
+                        description: format!(
+                            "Deterministic device identification for {}",
+                            self.name
+                        ),
                         bitfields: vec![],
                     },
                     RegisterDefinition {
@@ -575,7 +581,10 @@ fn build_device_stub(node: &DtsNode, bus_type: BusType, bus_name: &str) -> Devic
     let compat = node.compatible_strings();
     let reg = node.reg_address();
     let interrupts = node.interrupts();
-    let interrupt_parent = node.properties.get("interrupt-parent").map(format_dts_value);
+    let interrupt_parent = node
+        .properties
+        .get("interrupt-parent")
+        .map(format_dts_value);
 
     let clean_name = clean_node_name(&node.name);
     let id = generate_device_id(&clean_name, compat.first().map(String::as_str), reg);
@@ -594,15 +603,18 @@ fn build_device_stub(node: &DtsNode, bus_type: BusType, bus_name: &str) -> Devic
         None
     };
 
-    let spi_max_frequency_hz = node.properties.get("spi-max-frequency").and_then(|v| {
-        match v {
+    let spi_max_frequency_hz = node
+        .properties
+        .get("spi-max-frequency")
+        .and_then(|v| match v {
             DtsValue::Cells(cells) => cells.first().copied(),
             _ => None,
-        }
-    });
+        });
 
     let status = match node.properties.get("status") {
-        Some(DtsValue::StringList(list)) => list.first().cloned().unwrap_or_else(|| "okay".to_string()),
+        Some(DtsValue::StringList(list)) => {
+            list.first().cloned().unwrap_or_else(|| "okay".to_string())
+        }
         _ => "okay".to_string(),
     };
 
@@ -651,7 +663,9 @@ fn generate_device_id(node_name: &str, compat: Option<&str>, reg: Option<u64>) -
 }
 
 fn clean_node_name(name: &str) -> String {
-    name.trim_start_matches('&').trim_start_matches('/').to_string()
+    name.trim_start_matches('&')
+        .trim_start_matches('/')
+        .to_string()
 }
 
 fn format_dts_value(val: &DtsValue) -> String {
@@ -1085,16 +1099,28 @@ mod tests {
         // Verify devices
         assert_eq!(board.devices.len(), 3);
 
-        let bme280 = board.devices.iter().find(|d| d.id.starts_with("bme280")).unwrap();
+        let bme280 = board
+            .devices
+            .iter()
+            .find(|d| d.id.starts_with("bme280"))
+            .unwrap();
         assert_eq!(bme280.bus_type, BusType::I2c);
         assert_eq!(bme280.address, Some(0x76));
         assert_eq!(bme280.compatible, vec!["bosch,bme280"]);
 
-        let eeprom = board.devices.iter().find(|d| d.id.starts_with("24c256")).unwrap();
+        let eeprom = board
+            .devices
+            .iter()
+            .find(|d| d.id.starts_with("24c256"))
+            .unwrap();
         assert_eq!(eeprom.bus_type, BusType::I2c);
         assert_eq!(eeprom.address, Some(0x50));
 
-        let spidev = board.devices.iter().find(|d| d.id.starts_with("dh2228fv") || d.id.starts_with("spidev")).unwrap();
+        let spidev = board
+            .devices
+            .iter()
+            .find(|d| d.id.starts_with("dh2228fv") || d.id.starts_with("spidev"))
+            .unwrap();
         assert_eq!(spidev.bus_type, BusType::Spi);
         assert_eq!(spidev.address, Some(0));
         assert_eq!(spidev.spi_mode, Some(2)); // CPOL=1, CPHA=0 -> mode 2
@@ -1105,13 +1131,21 @@ mod tests {
     fn converts_stubs_to_device_models() {
         let board = VirtualBoardDraft::from_dts(SAMPLE_DTS).expect("valid DTS parsing");
 
-        let bme280 = board.devices.iter().find(|d| d.id.starts_with("bme280")).unwrap();
+        let bme280 = board
+            .devices
+            .iter()
+            .find(|d| d.id.starts_with("bme280"))
+            .unwrap();
         let i2c_model = bme280.to_device_model().expect("generates I2C model");
         assert_eq!(i2c_model.device.bus, "i2c");
         assert_eq!(i2c_model.device.model, "generic-i2c-register");
         assert!(!i2c_model.device.registers.is_empty());
 
-        let spidev = board.devices.iter().find(|d| d.id.starts_with("dh2228fv") || d.id.starts_with("spidev")).unwrap();
+        let spidev = board
+            .devices
+            .iter()
+            .find(|d| d.id.starts_with("dh2228fv") || d.id.starts_with("spidev"))
+            .unwrap();
         let spi_model = spidev.to_device_model().expect("generates SPI model");
         assert_eq!(spi_model.device.bus, "spi");
         assert_eq!(spi_model.device.model, "generic-spi-command");

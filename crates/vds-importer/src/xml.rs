@@ -106,13 +106,19 @@ pub fn parse_int_u64(raw: &str) -> std::result::Result<u64, String> {
         return Err("empty integer string".to_string());
     }
 
-    if let Some(hex) = clean.strip_prefix("0x").or_else(|| clean.strip_prefix("0X")) {
+    if let Some(hex) = clean
+        .strip_prefix("0x")
+        .or_else(|| clean.strip_prefix("0X"))
+    {
         u64::from_str_radix(hex, 16)
             .map_err(|err| format!("invalid hexadecimal number '{raw}': {err}"))
     } else if let Some(hex) = clean.strip_prefix('#') {
         u64::from_str_radix(hex, 16)
             .map_err(|err| format!("invalid hexadecimal number '{raw}': {err}"))
-    } else if let Some(bin) = clean.strip_prefix("0b").or_else(|| clean.strip_prefix("0B")) {
+    } else if let Some(bin) = clean
+        .strip_prefix("0b")
+        .or_else(|| clean.strip_prefix("0B"))
+    {
         u64::from_str_radix(bin, 2).map_err(|err| format!("invalid binary number '{raw}': {err}"))
     } else {
         clean

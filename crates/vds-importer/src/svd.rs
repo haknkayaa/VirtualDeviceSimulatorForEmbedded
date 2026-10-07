@@ -220,7 +220,8 @@ impl SvdPeripheral {
                             } else {
                                 format!("{}_{byte_idx}", reg.name)
                             };
-                            let byte_offset = reg.address_offset + u64::try_from(byte_idx).unwrap_or(0);
+                            let byte_offset =
+                                reg.address_offset + u64::try_from(byte_idx).unwrap_or(0);
 
                             // Find matching bitfields in this byte range
                             let mut byte_fields = Vec::new();
@@ -378,9 +379,7 @@ fn parse_peripheral(
 
     let description = node.child_text("description").map(ToString::to_string);
     let group_name = node.child_text("groupName").map(ToString::to_string);
-    let base_address = node
-        .parse_child_u64("baseAddress")?
-        .unwrap_or(0);
+    let base_address = node.parse_child_u64("baseAddress")?.unwrap_or(0);
     let derived_from = node.attr("derivedFrom").map(ToString::to_string);
 
     let periph_size = node.parse_child_u8("size")?.unwrap_or(device_size);
@@ -428,14 +427,9 @@ fn parse_registers_node(
             .child_text("name")
             .ok_or_else(|| ImporterError::InvalidSvd("missing <name> in <register>".to_string()))?;
         let reg_desc = reg_node.child_text("description").map(ToString::to_string);
-        let base_offset = reg_node
-            .parse_child_u64("addressOffset")?
-            .ok_or_else(|| {
-                ImporterError::InvalidSvd(format!(
-                    "missing <addressOffset> in register '{reg_name}'"
-                ))
-            })?
-            + cluster_offset;
+        let base_offset = reg_node.parse_child_u64("addressOffset")?.ok_or_else(|| {
+            ImporterError::InvalidSvd(format!("missing <addressOffset> in register '{reg_name}'"))
+        })? + cluster_offset;
 
         let reg_size = reg_node.parse_child_u8("size")?.unwrap_or(default_size);
         let reg_reset_val = reg_node
@@ -456,7 +450,9 @@ fn parse_registers_node(
                         ImporterError::InvalidSvd("missing <name> in <field>".to_string())
                     })?
                     .to_string();
-                let f_desc = field_node.child_text("description").map(ToString::to_string);
+                let f_desc = field_node
+                    .child_text("description")
+                    .map(ToString::to_string);
                 let (lsb, width) = parse_bit_range(field_node)?;
                 let f_access = field_node
                     .child_text("access")
@@ -513,9 +509,7 @@ fn parse_registers_node(
 
     // Clusters
     for cluster_node in regs_node.children_named("cluster") {
-        let cluster_rel = cluster_node
-            .parse_child_u64("addressOffset")?
-            .unwrap_or(0);
+        let cluster_rel = cluster_node.parse_child_u64("addressOffset")?.unwrap_or(0);
         let cluster_abs = cluster_offset + cluster_rel;
         parse_registers_node(
             cluster_node,
@@ -541,9 +535,15 @@ fn parse_bit_range(node: &XmlElement) -> Result<(u8, u8)> {
 
     // Format 2: <bitRange>[msb:lsb]</bitRange>
     if let Some(range_str) = node.child_text("bitRange") {
-        if let Some(clean) = range_str.trim().strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+        if let Some(clean) = range_str
+            .trim()
+            .strip_prefix('[')
+            .and_then(|s| s.strip_suffix(']'))
+        {
             if let Some((msb_str, lsb_str)) = clean.split_once(':') {
-                if let (Ok(msb), Ok(lsb)) = (msb_str.trim().parse::<u8>(), lsb_str.trim().parse::<u8>()) {
+                if let (Ok(msb), Ok(lsb)) =
+                    (msb_str.trim().parse::<u8>(), lsb_str.trim().parse::<u8>())
+                {
                     if msb >= lsb {
                         return Ok((lsb, msb - lsb + 1));
                     }
@@ -553,10 +553,7 @@ fn parse_bit_range(node: &XmlElement) -> Result<(u8, u8)> {
     }
 
     // Format 3: <lsb> and <msb>
-    if let (Some(lsb), Some(msb)) = (
-        node.parse_child_u8("lsb")?,
-        node.parse_child_u8("msb")?,
-    ) {
+    if let (Some(lsb), Some(msb)) = (node.parse_child_u8("lsb")?, node.parse_child_u8("msb")?) {
         if msb >= lsb {
             return Ok((lsb, msb - lsb + 1));
         }
@@ -572,9 +569,7 @@ fn parse_access_type(raw: &str) -> Option<AccessType> {
     let lower = raw.trim().to_ascii_lowercase();
     match lower.as_str() {
         "read-only" | "readonly" | "ro" => Some(AccessType::Ro),
-        "write-only" | "writeonly" | "wo" | "writeonce" | "write-only-once" => {
-            Some(AccessType::Wo)
-        }
+        "write-only" | "writeonly" | "wo" | "writeonce" | "write-only-once" => Some(AccessType::Wo),
         "read-write" | "readwrite" | "rw" | "read-writeonce" => Some(AccessType::Rw),
         _ => None,
     }
@@ -586,7 +581,9 @@ fn parse_dim_indices(raw: Option<&str>, dim: u64) -> Vec<String> {
             return s.split(',').map(|p| p.trim().to_string()).collect();
         }
         if let Some((start_s, end_s)) = s.split_once('-') {
-            if let (Ok(start), Ok(end)) = (start_s.trim().parse::<u64>(), end_s.trim().parse::<u64>()) {
+            if let (Ok(start), Ok(end)) =
+                (start_s.trim().parse::<u64>(), end_s.trim().parse::<u64>())
+            {
                 if end >= start {
                     return (start..=end).map(|i| i.to_string()).collect();
                 }
@@ -623,7 +620,11 @@ fn sanitize_identifier(s: &str) -> String {
         }
     }
     let res = out.trim_matches('-').to_string();
-    if res.is_empty() { "device".to_string() } else { res }
+    if res.is_empty() {
+        "device".to_string()
+    } else {
+        res
+    }
 }
 
 #[cfg(test)]
