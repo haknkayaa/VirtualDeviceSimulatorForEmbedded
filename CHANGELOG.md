@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with their delay, last sampled source level and in-flight delayed deliveries.
 - The Web UI shows *Signal connections* on the Overview and, scoped to the
   device, on the Devices Configuration tab.
+- Scenario coverage (ADR 0013): run results report, per device the scenario
+  touches, which declared commands, registers, states, state transitions and
+  faults were exercised. Shown in the JSON result, as `vds4e.coverage.*` JUnit
+  properties, as a CLI summary on standard error, and in the Visual Scenario
+  Editor's result panel.
 
 ### Changed
 - The Web UI Overview shows the live device path from the application under

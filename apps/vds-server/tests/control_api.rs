@@ -676,6 +676,17 @@ async fn scenario_run_is_asynchronous_and_result_is_retrievable() {
                 json_request(app.clone(), "GET", &format!("/api/v1/runs/{run_id}/result")).await;
             assert_eq!(status, StatusCode::OK);
             assert_eq!(result["status"], "passed");
+            let coverage = &result["coverage"]["devices"][0];
+            assert_eq!(coverage["device_id"], "micron-mt25ql256aba8esf-0sit");
+            assert_eq!(coverage["commands"]["covered"], 1);
+            assert!(
+                coverage["transitions"]["missed"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .all(|transition| transition != "resetting -> ready"),
+                "the reset completion is covered: {coverage}"
+            );
             let event_types = events
                 .events_after(0)
                 .into_iter()
