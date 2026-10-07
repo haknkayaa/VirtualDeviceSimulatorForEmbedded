@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+
+bindir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+prefix=$(CDPATH= cd -- "$bindir/.." && pwd)
+server="$bindir/vds-server"
+
+if [ ! -x "$server" ]; then
+  echo "vds4e: vds-server was not found next to the launcher" >&2
+  exit 1
+fi
+
+if [ -n "${VDS4E_CONFIG:-}" ]; then
+  config="$VDS4E_CONFIG"
+elif [ -f /etc/vds4e/vds-server.yaml ]; then
+  config=/etc/vds4e/vds-server.yaml
+else
+  config="$prefix/share/vds4e/vds-server.example.yaml"
+fi
+
+if [ -z "${VDS4E_WEB_ROOT:-}" ] && [ -f "$prefix/share/vds4e/web/index.html" ]; then
+  export VDS4E_WEB_ROOT="$prefix/share/vds4e/web"
+fi
+
+for argument in "$@"; do
+  if [ "$argument" = "--config" ]; then
+    exec "$server" "$@"
+  fi
+done
+
+exec "$server" --config "$config" "$@"
