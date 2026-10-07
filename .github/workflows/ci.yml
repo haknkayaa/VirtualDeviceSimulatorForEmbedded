@@ -7,9 +7,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   rust:
-    name: Core Runtime and Host Adapters
+    name: Rust workspace
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,5 +30,88 @@ jobs:
         run: cargo test --workspace --locked
       - name: Validate example configuration
         run: cargo run --locked -p vds-server -- --config config/vds-server.yaml --check-config
-      - name: Build shared adapter transport
-        run: make -C adapters/bridge BUILD_DIR="$RUNNER_TEMP/vds4e-bridge"
+
+  web:
+    name: Web UI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/vds-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/vds-web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:run
+      - run: npm run build
+
+  native-adapters:
+    name: Native adapters (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default
+            c_flags: ""
+          - name: asan-ubsan
+            c_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -g"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake pkg-config build-essential libfuse3-dev
+      - name: Build and test adapters
+        env:
+          CFLAGS_EXTRA: ${{ matrix.c_flags }}
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          set -eu
+          for adapter in spi-cuse i2c-cuse gpio-sim uart-pty; do
+            echo "::group::$adapter"
+            cmake -S "adapters/$adapter" -B "$RUNNER_TEMP/build-$adapter" \
+              -DCMAKE_BUILD_TYPE=Debug \
+              -DCMAKE_C_FLAGS="$CFLAGS_EXTRA" \
+              -DCMAKE_EXE_LINKER_FLAGS="$CFLAGS_EXTRA"
+            cmake --build "$RUNNER_TEMP/build-$adapter" --parallel
+            ctest --test-dir "$RUNNER_TEMP/build-$adapter" --output-on-failure
+            echo "::endgroup::"
+          done
+
+  examples:
+    name: Embedded C examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build example applications
+        run: |
+          set -eu
+          make -C examples/atmel-at24c256-embedded
+          make -C examples/micron-mt25ql256-embedded
+          # generic-uart-embedded has no Makefile; compile it directly.
+          gcc -O2 -Wall -Wextra -Wpedantic -std=c11 -D_DEFAULT_SOURCE \
+            examples/generic-uart-embedded/uart_ping.c \
+            -o "$RUNNER_TEMP/uart_ping"
+
+  # TODO: privileged real-device integration job (intentionally disabled).
+  # Intended chain, using unmodified upstream Linux tools:
+  #   vds-server (control API + Unix-socket data plane)
+  #     -> host adapter (vds4e-spi-cuse / vds4e-i2c-cuse / vds4e-gpio-sim)
+  #     -> /dev/spidevX.Y, /dev/i2c-N, /dev/gpiochipN
+  #     -> spidev_test, i2ctransfer, gpioget
+  # Requires /dev/cuse, FUSE, gpio-sim configfs and root; run on a
+  # self-hosted privileged runner once available, then remove `if: false`.
+  integration:
+    name: Device ABI integration (disabled)
+    if: false
+    runs-on: ubuntu-latest
+    needs: [rust, native-adapters]
+    steps:
+      - run: echo "TODO - see comment above"
