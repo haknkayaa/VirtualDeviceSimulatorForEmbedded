@@ -113,7 +113,7 @@ impl Topology {
             .map_err(|error| TopologyError::InvalidEmbeddedSchema(error.to_string()))?;
         let errors = validator
             .iter_errors(&instance)
-            .map(|error| format!("- {}: {}", error.instance_path, error))
+            .map(|error| format!("- {}: {}", error.instance_path(), error))
             .collect::<Vec<_>>();
         if !errors.is_empty() {
             return Err(TopologyError::Validation(errors.join("\n")));

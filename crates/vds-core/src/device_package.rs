@@ -146,7 +146,7 @@ impl DevicePackage {
             .map_err(|error| DevicePackageError::Schema(error.to_string()))?;
         let errors = validator
             .iter_errors(&instance)
-            .map(|error| format!("- {}: {}", error.instance_path, error))
+            .map(|error| format!("- {}: {}", error.instance_path(), error))
             .collect::<Vec<_>>();
         if !errors.is_empty() {
             return Err(DevicePackageError::Validation(errors.join("\n")));
