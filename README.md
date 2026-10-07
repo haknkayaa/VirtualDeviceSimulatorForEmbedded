@@ -74,6 +74,13 @@ whole system:
 - Checkpoint/restore and record/replay are not implemented (see the
   [roadmap](docs/ROADMAP.md)).
 
+## Hardware import
+
+The `vds-importer` crate drafts declarative models from existing hardware
+descriptions: CMSIS-SVD register maps and Device Tree source (buses, addresses,
+compatible strings). Its output is a starting point for a device package, not a
+finished behavioral model; review and complete it before use.
+
 ## How VDS4E compares with related tools
 
 VDS4E is not a CPU or full-system emulator and cannot boot Linux; it is not a
