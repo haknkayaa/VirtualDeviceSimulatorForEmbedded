@@ -89,10 +89,7 @@ export function exportToVcd(
   return vcd
 }
 
-export function exportToCsv(
-  channels: WaveformChannel[],
-  packets: ProtocolPacket[],
-): string {
+export function exportToCsv(channels: WaveformChannel[]): string {
   const lines: string[] = []
   lines.push('Timestamp_ns,Bus,Device,Channel,Signal_State,Decoded_Label,Decoded_Detail')
 

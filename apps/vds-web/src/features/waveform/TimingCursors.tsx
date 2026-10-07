@@ -12,16 +12,6 @@ interface TimingCursorsProps {
   width: number
 }
 
-export function formatFrequency(deltaNs: number): string {
-  if (deltaNs <= 0) return '—'
-  const freqHz = 1e9 / deltaNs
-
-  if (freqHz >= 1e9 - 1e-3) return `${(freqHz / 1e9).toFixed(2)} GHz`
-  if (freqHz >= 1e6 - 1e-3) return `${(freqHz / 1e6).toFixed(2)} MHz`
-  if (freqHz >= 1e3 - 1e-3) return `${(freqHz / 1e3).toFixed(2)} kHz`
-  return `${freqHz.toFixed(1)} Hz`
-}
-
 export function TimingCursors({
   cursorANs,
   cursorBNs,
@@ -34,7 +24,7 @@ export function TimingCursors({
 }: TimingCursorsProps) {
   const draggingRef = useRef<'A' | 'B' | null>(null)
 
-  const handlePointerDown = (cursor: 'A' | 'B') => (e: React.PointerEvent) => {
+  const beginDrag = (cursor: 'A' | 'B', e: React.PointerEvent) => {
     e.stopPropagation()
     e.preventDefault()
     draggingRef.current = cursor
@@ -102,7 +92,7 @@ export function TimingCursors({
           {/* Flag handle at top */}
           <g
             className="cursor-flag cursor-flag-a"
-            onPointerDown={handlePointerDown('A')}
+            onPointerDown={(event) => beginDrag('A', event)}
             style={{ cursor: 'ew-resize' }}
             transform={`translate(${xA}, 4)`}
           >
@@ -149,7 +139,7 @@ export function TimingCursors({
           {/* Flag handle at top */}
           <g
             className="cursor-flag cursor-flag-b"
-            onPointerDown={handlePointerDown('B')}
+            onPointerDown={(event) => beginDrag('B', event)}
             style={{ cursor: 'ew-resize' }}
             transform={`translate(${xB}, 4)`}
           >

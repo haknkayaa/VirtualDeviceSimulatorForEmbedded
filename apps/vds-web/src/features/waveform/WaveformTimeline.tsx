@@ -62,11 +62,14 @@ export function WaveformTimeline({
     return () => obs.disconnect()
   }, [])
 
-  // Sync initial view if totalDuration changes significantly
-  useLayoutEffect(() => {
+  // Reset the viewport when the captured time range changes. Adjusting state
+  // during render (instead of in an effect) avoids a cascading extra render.
+  const [syncedRange, setSyncedRange] = useState({ minTimeNs, maxTimeNs })
+  if (syncedRange.minTimeNs !== minTimeNs || syncedRange.maxTimeNs !== maxTimeNs) {
+    setSyncedRange({ minTimeNs, maxTimeNs })
     setViewStartNs(minTimeNs)
     setViewEndNs(Math.max(maxTimeNs, minTimeNs + 1_000))
-  }, [minTimeNs, maxTimeNs])
+  }
 
   const traceAreaWidth = Math.max(containerWidth - CHANNEL_LABEL_WIDTH, 200)
   const visibleDurationNs = Math.max(viewEndNs - viewStartNs, 10)
@@ -357,11 +360,10 @@ export function WaveformTimeline({
               let pathStr = ''
               if (channel.samples.length > 0) {
                 // Find initial value
-                let currentVal = channel.samples[0].value
-                let currentY = currentVal === 1 ? highY : lowY
-                let currentX = Math.max(CHANNEL_LABEL_WIDTH, timeToX(channel.samples[0].timeNs))
+                let currentY = channel.samples[0].value === 1 ? highY : lowY
+                const startX = Math.max(CHANNEL_LABEL_WIDTH, timeToX(channel.samples[0].timeNs))
 
-                pathStr = `M ${currentX} ${currentY}`
+                pathStr = `M ${startX} ${currentY}`
 
                 for (let i = 1; i < channel.samples.length; i++) {
                   const s = channel.samples[i]
@@ -375,9 +377,7 @@ export function WaveformTimeline({
                     pathStr += ` L ${nextX} ${nextY}`
                   }
 
-                  currentX = nextX
                   currentY = nextY
-                  currentVal = s.value
                 }
 
                 // Extend to right edge of trace area

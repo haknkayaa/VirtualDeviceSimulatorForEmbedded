@@ -3,7 +3,6 @@ import type {
   DigitalLogicLevel,
   ProtocolPacket,
   WaveformChannel,
-  WaveformSample,
 } from './types'
 
 function hex(byte: number): string {
@@ -147,7 +146,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
       )
 
       const halfClockNs = 100 // 5 MHz clock
-      const clockPeriodNs = halfClockNs * 2
       let curT = t0
 
       // CS goes LOW (Assert)
@@ -453,7 +451,7 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
       )
 
       const bitDurationNs = 8_680 // 115200 baud
-      let curT = t0
+      const curT = t0
 
       const emitUartBytes = (
         bytes: number[],
@@ -462,7 +460,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
       ) => {
         let t = curT
         bytes.forEach((byte, idx) => {
-          const frameStart = t
           // Start bit (0)
           addSample(chan, t, 0)
           addPacket(chan, {
@@ -737,7 +734,7 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
       }
 
       const pulseDurationNs = 1_000
-      let curT = t0
+      const curT = t0
 
       Array.from(activeLines).sort((a, b) => a - b).forEach((line) => {
         const color = GPIO_COLORS[line % GPIO_COLORS.length]
