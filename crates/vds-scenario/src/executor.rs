@@ -1,6 +1,12 @@
 //! Deterministic execution of scenario steps against a runtime.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use tracing::{info, warn};
 use vds_events::{EventBus, EventDraft, EventPayload};
@@ -17,6 +23,7 @@ pub struct ScenarioExecutor<R> {
     event_cursor: usize,
     event_bus: Option<Arc<EventBus>>,
     scenario_run_id: Option<String>,
+    cancel: Option<Arc<AtomicBool>>,
 }
 
 impl<R: ScenarioRuntime> ScenarioExecutor<R> {
@@ -29,7 +36,15 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
             event_cursor: 0,
             event_bus: None,
             scenario_run_id: None,
+            cancel: None,
         }
+    }
+
+    /// Stops the run before the next step once the flag is set.
+    #[must_use]
+    pub fn with_cancellation(mut self, cancel: Arc<AtomicBool>) -> Self {
+        self.cancel = Some(cancel);
+        self
     }
 
     #[must_use]
@@ -56,6 +71,13 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
         let mut steps = Vec::with_capacity(document.steps.len());
         let mut stopped = false;
         for step in &document.steps {
+            if self
+                .cancel
+                .as_ref()
+                .is_some_and(|flag| flag.load(Ordering::Relaxed))
+            {
+                stopped = true;
+            }
             if stopped {
                 let now = self.runtime.now_ns();
                 steps.push(StepResult {
@@ -78,7 +100,7 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
                 },
             );
             let outcome = if step_started > deadline {
-                Err("scenario timeout exceeded".to_owned())
+                Err(SCENARIO_TIMEOUT_EXCEEDED.to_owned())
             } else {
                 self.execute(&step.action, deadline)
             };
@@ -327,7 +349,7 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
             .checked_add(duration_ns)
             .ok_or_else(|| "virtual time overflow".to_owned())?;
         if target > deadline {
-            return Err("scenario timeout would be exceeded".to_owned());
+            return Err(SCENARIO_TIMEOUT_WOULD_EXCEED.to_owned());
         }
         let events = self.runtime.advance_time(duration_ns)?;
         self.record_events(events);
@@ -363,13 +385,13 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
                 let remaining = local_deadline.saturating_sub(self.runtime.now_ns());
                 let events = self.runtime.advance_time(remaining)?;
                 self.record_events(events);
-                return Err(format!("event '{kind}' was not observed before timeout"));
+                return Err(event_timeout_message(kind));
             };
             if next > local_deadline {
                 let remaining = local_deadline.saturating_sub(self.runtime.now_ns());
                 let events = self.runtime.advance_time(remaining)?;
                 self.record_events(events);
-                return Err(format!("event '{kind}' was not observed before timeout"));
+                return Err(event_timeout_message(kind));
             }
             let now = self.runtime.now_ns();
             let events = self.runtime.advance_time(next.saturating_sub(now))?;
@@ -399,7 +421,23 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
     }
 }
 
+const SCENARIO_TIMEOUT_EXCEEDED: &str = "scenario timeout exceeded";
+const SCENARIO_TIMEOUT_WOULD_EXCEED: &str = "scenario timeout would be exceeded";
+
+fn event_timeout_message(kind: &str) -> String {
+    format!("event '{kind}' was not observed before timeout")
+}
+
+fn is_timeout_error(error: &str) -> bool {
+    error == SCENARIO_TIMEOUT_EXCEEDED
+        || error == SCENARIO_TIMEOUT_WOULD_EXCEED
+        || (error.starts_with("event '") && error.ends_with("was not observed before timeout"))
+}
+
 fn classify_failure(action: &ScenarioAction, error: &str) -> StepFailureKind {
+    if is_timeout_error(error) {
+        return StepFailureKind::Timeout;
+    }
     let assertion_failed = match action {
         ScenarioAction::AssertRegister { .. } => {
             error.starts_with("register '") && error.contains(" expected ")

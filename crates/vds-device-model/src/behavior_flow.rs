@@ -340,7 +340,7 @@ fn file_format(data: &Map<String, Value>) -> Result<FileFormat, String> {
 
 fn duration_us(value: u64, unit: &str) -> Result<u64, String> {
     match unit {
-        "ns" if value % 1_000 == 0 => Ok(value / 1_000),
+        "ns" if value.is_multiple_of(1_000) => Ok(value / 1_000),
         "us" => Ok(value),
         "ms" => value
             .checked_mul(1_000)

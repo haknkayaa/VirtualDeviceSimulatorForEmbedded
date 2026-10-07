@@ -163,10 +163,10 @@ impl ScenarioDocument {
             if !step_ids.insert(&step.id) {
                 return Err(ScenarioError::DuplicateStepId(step.id.clone()));
             }
-            if let ScenarioAction::SendSpi { save_as, .. } = &step.action {
-                if !result_names.insert(save_as) {
-                    return Err(ScenarioError::DuplicateResultName(save_as.clone()));
-                }
+            if let ScenarioAction::SendSpi { save_as, .. } = &step.action
+                && !result_names.insert(save_as)
+            {
+                return Err(ScenarioError::DuplicateResultName(save_as.clone()));
             }
         }
         Ok(())

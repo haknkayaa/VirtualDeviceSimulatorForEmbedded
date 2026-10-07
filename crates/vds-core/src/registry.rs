@@ -63,6 +63,7 @@ impl DeviceRegistry {
         rx_length: usize,
         wire: SpiWireConfig,
     ) -> Result<DeviceTransfer, DeviceError> {
+        crate::device::validate_spi_transfer_size(request.len(), rx_length)?;
         self.device(device_id)?
             .transfer_spi(request, rx_length, wire)
     }
@@ -76,6 +77,7 @@ impl DeviceRegistry {
         device_id: &str,
         messages: &[I2cMessage],
     ) -> Result<Vec<Vec<u8>>, DeviceError> {
+        crate::device::validate_i2c_transfer_size(messages)?;
         self.device(device_id)?.transfer_i2c(messages)
     }
 
@@ -342,6 +344,32 @@ mod tests {
             .expect("transfer should succeed");
 
         assert_eq!(response.response, vec![0x9f]);
+    }
+
+    #[test]
+    fn rejects_oversized_spi_and_i2c_length_fields() {
+        let registry = DeviceRegistry::new();
+        registry
+            .register(Arc::new(EchoDevice))
+            .expect("device should register");
+
+        let spi = registry.transfer_spi(
+            "echo",
+            &[0x03],
+            usize::MAX,
+            crate::device::SpiWireConfig::default(),
+        );
+        assert!(matches!(spi, Err(DeviceError::InvalidRequest(_))));
+
+        let i2c = registry.transfer_i2c(
+            "echo",
+            &[crate::device::I2cMessage {
+                read: true,
+                data: Vec::new(),
+                read_length: u32::MAX as usize,
+            }],
+        );
+        assert!(matches!(i2c, Err(DeviceError::InvalidRequest(_))));
     }
 
     #[test]

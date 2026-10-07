@@ -13,6 +13,48 @@ pub enum BusType {
     Uart,
 }
 
+/// Maximum SPI payload (TX or requested RX) accepted for one transfer.
+pub const MAX_SPI_TRANSFER_BYTES: usize = 1024 * 1024;
+/// Maximum number of messages in one atomic I2C transfer.
+pub const MAX_I2C_MESSAGES: usize = 256;
+/// Maximum total bytes read by one atomic I2C transfer.
+pub const MAX_I2C_READ_BYTES: usize = 1024 * 1024;
+
+/// Rejects SPI transfers whose length fields would force oversized allocations.
+///
+/// # Errors
+/// Returns `InvalidRequest` when TX or the requested RX length exceeds the cap.
+pub fn validate_spi_transfer_size(tx_len: usize, rx_length: usize) -> Result<(), DeviceError> {
+    if tx_len > MAX_SPI_TRANSFER_BYTES || rx_length > MAX_SPI_TRANSFER_BYTES {
+        return Err(DeviceError::InvalidRequest(format!(
+            "SPI transfer exceeds the {MAX_SPI_TRANSFER_BYTES} byte limit"
+        )));
+    }
+    Ok(())
+}
+
+/// Rejects I2C transfers with too many messages or an oversized total read.
+///
+/// # Errors
+/// Returns `InvalidRequest` when a message-count or read-size cap is exceeded.
+pub fn validate_i2c_transfer_size(messages: &[I2cMessage]) -> Result<(), DeviceError> {
+    if messages.len() > MAX_I2C_MESSAGES {
+        return Err(DeviceError::InvalidRequest(format!(
+            "I2C transfer exceeds the {MAX_I2C_MESSAGES} message limit"
+        )));
+    }
+    let mut total = 0_usize;
+    for message in messages {
+        total = total.saturating_add(message.read_length);
+        if total > MAX_I2C_READ_BYTES {
+            return Err(DeviceError::InvalidRequest(format!(
+                "I2C transfer reads more than {MAX_I2C_READ_BYTES} bytes"
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// One Linux-compatible I2C message within an atomic transfer.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct I2cMessage {

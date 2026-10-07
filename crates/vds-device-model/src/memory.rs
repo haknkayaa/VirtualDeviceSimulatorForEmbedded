@@ -281,11 +281,11 @@ impl GenericSpiDevice {
             return Err(error);
         }
 
-        if timing.busy_during_operation {
-            if let Err(error) = self.set_busy(state, true) {
-                state.scheduler.cancel(event_id);
-                return Err(error);
-            }
+        if timing.busy_during_operation
+            && let Err(error) = self.set_busy(state, true)
+        {
+            state.scheduler.cancel(event_id);
+            return Err(error);
         }
         events.push(DeviceEvent::OperationStarted {
             command: command_name.to_owned(),

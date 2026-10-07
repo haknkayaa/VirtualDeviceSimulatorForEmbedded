@@ -189,13 +189,13 @@ impl DeviceModel {
                     reason: "define a fixed response or a supported operation with its required address/register selector".to_owned(),
                 });
             }
-            if let Some(shortcut) = &command.shortcut {
-                if shortcut.tx.first() != Some(&command.opcode) {
-                    return Err(ModelError::InvalidCommand {
-                        name: command.name.clone(),
-                        reason: "shortcut TX must start with the command opcode".to_owned(),
-                    });
-                }
+            if let Some(shortcut) = &command.shortcut
+                && shortcut.tx.first() != Some(&command.opcode)
+            {
+                return Err(ModelError::InvalidCommand {
+                    name: command.name.clone(),
+                    reason: "shortcut TX must start with the command opcode".to_owned(),
+                });
             }
             if command.timing.is_some()
                 && !matches!(
@@ -274,19 +274,17 @@ impl DeviceModel {
                 }
             }
         }
-        if let Some(memory) = model.device.memory {
-            if memory.size_bytes == 0
+        if let Some(memory) = model.device.memory
+            && (memory.size_bytes == 0
                 || memory.page_size_bytes == 0
                 || memory.sector_size_bytes == 0
                 || memory.size_bytes % memory.sector_size_bytes != 0
                 || memory.sector_size_bytes % memory.page_size_bytes != 0
-                || usize::try_from(memory.size_bytes).is_err()
-            {
-                return Err(ModelError::InvalidMemory {
-                    reason: "size, page, and sector geometry must be non-zero and aligned"
-                        .to_owned(),
-                });
-            }
+                || usize::try_from(memory.size_bytes).is_err())
+        {
+            return Err(ModelError::InvalidMemory {
+                reason: "size, page, and sector geometry must be non-zero and aligned".to_owned(),
+            });
         }
         if let Some(machine) = &model.device.state_machine {
             StateMachine::new(uncompiled_state_machine(machine)?)?;

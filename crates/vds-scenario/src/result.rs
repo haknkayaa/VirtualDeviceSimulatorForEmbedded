@@ -14,6 +14,8 @@ pub enum ResultStatus {
 pub enum StepFailureKind {
     Assertion,
     Execution,
+    /// The scenario or an event wait exceeded its virtual-time budget.
+    Timeout,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -51,6 +53,14 @@ pub struct ScenarioResult {
 }
 
 impl ScenarioResult {
+    /// Whether any step failed because a virtual-time budget was exhausted.
+    #[must_use]
+    pub fn timed_out(&self) -> bool {
+        self.steps
+            .iter()
+            .any(|step| step.failure_kind == Some(StepFailureKind::Timeout))
+    }
+
     /// Serializes this result as human-readable JSON.
     ///
     /// # Errors

@@ -106,7 +106,7 @@ fn write_testcase(xml: &mut String, scenario_id: &str, step: &StepResult) {
                 StepFailureKind::Assertion => {
                     writeln!(xml, "    <failure type=\"assertion\" message=\"{action} assertion failed\">Step {step_id} did not satisfy {action}.</failure>").expect("writing to String cannot fail");
                 }
-                StepFailureKind::Execution => {
+                StepFailureKind::Execution | StepFailureKind::Timeout => {
                     writeln!(xml, "    <error type=\"execution\" message=\"{action} execution failed\">Step {step_id} could not complete {action}.</error>").expect("writing to String cannot fail");
                 }
             }
@@ -116,7 +116,10 @@ fn write_testcase(xml: &mut String, scenario_id: &str, step: &StepResult) {
 }
 
 fn report_kind(step: &StepResult) -> StepFailureKind {
-    step.failure_kind.unwrap_or(StepFailureKind::Execution)
+    match step.failure_kind {
+        Some(StepFailureKind::Assertion) => StepFailureKind::Assertion,
+        _ => StepFailureKind::Execution,
+    }
 }
 
 fn seconds(nanoseconds: u64) -> String {

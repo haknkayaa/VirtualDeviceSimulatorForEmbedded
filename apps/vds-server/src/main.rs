@@ -8,12 +8,14 @@ use vds_core::config::ServerConfig;
 struct Arguments {
     config: PathBuf,
     check_config: bool,
+    allow_remote: bool,
 }
 
 impl Arguments {
     fn parse() -> Result<Self, String> {
         let mut config = PathBuf::from("config/vds-server.yaml");
         let mut check_config = false;
+        let mut allow_remote = false;
         let mut args = env::args().skip(1);
 
         while let Some(argument) = args.next() {
@@ -25,9 +27,10 @@ impl Arguments {
                         .ok_or_else(|| "--config requires a path".to_owned())?;
                 }
                 "--check-config" => check_config = true,
+                "--allow-remote" => allow_remote = true,
                 "--help" | "-h" => {
                     println!(
-                        "vds-server\n\nUSAGE:\n    vds-server [--config PATH] [--check-config]"
+                        "vds-server\n\nUSAGE:\n    vds-server [--config PATH] [--check-config] [--allow-remote]"
                     );
                     return Err(String::new());
                 }
@@ -38,6 +41,7 @@ impl Arguments {
         Ok(Self {
             config,
             check_config,
+            allow_remote,
         })
     }
 }
@@ -86,7 +90,7 @@ async fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    if let Err(error) = vds_server::run(config).await {
+    if let Err(error) = vds_server::run_with_options(config, arguments.allow_remote).await {
         error!(component = "vds-server", %error, "server stopped with error");
         return ExitCode::FAILURE;
     }
