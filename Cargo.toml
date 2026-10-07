@@ -14,9 +14,9 @@ resolver = "3"
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.91.1"
 license = "Apache-2.0"
-repository = "https://github.com/vds4e/virtual-device-simulator"
+repository = "https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded"
 
 [workspace.dependencies]
 axum = { version = "0.8.9", features = ["ws"] }
