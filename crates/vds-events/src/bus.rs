@@ -278,12 +278,12 @@ fn cleanup_events(
     )?;
     delete_expired(
         &transaction,
-        "event_type IN ('transaction_started', 'transaction_completed', 'operation_started', 'operation_completed')",
+        "event_type IN ('transaction_started', 'transaction_completed', 'operation_started', 'operation_completed', 'signal_changed')",
         cutoff_ns(policy.transaction_retention),
     )?;
     delete_expired(
         &transaction,
-        "event_type NOT IN ('register_read', 'transaction_started', 'transaction_completed', 'operation_started', 'operation_completed')",
+        "event_type NOT IN ('register_read', 'transaction_started', 'transaction_completed', 'operation_started', 'operation_completed', 'signal_changed')",
         cutoff_ns(policy.critical_retention),
     )?;
     let count = transaction.query_row("SELECT COUNT(*) FROM domain_events", [], |row| {
