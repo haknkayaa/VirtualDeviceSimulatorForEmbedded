@@ -1,84 +1,17 @@
-import type { Adapter, AdapterBinding, BusTelemetry, Device } from '../../types/api'
+import type { Adapter, AdapterBinding, Device, DeviceCommand } from '../../types/api'
 import type { DomainEvent } from '../../types/events'
+import { humanize } from '../../utils/format'
 import type { LiveTransaction } from '../transactions/transactionModel'
 
-export interface DeviceNodeRow {
-  key: string
-  adapter?: Adapter
-  binding?: AdapterBinding
-  device?: Device
-  deviceId?: string
-  telemetry?: BusTelemetry
-  lastActivityWallNs?: number
-}
+/* ── Host prerequisites ──────────────────────────────────────────────── */
 
-/**
- * One row per Linux device node an application can open, followed by adapters
- * with nothing attached and runtime devices no adapter exposes.
- */
-export function buildDeviceNodeRows(
-  adapters: Adapter[] | undefined,
-  devices: Device[] | undefined,
-  telemetry: BusTelemetry[] | undefined,
-  events: DomainEvent[],
-): DeviceNodeRow[] {
-  const devicesById = new Map((devices ?? []).map((device) => [device.id, device]))
-  const telemetryById = new Map((telemetry ?? []).map((bus) => [bus.device_id, bus]))
-  const lastActivity = new Map<string, number>()
-  for (const event of events) {
-    if (event.device_id && (event.event_type === 'transaction_completed' || event.event_type === 'signal_changed')) {
-      lastActivity.set(event.device_id, event.timestamp_wall_ns)
-    }
-  }
-  const rows: DeviceNodeRow[] = []
-  const bound = new Set<string>()
-  for (const adapter of adapters ?? []) {
-    if (adapter.bindings.length === 0) {
-      rows.push({ key: `adapter:${adapter.id}`, adapter })
-      continue
-    }
-    for (const binding of adapter.bindings) {
-      bound.add(binding.device_id)
-      rows.push({
-        key: `${adapter.id}:${binding.device_id}`,
-        adapter,
-        binding,
-        device: devicesById.get(binding.device_id),
-        deviceId: binding.device_id,
-        telemetry: telemetryById.get(binding.device_id),
-        lastActivityWallNs: lastActivity.get(binding.device_id),
-      })
-    }
-  }
-  for (const device of devices ?? []) {
-    if (bound.has(device.id)) continue
-    rows.push({
-      key: `device:${device.id}`,
-      device,
-      deviceId: device.id,
-      telemetry: telemetryById.get(device.id),
-      lastActivityWallNs: lastActivity.get(device.id),
-    })
-  }
-  return rows
-}
-
-export type BringUpStatus = 'ok' | 'fail' | 'blocked' | 'idle'
-
-export interface BringUpStep {
-  id: 'modules' | 'adapters' | 'nodes' | 'traffic'
-  title: string
-  status: BringUpStatus
-  detail: string
-}
-
-export interface BringUpState {
-  steps: BringUpStep[]
-  /** First failing step; undefined when the host is ready. */
-  current?: BringUpStep
+export interface HostPrerequisites {
+  /** Kernel modules the bound adapters need but the host does not provide. */
   missingModules: string[]
-  /** Adapters with bindings that are ready to load but not loaded. */
+  /** Bound adapters that are ready to load but not loaded. */
   loadableAdapters: Adapter[]
+  /** Bound adapters in the error state. */
+  failedAdapters: Adapter[]
   nodesOpen: number
   nodesTotal: number
 }
@@ -90,131 +23,159 @@ function kernelModule(adapter: Adapter): string | undefined {
   return undefined
 }
 
-/**
- * The host bring-up path an application depends on, in the order it fails:
- * kernel modules → adapters loaded → device nodes open → runtime traffic.
- * Steps after the first failure are reported as blocked, not failed, so the
- * user fixes one cause instead of reading four symptoms.
- */
-export function buildBringUp(adapters: Adapter[] | undefined, transactions: LiveTransaction[]): BringUpState {
+/** What stands between the application and its device nodes, if anything. */
+export function hostPrerequisites(adapters: Adapter[] | undefined): HostPrerequisites {
   const used = (adapters ?? []).filter((adapter) => adapter.bindings.length > 0)
   const missingModules = [...new Set(used
     .filter((adapter) => adapter.readiness !== 'ready')
     .map(kernelModule)
-    .filter((module): module is string => Boolean(module)))]
+    .filter((module): module is string => Boolean(module)))].sort()
   const loaded = used.filter((adapter) => adapter.state === 'loaded')
-  const failedAdapters = used.filter((adapter) => adapter.state === 'error')
-  const loadableAdapters = used.filter((adapter) => adapter.readiness === 'ready' && (adapter.state === 'unloaded' || adapter.state === 'error'))
-  const nodesTotal = used.reduce((total, adapter) => total + adapter.bindings.length, 0)
-  const nodesOpen = loaded.reduce((total, adapter) => total + adapter.bindings.length, 0)
-  const failed = transactions.filter((transaction) => transaction.status === 'error').length
-
-  const modulesStatus: BringUpStatus = missingModules.length ? 'fail' : 'ok'
-  let adaptersStatus: BringUpStatus = 'fail'
-  if (used.length > 0 && loaded.length === used.length) adaptersStatus = 'ok'
-  else if (used.length > 0 && failedAdapters.length === 0 && modulesStatus === 'fail') adaptersStatus = 'blocked'
-  const nodesStatus: BringUpStatus = nodesTotal > 0 && nodesOpen === nodesTotal ? 'ok' : adaptersStatus === 'ok' ? 'fail' : 'blocked'
-  const trafficStatus: BringUpStatus = transactions.length > 0 ? 'ok' : 'idle'
-
-  const steps: BringUpStep[] = [
-    {
-      id: 'modules',
-      title: 'Kernel modules',
-      status: modulesStatus,
-      detail: missingModules.length ? missingModules.map((module) => `${module} missing`).join(' · ') : used.length ? 'cuse and gpio-sim available' : 'No adapters need a module yet',
-    },
-    {
-      id: 'adapters',
-      title: 'Adapters loaded',
-      status: adaptersStatus,
-      detail: used.length === 0
-        ? 'No adapter has a device attached'
-        : `${loaded.length} of ${used.length}${failedAdapters.length ? ` · ${failedAdapters.map((adapter) => adapter.id).join(', ')} failed` : ` · ${used.map((adapter) => adapter.id).join(', ')}`}`,
-    },
-    {
-      id: 'nodes',
-      title: 'Device nodes open',
-      status: nodesStatus,
-      detail: nodesTotal === 0 ? 'No device nodes bound' : `${nodesOpen} of ${nodesTotal}`,
-    },
-    {
-      id: 'traffic',
-      title: 'Runtime traffic',
-      status: trafficStatus,
-      detail: transactions.length === 0 ? 'No transactions yet' : `${transactions.length} transactions${failed ? ` · ${failed} failed` : ''}`,
-    },
-  ]
   return {
-    steps,
-    current: steps.find((step) => step.status === 'fail'),
     missingModules,
-    loadableAdapters,
-    nodesOpen,
-    nodesTotal,
+    loadableAdapters: used.filter((adapter) => adapter.readiness === 'ready' && adapter.state === 'unloaded'),
+    failedAdapters: used.filter((adapter) => adapter.state === 'error'),
+    nodesOpen: loaded.reduce((total, adapter) => total + adapter.bindings.length, 0),
+    nodesTotal: used.reduce((total, adapter) => total + adapter.bindings.length, 0),
   }
 }
 
-export interface BusLane {
+/* ── Live device path ────────────────────────────────────────────────── */
+
+export interface DevicePathLink {
+  binding: AdapterBinding
+  device?: Device
+}
+
+export interface DevicePathGroup {
+  adapter: Adapter
+  links: DevicePathLink[]
+}
+
+/** Adapters with at least one bound device, each with its devices in endpoint order. */
+export function buildDevicePath(adapters: Adapter[] | undefined, devices: Device[] | undefined): DevicePathGroup[] {
+  const byId = new Map((devices ?? []).map((device) => [device.id, device]))
+  return (adapters ?? [])
+    .filter((adapter) => adapter.bindings.length > 0)
+    .map((adapter) => ({
+      adapter,
+      links: [...adapter.bindings]
+        .sort((left, right) => left.endpoint - right.endpoint)
+        .map((binding) => ({ binding, device: byId.get(binding.device_id) })),
+    }))
+}
+
+export function unboundDevices(adapters: Adapter[] | undefined, devices: Device[] | undefined) {
+  const bound = new Set((adapters ?? []).flatMap((adapter) => adapter.bindings.map((binding) => binding.device_id)))
+  return (devices ?? []).filter((device) => !bound.has(device.id))
+}
+
+export type LinkActivity =
+  | { kind: 'down'; label: string }
+  | { kind: 'idle'; label: string }
+  | { kind: 'active'; label: string; failed: boolean; edge?: boolean }
+
+/** How long a link stays "active" after its last transaction. */
+export const LINK_ACTIVE_MS = 10_000
+
+export function transactionWallMs(transaction: LiveTransaction) {
+  return (transaction.completedWallNs ?? transaction.startedWallNs ?? 0) / 1_000_000
+}
+
+function hexBytes(bytes: number[], limit = 4) {
+  const shown = bytes.slice(0, limit).map((byte) => byte.toString(16).toUpperCase().padStart(2, '0')).join(' ')
+  return bytes.length > limit ? `${shown} …` : shown
+}
+
+/** Label for the link between an adapter and one device: last traffic, idle, or down. */
+export function linkActivity(adapter: Adapter, deviceId: string, transactions: LiveTransaction[], now: number): LinkActivity {
+  const last = transactions.find((transaction) => transaction.deviceId === deviceId)
+  const recent = last && now - transactionWallMs(last) <= LINK_ACTIVE_MS
+  if (adapter.state !== 'loaded' && !recent) {
+    return { kind: 'down', label: adapter.state === 'error' ? 'Adapter error' : 'Not loaded' }
+  }
+  if (!last || !recent) return { kind: 'idle', label: 'Idle' }
+  if (adapter.bus_type.toLowerCase() === 'gpio') {
+    const edge = last.gpioEdges?.[0]
+    return { kind: 'active', label: edge ? `Edge ${edge.to ? '↑' : '↓'} (line ${edge.line})` : 'Lines updated', failed: last.status === 'error', edge: true }
+  }
+  const tx = last.request.length ? `TX ${hexBytes(last.request, 2)}` : ''
+  const rx = last.response.length ? `RX ${hexBytes(last.response, 3)}` : ''
+  return { kind: 'active', label: [tx, rx].filter(Boolean).join(' / ') || 'Transfer', failed: last.status === 'error' }
+}
+
+/* ── Transactions ────────────────────────────────────────────────────── */
+
+/** Human operation name: the device command matching the opcode, else read/write by direction. */
+export function transactionOperation(transaction: LiveTransaction, commands: DeviceCommand[] | undefined) {
+  const bus = transaction.busType.toLowerCase()
+  if (bus === 'gpio') {
+    const edges = transaction.gpioEdges?.length ?? 0
+    return edges ? `Line change (${edges})` : 'Write (lines)'
+  }
+  const opcode = transaction.request[0]
+  if (bus === 'spi' && opcode !== undefined) {
+    const command = commands?.find((candidate) => candidate.opcode === opcode)
+    if (command) return humanize(command.name.toLowerCase()).replace(/^\w/, (letter) => letter.toUpperCase())
+  }
+  const length = transaction.response.length || transaction.request.length
+  const unit = `${length} byte${length === 1 ? '' : 's'}`
+  return transaction.response.length ? `Read (${unit})` : `Write (${unit})`
+}
+
+export function transactionHex(bytes: number[], limit = 4) {
+  return bytes.length ? hexBytes(bytes, limit) : '—'
+}
+
+/** Virtual time in seconds with millisecond precision, e.g. "02.318". */
+export function virtualSeconds(nanoseconds: number | undefined) {
+  if (nanoseconds === undefined) return '—'
+  return (nanoseconds / 1_000_000_000).toFixed(3).padStart(6, '0')
+}
+
+/* ── Bus timeline ────────────────────────────────────────────────────── */
+
+export interface TimelineTick {
+  id: string
+  /** Position in the window, 0 = window start, 1 = now. */
+  at: number
+  failed: boolean
+}
+
+export interface TimelineLane {
   bus: string
-  transactions: LiveTransaction[]
-  total: number
-  failed: number
-  /** Why the lane is silent, when it has no transactions. */
-  silentReason?: string
+  ticks: TimelineTick[]
+  configured: boolean
 }
 
-const LANE_BUSES = ['spi', 'i2c', 'gpio', 'uart']
+const TIMELINE_BUSES = ['spi', 'i2c', 'gpio', 'uart']
 
-/** One lane per bus: the newest transactions oldest-first, so time reads left to right. */
-export function buildBusLanes(transactions: LiveTransaction[], adapters: Adapter[] | undefined, limit = 18): BusLane[] {
-  const extra = [...new Set(transactions.map((transaction) => transaction.busType.toLowerCase()))].filter((bus) => !LANE_BUSES.includes(bus))
-  return [...LANE_BUSES, ...extra].map((bus) => {
-    const onBus = transactions.filter((transaction) => transaction.busType.toLowerCase() === bus)
-    const busAdapters = (adapters ?? []).filter((adapter) => adapter.bus_type.toLowerCase() === bus)
-    let silentReason: string | undefined
-    if (onBus.length === 0) {
-      if (busAdapters.length === 0) silentReason = `No ${bus.toUpperCase()} adapter configured`
-      else if (!busAdapters.some((adapter) => adapter.state === 'loaded')) silentReason = `${busAdapters.map((adapter) => adapter.id).join(', ')} not loaded`
-      else silentReason = bus === 'gpio' ? 'No line edges yet' : 'No traffic yet'
-    }
-    return {
-      bus,
-      transactions: onBus.slice(0, limit).reverse(),
-      total: onBus.length,
-      failed: onBus.filter((transaction) => transaction.status === 'error').length,
-      silentReason,
-    }
-  })
-}
-
-/** Short opcode-style label for a lane chip. */
-export function laneLabel(transaction: LiveTransaction) {
-  if (transaction.busType.toLowerCase() === 'gpio') {
-    const edge = transaction.gpioEdges?.[0]
-    return edge ? `IO${edge.line} ${edge.to ? '↑' : '↓'}` : 'IO'
+export function buildTimeline(transactions: LiveTransaction[], adapters: Adapter[] | undefined, now: number, windowMs: number): TimelineLane[] {
+  const start = now - windowMs
+  const lanes = new Map(TIMELINE_BUSES.map((bus) => [bus, [] as TimelineTick[]]))
+  for (const transaction of transactions) {
+    const wall = transactionWallMs(transaction)
+    if (wall < start) break
+    if (wall > now) continue
+    const bus = transaction.busType.toLowerCase()
+    if (bus === 'gpio' && (transaction.gpioEdges?.length ?? 0) === 0) continue
+    if (!lanes.has(bus)) lanes.set(bus, [])
+    lanes.get(bus)?.push({ id: transaction.id, at: (wall - start) / windowMs, failed: transaction.status === 'error' })
   }
-  const bytes = transaction.request.length ? transaction.request : transaction.response
-  if (bytes.length === 0) return '—'
-  const head = bytes.slice(0, 2).map((byte) => byte.toString(16).toUpperCase().padStart(2, '0')).join(' ')
-  return bytes.length > 2 ? `${head}…` : head
+  const configured = new Set((adapters ?? []).map((adapter) => adapter.bus_type.toLowerCase()))
+  return [...lanes].map(([bus, ticks]) => ({ bus, ticks, configured: configured.has(bus) }))
 }
 
-function hexPreview(bytes: number[], limit = 4) {
-  const preview = bytes.slice(0, limit).map((byte) => byte.toString(16).toUpperCase().padStart(2, '0')).join(' ')
-  return bytes.length > limit ? `${preview} …` : preview
-}
+/* ── Scenario run ────────────────────────────────────────────────────── */
 
-/** Compact wire-level summary of a transaction for overview tables. */
-export function transactionWireSummary(transaction: LiveTransaction) {
-  if (transaction.busType.toLowerCase() === 'gpio') {
-    const edges = transaction.gpioEdges ?? []
-    if (edges.length === 0) return 'no edge'
-    const first = edges[0]
-    const label = `IO${first.line} ${first.to ? '↑' : '↓'}`
-    return edges.length === 1 ? label : `${label} +${edges.length - 1}`
-  }
-  const request = transaction.request.length ? hexPreview(transaction.request) : '—'
-  return transaction.response.length ? `${request} → ${hexPreview(transaction.response)}` : request
+export type ScenarioStepState = 'queued' | 'running' | 'passed' | 'failed' | 'skipped'
+
+export interface ScenarioRunStep {
+  id: string
+  action: string
+  state: ScenarioStepState
+  durationNs?: number
+  error?: string
 }
 
 export interface ScenarioRunSummary {
@@ -226,13 +187,14 @@ export interface ScenarioRunSummary {
   passed?: number
   failed?: number
   skipped?: number
-  lastStep?: string
-  lastError?: string
+  /** Steps seen in the event stream, in execution order. */
+  steps: ScenarioRunStep[]
 }
 
-function findLastEvent(events: DomainEvent[], predicate: (event: DomainEvent) => boolean) {
-  for (let index = events.length - 1; index >= 0; index -= 1) if (predicate(events[index])) return events[index]
-  return undefined
+function stepState(status: string): ScenarioStepState {
+  if (/fail|error|timeout/i.test(status)) return 'failed'
+  if (/skip/i.test(status)) return 'skipped'
+  return 'passed'
 }
 
 /** Latest scenario run reconstructed from retained scenario events. */
@@ -242,26 +204,48 @@ export function latestScenarioRun(events: DomainEvent[]): ScenarioRunSummary | u
     if (event.payload.kind !== 'scenario_started' && event.payload.kind !== 'scenario_completed') continue
     const runId = event.scenario_run_id
     const runEvents = runId ? events.filter((candidate) => candidate.scenario_run_id === runId) : [event]
-    const started = runEvents.find((candidate) => candidate.payload.kind === 'scenario_started')
-    const completed = findLastEvent(runEvents, (candidate) => candidate.payload.kind === 'scenario_completed')
-    const steps = runEvents.filter((candidate) => candidate.payload.kind === 'scenario_step_completed')
-    const lastStep = steps.at(-1)
-    const failedStep = findLastEvent(steps, (candidate) => candidate.payload.kind === 'scenario_step_completed' && Boolean(candidate.payload.error))
+    let started: DomainEvent | undefined
+    let completed: DomainEvent | undefined
+    const steps = new Map<string, ScenarioRunStep>()
+    const stepStarts = new Map<string, number>()
+    for (const candidate of runEvents) {
+      const payload = candidate.payload
+      if (payload.kind === 'scenario_started') started ??= candidate
+      else if (payload.kind === 'scenario_completed') completed = candidate
+      else if (payload.kind === 'scenario_step_started') {
+        stepStarts.set(payload.step_id, candidate.timestamp_virtual_ns)
+        steps.set(payload.step_id, { id: payload.step_id, action: payload.action, state: 'running' })
+      } else if (payload.kind === 'scenario_step_completed') {
+        const startedNs = stepStarts.get(payload.step_id)
+        steps.set(payload.step_id, {
+          id: payload.step_id,
+          action: payload.action,
+          state: stepState(payload.status),
+          durationNs: startedNs === undefined ? undefined : candidate.timestamp_virtual_ns - startedNs,
+          error: payload.error ?? undefined,
+        })
+      }
+    }
     const completion = completed?.payload.kind === 'scenario_completed' ? completed.payload : undefined
-    const scenarioId = completion?.scenario_id
-      ?? (started?.payload.kind === 'scenario_started' ? started.payload.scenario_id : 'scenario')
     return {
       runId,
-      scenarioId,
+      scenarioId: completion?.scenario_id ?? (started?.payload.kind === 'scenario_started' ? started.payload.scenario_id : 'scenario'),
       status: completion?.status ?? 'running',
       startedVirtualNs: started?.timestamp_virtual_ns,
       completedVirtualNs: completed?.timestamp_virtual_ns,
       passed: completion?.steps_passed,
       failed: completion?.steps_failed,
       skipped: completion?.steps_skipped,
-      lastStep: lastStep?.payload.kind === 'scenario_step_completed' ? lastStep.payload.step_id : undefined,
-      lastError: failedStep?.payload.kind === 'scenario_step_completed' ? failedStep.payload.error ?? undefined : undefined,
+      steps: [...steps.values()],
     }
   }
   return undefined
+}
+
+/** Merge the scenario definition's step order with the states seen in the run. */
+export function mergeScenarioSteps(run: ScenarioRunSummary, definition: { id: string; action: string }[] | undefined): ScenarioRunStep[] {
+  if (!definition?.length) return run.steps
+  const seen = new Map(run.steps.map((step) => [step.id, step]))
+  const finished = run.status !== 'running'
+  return definition.map((step) => seen.get(step.id) ?? { id: step.id, action: step.action, state: finished ? 'skipped' : 'queued' })
 }

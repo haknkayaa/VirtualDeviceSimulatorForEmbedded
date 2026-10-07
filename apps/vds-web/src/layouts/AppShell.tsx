@@ -6,6 +6,7 @@ import { EventDetailDrawer } from '../components/EventDetailDrawer'
 import { useTheme } from '../hooks/useTheme'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
+import { TopBar } from './TopBar'
 
 const SIDEBAR_KEY = 'vds4e-sidebar-collapsed'
 
@@ -32,6 +33,7 @@ export function AppShell() {
 
   return (
     <div className={`app-shell${collapsed ? ' sidebar-collapsed' : ''}`}>
+      <TopBar />
       <Sidebar collapsed={collapsed} onToggle={toggleSidebar} />
       <main className="workspace">
         <Suspense fallback={<AsyncState centered kind="loading" title="Loading view" />}>

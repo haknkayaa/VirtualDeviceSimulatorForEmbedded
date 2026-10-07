@@ -39,9 +39,13 @@ describe('AppShell', () => {
     expect(screen.queryByText(/Pro\+|Account/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument()
 
+    const summary = screen.getByRole('banner', { name: 'Simulator summary' })
+    expect(await within(summary).findByText('1.500 ms')).toBeInTheDocument()
+    expect(await within(summary).findByText('Server connected')).toBeInTheDocument()
+    expect(within(summary).getByText(/0 \/ 1/)).toBeInTheDocument()
+
     const status = screen.getByRole('contentinfo', { name: 'Simulator status' })
-    expect(await within(status).findByText('1.500 ms')).toBeInTheDocument()
     expect(await within(status).findByRole('link', { name: '0 errors, 2 warnings' })).toBeInTheDocument()
-    expect(await within(nav).findByTitle('0 of 1 adapters loaded')).toHaveTextContent('0/1')
+    expect(within(status).getByText(/^VDS4E v\d/)).toBeInTheDocument()
   })
 })

@@ -44,30 +44,30 @@
   --sidebar-w-collapsed: 52px;
 
   /* Surfaces: 0 = app canvas, 1 = panel, 2 = raised/hover, 3 = pressed/selected-neutral */
-  --bg-0: #0a0d13;
-  --bg-1: #121722;
-  --bg-2: #19202d;
-  --bg-3: #212a3a;
-  --bg-inset: #0d1119;
-  --border: #222b3a;
-  --border-strong: #324055;
-  --divider: #1a2230;
+  --bg-0: #0a111e;
+  --bg-1: #0f1828;
+  --bg-2: #152135;
+  --bg-3: #1c2a42;
+  --bg-inset: #0b1322;
+  --border: #1f2d45;
+  --border-strong: #2d4061;
+  --divider: #182539;
 
-  --text: #d3dae6;
-  --text-strong: #f3f6fb;
-  --text-muted: #8f9bb0;
-  --text-faint: #616d82;
+  --text: #d4dceb;
+  --text-strong: #f2f6fc;
+  --text-muted: #8e9cb5;
+  --text-faint: #5f6e88;
 
-  --accent: #4a8ff7;
-  --accent-text: #8ab8ff;
-  --accent-bg: rgba(74, 143, 247, .14);
-  --accent-border: rgba(74, 143, 247, .5);
-  --selection: rgba(74, 143, 247, .18);
+  --accent: #2f74de;
+  --accent-text: #7fb0ff;
+  --accent-bg: rgba(47, 116, 222, .18);
+  --accent-border: rgba(74, 143, 247, .55);
+  --selection: rgba(47, 116, 222, .22);
   --on-accent: #ffffff;
 
   --ok: #3fc26a;
   --ok-bg: rgba(63, 194, 106, .13);
-  --warn: #e0a83a;
+  --warn: #e8b13c;
   --warn-bg: rgba(224, 168, 58, .14);
   --err: #f2555f;
   --err-bg: rgba(242, 85, 95, .14);
@@ -77,16 +77,16 @@
   --live: #2fc7b8;
 
   /* Bus identity */
-  --bus-spi: #4fcfb5;
-  --bus-i2c: #e2bd62;
-  --bus-gpio: #a6d86c;
-  --bus-uart: #cf8ccb;
+  --bus-spi: #4c9bff;
+  --bus-i2c: #34c6c2;
+  --bus-gpio: #f28c38;
+  --bus-uart: #c38cf0;
   --bus-ethernet: #94acff;
   --bus-unknown: #8f9bb0;
 
   /* Signal levels (logic analyzer, GPIO) */
-  --signal-high: #a6d86c;
-  --signal-low: #4c586b;
+  --signal-high: #f28c38;
+  --signal-low: #3f5170;
 
   --shadow-pop: 0 8px 28px rgba(0, 0, 0, .5);
   --scrim: rgba(3, 6, 12, .6);
@@ -126,14 +126,14 @@
   --neutral-bg: rgba(86, 97, 115, .1);
   --live: #0f8a80;
 
-  --bus-spi: #0f8a74;
-  --bus-i2c: #946800;
-  --bus-gpio: #4b8712;
-  --bus-uart: #983c93;
+  --bus-spi: #1f6fe0;
+  --bus-i2c: #0f8a86;
+  --bus-gpio: #c25e0c;
+  --bus-uart: #7a3fc0;
   --bus-ethernet: #3e57c6;
   --bus-unknown: #566173;
 
-  --signal-high: #4b8712;
+  --signal-high: #c25e0c;
   --signal-low: #b8c1ce;
 
   --shadow-pop: 0 8px 28px rgba(14, 19, 27, .14);
