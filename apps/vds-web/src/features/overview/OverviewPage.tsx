@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
+import { SignalConnectionsPanel } from '../../components/SignalConnectionsPanel'
 import { useSessionTransactions } from '../../hooks/useSessionTransactions'
 import { AttentionPanel } from './AttentionPanel'
 import { BusTimelinePanel } from './BusTimelinePanel'
@@ -42,6 +43,7 @@ export function OverviewPage() {
           <RecentTransactionsPanel transactions={transactions} />
           <BusTimelinePanel transactions={transactions} />
         </div>
+        <SignalConnectionsPanel />
       </div>
     </div>
   )

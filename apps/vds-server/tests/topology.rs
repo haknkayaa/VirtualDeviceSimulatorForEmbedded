@@ -423,3 +423,116 @@ async fn idle_pump_wakes_only_for_the_safety_backstop() {
     );
     pump.abort();
 }
+
+#[tokio::test]
+async fn topology_endpoint_lists_connections_with_levels_and_in_flight_deliveries() {
+    use axum::{
+        body::{Body, to_bytes},
+        http::Request,
+    };
+    use tower::ServiceExt;
+    use vds_events::EventBus;
+    use vds_server::http::{ApiState, router};
+
+    async fn get_topology(state: &ApiState) -> serde_json::Value {
+        let response = router(state.clone())
+            .oneshot(
+                Request::builder()
+                    .uri("/api/v1/topology")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert!(response.status().is_success());
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap()
+    }
+
+    let path = write_topology(
+        "api",
+        &format!(
+            "  - {{ from: {SENSOR}.drdy, to: {BANK}.GPIO16 }}\n  - {{ from: {SENSOR}.drdy, to: {BANK}.GPIO17, delay_ns: 500000 }}\n"
+        ),
+    );
+    let config = config(&path);
+    let clock = Arc::new(ManualClock::default());
+    let registry = Arc::new(load_registry_with_clock(&config, clock.clone()).unwrap());
+    let state = ApiState::new(
+        config,
+        Arc::clone(&registry),
+        Arc::new(EventBus::default()),
+        clock.clone(),
+    )
+    .unwrap();
+    // Drain the initial synchronization of the delayed connection.
+    clock.advance(Duration::from_micros(500)).unwrap();
+    registry.run_due_events().unwrap();
+
+    let idle = get_topology(&state).await;
+    assert_eq!(idle["attached"], true);
+    assert_eq!(idle["path"], path.display().to_string());
+    assert_eq!(idle["connections"][0]["from"], format!("{SENSOR}.drdy"));
+    assert_eq!(idle["connections"][0]["to"], format!("{BANK}.GPIO16"));
+    assert_eq!(idle["connections"][0]["level"], false);
+    assert_eq!(idle["connections"][1]["delay_ns"], 500_000);
+    assert_eq!(idle["connections"][1]["pending"], serde_json::json!([]));
+
+    registry
+        .transfer_spi(SENSOR, &[0x10], 0, SpiWireConfig::default())
+        .unwrap();
+    clock.advance(Duration::from_millis(1)).unwrap();
+    registry.run_due_events().unwrap();
+    let raised = get_topology(&state).await;
+    assert_eq!(raised["connections"][0]["level"], true);
+    assert_eq!(raised["connections"][1]["level"], true);
+    assert_eq!(
+        raised["connections"][1]["pending"],
+        serde_json::json!([{ "due_ns": 2_000_000, "value": true }])
+    );
+    let _ = fs::remove_file(path);
+}
+
+#[tokio::test]
+async fn topology_endpoint_reports_no_topology() {
+    use axum::{
+        body::{Body, to_bytes},
+        http::Request,
+    };
+    use tower::ServiceExt;
+    use vds_events::EventBus;
+    use vds_server::http::{ApiState, router};
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let config = ServerConfig::from_yaml(&format!(
+        r"
+schema_version: 1
+server: {{ control_address: '127.0.0.1:0' }}
+data_plane: {{ unix_socket: /tmp/vds4e-topology-none.sock }}
+observability: {{ log_level: info }}
+device_packages: ['{}']
+",
+        root.join("device-models/examples/generic-gpio-bank")
+            .canonicalize()
+            .unwrap()
+            .display()
+    ))
+    .unwrap();
+    let clock = Arc::new(ManualClock::default());
+    let registry = Arc::new(load_registry_with_clock(&config, clock.clone()).unwrap());
+    let state = ApiState::new(config, registry, Arc::new(EventBus::default()), clock).unwrap();
+    let response = router(state)
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/topology")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body: serde_json::Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(
+        body,
+        serde_json::json!({ "attached": false, "path": null, "connections": [] })
+    );
+}
