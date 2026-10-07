@@ -235,6 +235,7 @@ impl SvdPeripheral {
                                         width: f.width,
                                         access: f.access,
                                         description: f.description.clone().unwrap_or_default(),
+                                        read_clear: false,
                                     });
                                 }
                             }
@@ -285,6 +286,8 @@ impl SvdPeripheral {
                     busy: None,
                     state_machine: None,
                     faults: vec![],
+                    signals: None,
+                    signal_bindings: vec![],
                 };
 
                 Ok(DeviceModel {
@@ -316,6 +319,8 @@ impl SvdPeripheral {
                     busy: None,
                     state_machine: None,
                     faults: vec![],
+                    signals: None,
+                    signal_bindings: vec![],
                 };
 
                 Ok(DeviceModel {
@@ -362,6 +367,7 @@ impl SvdField {
             width: self.width,
             access: self.access,
             description: self.description.clone().unwrap_or_default(),
+            read_clear: false,
         }
     }
 }

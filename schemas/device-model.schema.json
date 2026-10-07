@@ -256,7 +256,8 @@
                     "lsb": { "type": "integer", "minimum": 0, "maximum": 63 },
                     "width": { "type": "integer", "minimum": 1, "maximum": 64 },
                     "access": { "type": "string", "enum": ["ro", "wo", "rw"] },
-                    "description": { "type": "string" }
+                    "description": { "type": "string" },
+                    "read_clear": { "type": "boolean" }
                   }
                 }
               }
@@ -275,6 +276,37 @@
             "mask": {
               "type": "integer",
               "minimum": 1
+            }
+          }
+        },
+        "signals": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "outputs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "type"],
+                "properties": {
+                  "name": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
+                  "type": { "enum": ["bool"] },
+                  "description": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "signal_bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["signal", "source"],
+            "properties": {
+              "signal": { "type": "string", "minLength": 1 },
+              "source": { "$ref": "#/$defs/signal_source" }
             }
           }
         },
@@ -345,6 +377,53 @@
     }
   },
   "$defs": {
+    "signal_source": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["register", "bit"],
+          "properties": {
+            "register": { "type": "string", "minLength": 1 },
+            "bit": { "type": "integer", "minimum": 0, "maximum": 63 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": {
+            "state": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["equals"],
+              "properties": { "equals": { "type": "string", "minLength": 1 } }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "maxProperties": 1,
+          "properties": {
+            "and": { "$ref": "#/$defs/signal_source_pair" },
+            "or": { "$ref": "#/$defs/signal_source_pair" },
+            "nand": { "$ref": "#/$defs/signal_source_pair" },
+            "nor": { "$ref": "#/$defs/signal_source_pair" },
+            "xor": { "$ref": "#/$defs/signal_source_pair" },
+            "xnor": { "$ref": "#/$defs/signal_source_pair" },
+            "not": { "$ref": "#/$defs/signal_source" }
+          }
+        }
+      ]
+    },
+    "signal_source_pair": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "$ref": "#/$defs/signal_source" }
+    },
     "fault": {
       "type": "object",
       "additionalProperties": false,

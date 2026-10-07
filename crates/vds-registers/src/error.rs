@@ -27,6 +27,14 @@ pub enum RegisterError {
         reset_value: u64,
     },
 
+    #[error("bit field '{field}' of register '{name}' at 0x{address:X} is invalid: {reason}")]
+    InvalidBitField {
+        name: String,
+        address: u64,
+        field: String,
+        reason: &'static str,
+    },
+
     #[error("register address 0x{address:X} is not defined")]
     UnknownAddress { address: u64 },
 

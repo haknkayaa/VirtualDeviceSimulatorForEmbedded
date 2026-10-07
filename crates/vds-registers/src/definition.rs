@@ -33,6 +33,9 @@ pub struct BitFieldDefinition {
     pub access: AccessType,
     #[serde(default)]
     pub description: String,
+    /// Bits of this field are cleared after a bus read returns their value.
+    #[serde(default)]
+    pub read_clear: bool,
 }
 
 /// Declarative definition used to construct one runtime register.

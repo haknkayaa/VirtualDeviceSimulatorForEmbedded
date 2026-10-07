@@ -291,6 +291,8 @@ impl DeviceStubDraft {
                     busy: None,
                     state_machine: None,
                     faults: vec![],
+                    signals: None,
+                    signal_bindings: vec![],
                 };
 
                 Ok(DeviceModel {
@@ -360,6 +362,8 @@ impl DeviceStubDraft {
                     busy: None,
                     state_machine: None,
                     faults: vec![],
+                    signals: None,
+                    signal_bindings: vec![],
                 };
 
                 Ok(DeviceModel {
@@ -414,6 +418,8 @@ impl DeviceStubDraft {
                     busy: None,
                     state_machine: None,
                     faults: vec![],
+                    signals: None,
+                    signal_bindings: vec![],
                 };
 
                 Ok(DeviceModel {
