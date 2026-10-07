@@ -40,6 +40,9 @@ pub enum ModelError {
     #[error("SPI command '{name}' is invalid: {reason}")]
     InvalidCommand { name: String, reason: String },
 
+    #[error("device signal definition is invalid: {reason}")]
+    InvalidSignal { reason: String },
+
     #[error("device memory geometry is invalid: {reason}")]
     InvalidMemory { reason: String },
 

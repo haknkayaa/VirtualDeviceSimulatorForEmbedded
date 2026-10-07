@@ -45,6 +45,87 @@ pub struct DeviceDefinition {
     pub state_machine: Option<DeviceStateMachineDefinition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub faults: Vec<FaultDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signals: Option<SignalsDefinition>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub signal_bindings: Vec<SignalBindingDefinition>,
+}
+
+/// Public signal ports exposed to board topology. Internals stay private.
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignalsDefinition {
+    #[serde(default)]
+    pub outputs: Vec<SignalOutputDefinition>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignalOutputDefinition {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub kind: SignalPortType,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+}
+
+/// Signal value types. Version 1 supports boolean levels only.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SignalPortType {
+    Bool,
+}
+
+/// Drives one public output port from the device's own behavior.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SignalBindingDefinition {
+    pub signal: String,
+    pub source: SignalSourceDefinition,
+}
+
+/// Internal level source for a public port.
+///
+/// Combined sources reuse the logical node vocabulary of the typed signal graph
+/// (`and`, `or`, `not`, `nand`, `nor`, `xor`, `xnor`); there is no expression
+/// language.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum SignalSourceDefinition {
+    Register(RegisterBitSourceDefinition),
+    State(StateSourceDefinition),
+    Logic(LogicSourceDefinition),
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegisterBitSourceDefinition {
+    pub register: String,
+    pub bit: u8,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StateSourceDefinition {
+    pub state: StateEqualsDefinition,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StateEqualsDefinition {
+    pub equals: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LogicSourceDefinition {
+    And([Box<SignalSourceDefinition>; 2]),
+    Or([Box<SignalSourceDefinition>; 2]),
+    Nand([Box<SignalSourceDefinition>; 2]),
+    Nor([Box<SignalSourceDefinition>; 2]),
+    Xor([Box<SignalSourceDefinition>; 2]),
+    Xnor([Box<SignalSourceDefinition>; 2]),
+    Not(Box<SignalSourceDefinition>),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

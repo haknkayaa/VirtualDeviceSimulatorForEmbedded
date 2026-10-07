@@ -673,3 +673,172 @@ fn reset_clears_transient_counters_but_preserves_persistent_counters() {
         );
     }
 }
+
+mod signals {
+    use std::sync::Arc;
+
+    use vds_core::{clock::ManualClock, device::Device};
+
+    use crate::{DeviceModel, ModelError};
+
+    fn model(signals: &str) -> String {
+        format!(
+            r"
+schema_version: 1
+device:
+  id: sensor
+  name: Sensor
+  bus: spi
+  model: generic-spi-command
+  commands:
+    - {{ name: START, opcode: 0x10, response: [], event: start }}
+    - {{ name: STATUS, opcode: 0x05, operation: register_read, register: STATUS }}
+  registers:
+    - {{ name: STATUS, address: 0, width_bits: 8, reset_value: 0, access: rw }}
+    - {{ name: FLAGS, address: 1, width_bits: 8, reset_value: 0, access: rw }}
+  state_machine:
+    initial_state: idle
+    states:
+      idle:
+        transitions: [{{ event: start, target: ready }}]
+      ready:
+        transitions: []
+{signals}
+"
+        )
+    }
+
+    fn build(signals: &str) -> Result<crate::GenericSpiDevice, ModelError> {
+        DeviceModel::from_yaml(&model(signals))?
+            .into_spi_device_with_clock(Arc::new(ManualClock::default()))
+    }
+
+    fn levels(device: &impl Device) -> Vec<(String, bool)> {
+        device
+            .signal_outputs()
+            .unwrap()
+            .into_iter()
+            .map(|level| (level.name, level.value))
+            .collect()
+    }
+
+    #[test]
+    fn register_bit_state_and_logic_sources_drive_public_ports() {
+        let device = build(
+            r"
+  signals:
+    outputs:
+      - { name: bit_port, type: bool }
+      - { name: state_port, type: bool }
+      - { name: both, type: bool }
+      - { name: inverted, type: bool }
+  signal_bindings:
+    - { signal: bit_port, source: { register: STATUS, bit: 3 } }
+    - { signal: state_port, source: { state: { equals: ready } } }
+    - signal: both
+      source:
+        and:
+          - { register: STATUS, bit: 3 }
+          - { state: { equals: ready } }
+    - { signal: inverted, source: { not: { register: STATUS, bit: 3 } } }
+",
+        )
+        .unwrap();
+        let expect = |bit, state, both, inverted| {
+            assert_eq!(
+                levels(&device),
+                [
+                    ("bit_port".to_owned(), bit),
+                    ("state_port".to_owned(), state),
+                    ("both".to_owned(), both),
+                    ("inverted".to_owned(), inverted),
+                ]
+            );
+        };
+        expect(false, false, false, true);
+        device.write_register(0, 0x08).unwrap();
+        expect(true, false, false, false);
+        device.transfer(&[0x10]).unwrap();
+        expect(true, true, true, false);
+        device.write_register(0, 0x00).unwrap();
+        expect(false, true, false, true);
+    }
+
+    #[test]
+    fn rejects_invalid_signal_definitions() {
+        let cases = [
+            (
+                "undeclared signal",
+                "  signal_bindings:\n    - { signal: x, source: { register: STATUS, bit: 0 } }\n",
+            ),
+            (
+                "missing binding",
+                "  signals:\n    outputs: [{ name: x, type: bool }]\n",
+            ),
+            (
+                "unknown register",
+                "  signals:\n    outputs: [{ name: x, type: bool }]\n  signal_bindings:\n    - { signal: x, source: { register: NOPE, bit: 0 } }\n",
+            ),
+            (
+                "bit outside width",
+                "  signals:\n    outputs: [{ name: x, type: bool }]\n  signal_bindings:\n    - { signal: x, source: { register: STATUS, bit: 8 } }\n",
+            ),
+            (
+                "duplicate port",
+                "  signals:\n    outputs: [{ name: x, type: bool }, { name: x, type: bool }]\n  signal_bindings:\n    - { signal: x, source: { register: STATUS, bit: 0 } }\n",
+            ),
+            (
+                "double binding",
+                "  signals:\n    outputs: [{ name: x, type: bool }]\n  signal_bindings:\n    - { signal: x, source: { register: STATUS, bit: 0 } }\n    - { signal: x, source: { register: STATUS, bit: 1 } }\n",
+            ),
+            (
+                "dotted port name",
+                "  signals:\n    outputs: [{ name: 'a.b', type: bool }]\n  signal_bindings:\n    - { signal: 'a.b', source: { register: STATUS, bit: 0 } }\n",
+            ),
+        ];
+        for (label, signals) in cases {
+            let result = DeviceModel::from_yaml(&model(signals));
+            assert!(
+                matches!(
+                    result,
+                    Err(ModelError::InvalidSignal { .. } | ModelError::Validation(_))
+                ),
+                "{label}: {result:?}"
+            );
+        }
+        // Unknown states are caught once the final state machine is known.
+        let unknown_state = build(
+            "  signals:\n    outputs: [{ name: x, type: bool }]\n  signal_bindings:\n    - { signal: x, source: { state: { equals: nowhere } } }\n",
+        );
+        assert!(matches!(
+            unknown_state,
+            Err(ModelError::InvalidSignal { .. })
+        ));
+    }
+
+    #[test]
+    fn unsupported_models_reject_signal_ports() {
+        let yaml = r"
+schema_version: 1
+device:
+  id: gpio0
+  name: Bank
+  bus: gpio
+  model: generic-gpio-bank
+  gpio:
+    lines: [{ offset: 0, name: L0, direction: output, register: L0_STATE }]
+  commands: []
+  registers:
+    - { name: L0_STATE, address: 0, width_bits: 1, reset_value: 0, access: rw }
+  signals:
+    outputs: [{ name: x, type: bool }]
+  signal_bindings:
+    - { signal: x, source: { register: L0_STATE, bit: 0 } }
+";
+        let result = DeviceModel::from_yaml(yaml);
+        assert!(
+            matches!(result, Err(ModelError::InvalidSignal { .. })),
+            "{result:?}"
+        );
+    }
+}

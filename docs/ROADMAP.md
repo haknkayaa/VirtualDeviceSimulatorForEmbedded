@@ -6,30 +6,21 @@ implementation and ADR are accepted.
 
 ## Cross-device coupling
 
-Current state: not implemented. Each runtime device is isolated. A behavior
-flow or signal graph (`crates/vds-device-model/src/signal_graph.rs`) operates
-only on the registers, state, and signals of its own device, and the
-repository contains no model, schema field, or runtime path by which an I2C or
-SPI device drives a line of a GPIO device. The only way to change a GPIO line
-today is to write the GPIO bank's `GPIOn_STATE` registers directly through the
-control API, the Web UI, or a scenario step; a sensor model cannot do so.
+Version 1 is implemented ([ADR 0011](adr/0011-connect-devices-through-public-signal-ports.md),
+[guide](guides/topology.md)): a device model exposes `bool` output signal
+ports, a separate `topology.yaml` connects them to named GPIO lines, and the
+runtime propagates changes deterministically (zero delay by default, optional
+`delay_ns`). Register `read_clear` bitfields let a sample read drop DRDY.
 
-Design: [ADR 0011](adr/0011-connect-devices-through-public-signal-ports.md)
-(proposed).
+Out of scope for version 1 and candidates for follow-up ADRs:
 
-Planned work:
-
-- Add a declarative topology link, for example a data-ready output of an
-  I2C/SPI sensor model wired to a line of a `generic-gpio-bank` device, so the
-  runtime (not an ABI adapter) propagates the signal.
-- Support a behavior flow in which a sensor completes a conversion, asserts a
-  DRDY line, the application observes the edge with `gpiomon` (or libgpiod),
-  and then reads the sample over `/dev/spidevX.Y` or `/dev/i2c-N`; reading the
-  data clears DRDY.
-- Keep the link in the package and topology layer. Device-specific knowledge
-  must not move into the SPI, I2C, or GPIO host adapters.
-- Define ordering and time semantics for propagated edges, and cover the flow
-  with a scenario that asserts the edge and the subsequent read.
+- input ports and bidirectional or open-drain lines;
+- multiple drivers on one line;
+- `generic-gpio-bank` and other models exposing signal ports;
+- domain events for signal changes and publishing events from the live pump;
+- control-plane and Web UI views of connections;
+- attaching a topology to devices created at runtime;
+- Device Tree driven topology generation.
 
 ## Additional host adapters and buses
 

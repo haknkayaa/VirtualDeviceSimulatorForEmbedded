@@ -9,7 +9,9 @@ use super::{
     compile_state_machine, fs, initialize_state_machine, uncompiled_state_machine, validate_faults,
     validate_register_reference,
 };
-use crate::{DEVICE_MODEL_SCHEMA, behavior_flow};
+use std::collections::BTreeSet;
+
+use crate::{DEVICE_MODEL_SCHEMA, SignalOutputs, behavior_flow};
 
 impl DeviceModel {
     /// Compiles an authoritative behavior flow into this runtime model.
@@ -68,6 +70,21 @@ impl DeviceModel {
         }
 
         let model: Self = serde_json::from_value(instance)?;
+        let has_signals =
+            model.device.signals.is_some() || !model.device.signal_bindings.is_empty();
+        if has_signals
+            && !matches!(
+                model.device.model.as_str(),
+                "generic-spi-command" | "generic-i2c-register"
+            )
+        {
+            return Err(ModelError::InvalidSignal {
+                reason: format!(
+                    "model '{}' does not support public signal ports",
+                    model.device.model
+                ),
+            });
+        }
         if model.device.bus == "uart" {
             let uart = model.device.uart.as_ref().ok_or_else(|| {
                 ModelError::Validation("UART device is missing device.uart".to_owned())
@@ -301,6 +318,12 @@ impl DeviceModel {
             }
         }
         validate_faults(&model.device.faults, &model.device.registers)?;
+        SignalOutputs::compile(
+            model.device.signals.as_ref(),
+            &model.device.signal_bindings,
+            &RegisterEngine::new(model.device.registers.clone())?,
+            None,
+        )?;
         Ok(model)
     }
 
@@ -352,7 +375,13 @@ impl DeviceModel {
                 bus: "i2c".to_owned(),
                 model: "generic-i2c-register".to_owned(),
             })?;
-        GenericI2cDevice::new(self.device.id, definition, self.device.registers)
+        let signals = SignalOutputs::compile(
+            self.device.signals.as_ref(),
+            &self.device.signal_bindings,
+            &RegisterEngine::new(self.device.registers.clone())?,
+            Some(&BTreeSet::new()),
+        )?;
+        GenericI2cDevice::new(self.device.id, definition, self.device.registers, signals)
     }
 
     /// Builds a declarative byte-oriented UART runtime.
@@ -516,6 +545,19 @@ impl DeviceModel {
             .as_ref()
             .map(|definition| compile_state_machine(definition, &registers))
             .transpose()?;
+        let signals = SignalOutputs::compile(
+            self.device.signals.as_ref(),
+            &self.device.signal_bindings,
+            &registers,
+            Some(
+                &self
+                    .device
+                    .state_machine
+                    .as_ref()
+                    .map(|machine| machine.states.keys().cloned().collect::<BTreeSet<_>>())
+                    .unwrap_or_default(),
+            ),
+        )?;
         let signal_graph = self
             .signal_graph
             .map(|definition| SignalGraph::new(definition, self.package_root.unwrap_or_default()));
@@ -549,6 +591,7 @@ impl DeviceModel {
             }),
             clock,
             busy_binding: self.device.busy,
+            signals,
             state: Mutex::new(state),
         })
     }

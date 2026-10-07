@@ -1,0 +1,12 @@
+schema_version: 1
+
+# Reference with `topology: config/topology.example.yaml` in vds-server.yaml and
+# add the device-models/examples/spi-sensor-drdy package to `device_packages`.
+connections:
+  # Zero delay: the GPIO line follows the sensor at the same virtual timestamp.
+  - from: spi-sensor-drdy.drdy
+    to: generic-gpio-bank-32.GPIO16
+  # Optional explicit virtual-time propagation delay:
+  # - from: spi-sensor-drdy.drdy
+  #   to: generic-gpio-bank-32.GPIO17
+  #   delay_ns: 500

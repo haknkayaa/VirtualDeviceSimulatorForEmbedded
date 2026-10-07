@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Public device signal ports, `signal_bindings`, and a `topology.yaml` that
+  connects them to GPIO lines with deterministic zero-delay or `delay_ns`
+  propagation (ADR 0011).
+- Register bitfield `read_clear` attribute.
+- `spi-sensor-drdy` example package and `config/topology.example.yaml`.
+- Optional `topology` key in the server configuration.
 - Separate CI jobs for Rust, web UI, native adapters (with ASan/UBSan) and examples.
 - CodeQL analysis, Dependabot configuration and a security policy.
 

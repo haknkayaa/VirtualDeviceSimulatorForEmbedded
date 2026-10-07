@@ -490,6 +490,7 @@ pub(super) fn map_register_error(
         ),
         RegisterError::DuplicateAddress { address, .. }
         | RegisterError::InvalidWidth { address, .. }
+        | RegisterError::InvalidBitField { address, .. }
         | RegisterError::ResetValueOverflow { address, .. } => (
             RegisterErrorCode::Internal,
             None,

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vds4e.dev/schemas/topology/v1.json",
+  "title": "VDS4E board topology",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to"],
+        "properties": {
+          "from": {
+            "description": "<device-id>.<output-signal>",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*\\.[A-Za-z0-9_-]+$"
+          },
+          "to": {
+            "description": "<gpio-device-id>.<line-name>",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*\\..+$"
+          },
+          "delay_ns": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

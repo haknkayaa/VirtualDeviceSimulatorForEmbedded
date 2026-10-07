@@ -50,7 +50,10 @@ The repository currently implements:
 - datasheet-derived AT24C128/AT24C256 EEPROM devices with page and write-cycle
   semantics
 - generic GPIO banks
-- register maps and bitfields with access enforcement
+- public device signal ports connected to GPIO lines by a board topology
+  (ADR 0011)
+- register maps and bitfields with access enforcement, including read-clear
+  bitfields
 - flash-like memory operations and geometry validation
 - virtual time, scheduled operations, and busy-state behavior
 - state machines with guards, actions, and delayed transitions
@@ -250,6 +253,8 @@ The server accepts one YAML configuration containing:
 - `observability.log_level`
 - optional `event_store` policy
 - required, non-empty `device_packages`
+- optional `topology`, a path to a `topology.yaml` that connects public device
+  signal ports (section 8.8)
 
 Unknown top-level fields are rejected. The removed `device_models` and global
 `scenarios` fields are not compatibility aliases.
@@ -409,7 +414,8 @@ The registry maps device IDs to shared runtime instances and provides:
 - register reads/writes;
 - reset and state inspection;
 - fault control;
-- virtual-time and due-event operations.
+- virtual-time and due-event operations;
+- signal propagation for an attached topology (section 8.8).
 
 All clients converge at this boundary. The registry does not contain
 device-specific opcode logic.
@@ -425,7 +431,9 @@ description, and optional bitfields. The engine enforces:
 - `ro`, `wo`, and `rw` access;
 - valid non-overlapping bitfields;
 - bitfield access compatible with the parent register;
-- reset values and runtime constraints.
+- reset values and runtime constraints;
+- optional `read_clear` bitfields: a bus read returns the current value and then
+  clears those bits. Control-plane and scenario inspection never clear them.
 
 Device-internal actions may update status fields that are read-only to an
 external client.
@@ -485,6 +493,52 @@ value, and stuck-at constraints.
 Matching faults execute by descending priority and declaration order. Terminal
 actions stop evaluation; composable actions accumulate. Reset clears transient
 fault state and preserves explicitly persistent state.
+
+### 8.8 Signal ports and board topology
+
+A device model may expose **public output signal ports** (`signals.outputs`,
+type `bool` in version 1). Each port is driven by an internal
+`signal_bindings` entry whose source is a register bit, a state-machine state,
+or a combination of those using the logical vocabulary of the typed signal graph
+(`and`, `or`, `not`, `nand`, `nor`, `xor`, `xnor`). There is no expression
+language. Only `generic-spi-command` and `generic-i2c-register` models support
+ports in version 1.
+
+A separate `topology.yaml`, referenced by the optional `topology:` key in the
+server configuration, connects ports to GPIO lines:
+
+```yaml
+schema_version: 1
+connections:
+  - from: imu0.drdy            # <device.id>.<signal>
+    to: gpio0.DRDY_IMU         # <device.id>.<line name>
+    delay_ns: 500              # optional; default is zero
+```
+
+The topology addresses ports and named GPIO lines only. It never refers to
+registers, states, or line offsets, and it does not know adapters. Endpoint
+device names resolve to runtime `device.id` values; there is no separate
+instance or composition system.
+
+The target must be a device-driven GPIO line (`direction: output` in the GPIO
+model; the application reads it). Two connections may not drive the same line.
+Validation rejects unknown devices, ports, and lines, host-driven targets,
+multiple drivers, and device-level cycles when the topology is attached.
+
+The registry owns a deterministic signal router. After every transaction,
+reset, register write, and due-event pass it samples the source ports and
+propagates only values that changed since the last propagation. Zero-delay
+changes drain through a FIFO queue at the same virtual timestamp until the
+system is stable; the loop is bounded and fails with a typed error if it does
+not stabilize. Connections with `delay_ns` are queued on virtual time and
+participate in the earliest-deadline calculation. Propagation is never recursive.
+
+The router drives the target GPIO bank's backing register. The existing path
+from the bank through the GPIO adapter and kernel `gpio-sim` carries the level
+to `/dev/gpiochipN`, so the router and host adapters stay independent. The live
+server runs a short pump that applies due events when a topology is attached,
+so timer-driven signals do not wait for another bus transaction. Read-clear
+behavior ("reading the sample drops DRDY") belongs to the register/model layer.
 
 ## 9. Bus runtime drivers
 
@@ -918,7 +972,8 @@ The current ADR set records:
 - managed Linux SPI CUSE;
 - managed host adapters;
 - behavior-flow compilation;
-- kernel gpio-sim integration.
+- kernel gpio-sim integration;
+- public signal ports and board topology.
 
 ## 21. Final architectural constraint
 
