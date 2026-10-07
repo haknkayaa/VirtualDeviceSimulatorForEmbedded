@@ -109,3 +109,11 @@ DESTDIR="$PWD/package-root" PREFIX=/usr ./install
 
 Focused module builds remain available during development; the full root
 pipeline does not need to run after every isolated change.
+
+
+## Next steps
+
+- [Build your first virtual I²C device](../tutorials/first-virtual-device.md).
+- [Use the control-plane API and WebSocket event stream](api.md).
+- Choose a host-interface guide: [SPI](spi.md), [I²C](i2c.md),
+  [GPIO](gpio.md) or [UART](uart.md).

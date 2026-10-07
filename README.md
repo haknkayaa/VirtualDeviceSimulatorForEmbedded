@@ -268,6 +268,8 @@ A real Linux ABI E2E harness is available under `tests/e2e/` for privileged inte
 | --- | --- |
 | [Documentation index](docs/README.md) | map of user, contributor and architecture documentation |
 | [Getting started](docs/guides/getting-started.md) | prerequisites, development workspace, staged build and installation |
+| [First virtual device](docs/tutorials/first-virtual-device.md) | create an I²C model and exercise it through a real `/dev/i2c-N` endpoint |
+| [Control-plane API](docs/guides/api.md) | REST resources, error contract and replayable WebSocket events |
 | [Architecture](VDS4E_ARCHITECTURE.md) | authoritative system architecture and boundaries |
 | [Testing](docs/guides/testing.md) | local checks, native adapters, real Linux ABI E2E and CI scope |
 | [Releases](docs/guides/releases.md) | version/tag rules and Debian release workflow |
