@@ -128,8 +128,9 @@ responsibilities of the VDS4E device runtime.
 
 ### Collaboration, automation, and scale
 
-- Add coverage metrics for models, state transitions, registers, faults, and
-  scenarios.
+- Extend scenario coverage ([ADR 0013](adr/0013-measure-scenario-coverage-against-device-models.md):
+  commands, registers, states, transitions and faults per run) to suites,
+  bitfields and I2C/GPIO/UART actions, and add CI thresholds.
 - Expand test-case management and regression dashboards around the existing
   headless scenario and JUnit interfaces.
 - Support distributed, cloud-scale simulation workers with deterministic input

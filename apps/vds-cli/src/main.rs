@@ -337,8 +337,11 @@ fn run_scenario(arguments: &ScenarioRunArguments) -> Result<ResultStatus, String
     let clock = Arc::new(ManualClock::default());
     let registry = vds_server::load_registry_with_clock(&config, clock.clone())
         .map_err(|error| error.to_string())?;
+    let coverage = vds_server::load_coverage_targets(&config).map_err(|error| error.to_string())?;
     let runtime = RegistryRuntime::new(Arc::new(registry), clock);
-    let result = ScenarioExecutor::new(runtime).run(&document);
+    let result = ScenarioExecutor::new(runtime)
+        .with_coverage(Arc::new(coverage))
+        .run(&document);
     let json = format!(
         "{}\n",
         result.to_json_pretty().map_err(|error| error.to_string())?
@@ -361,7 +364,28 @@ fn run_scenario(arguments: &ScenarioRunArguments) -> Result<ResultStatus, String
     if arguments.json_output.is_none() && arguments.junit_output.is_none() {
         print!("{json}");
     }
+    for line in coverage_summary(&result) {
+        eprintln!("{line}");
+    }
     Ok(result.status)
+}
+
+/// One `coverage <device>: commands 3/21, registers 1/9, …` line per device.
+fn coverage_summary(result: &vds_scenario::ScenarioResult) -> Vec<String> {
+    result
+        .coverage
+        .iter()
+        .flat_map(|coverage| coverage.devices.iter())
+        .map(|device| {
+            let metrics = device
+                .metrics()
+                .iter()
+                .map(|(name, metric)| format!("{name} {}/{}", metric.covered, metric.total))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("coverage {}: {metrics}", device.device_id)
+        })
+        .collect()
 }
 
 fn validate_device_package(path: &PathBuf) -> Result<(), String> {
@@ -608,6 +632,9 @@ mod tests {
         let xml = fs::read_to_string(junit).unwrap();
         assert!(xml.contains("name=\"vds4e.run_id\" value=\"cli-test\""));
         assert!(xml.contains("name=\"vds4e.scenario_revision\" value=\"3\""));
+        assert!(xml.contains(
+            "name=\"vds4e.coverage.micron-mt25ql256aba8esf-0sit.commands\" value=\"1/21\""
+        ));
         fs::remove_dir_all(directory).unwrap();
     }
 }

@@ -463,3 +463,18 @@ body.flow-panel-resizing { user-select: none; }
   .flow-resize-handle { display: none; }
   .flow-page .page-bar-context, .flow-revision { display: none; }
 }
+
+/* Scenario coverage (ADR 0013) */
+/* With coverage the result panel scrolls as one, so neither table squeezes the other. */
+.scenario-result-panel:has(.scenario-coverage) { overflow: auto; }
+.scenario-result-panel:has(.scenario-coverage) .scenario-run-steps { flex: 0 0 auto; overflow: visible; }
+.scenario-coverage { flex: 0 0 auto; border-bottom: 1px solid var(--divider); }
+.scenario-coverage .coverage-cell { white-space: nowrap; }
+.coverage-bar { display: inline-block; width: 40px; height: 4px; margin-left: var(--space-2); overflow: hidden; vertical-align: middle; background: var(--divider); border-radius: 2px; }
+.coverage-bar > span { display: block; height: 100%; background: var(--accent); }
+.scenario-coverage-missed { padding: var(--space-1) var(--space-4); font-size: var(--fs-sm); }
+.scenario-coverage-missed summary { cursor: pointer; color: var(--text-muted); }
+.scenario-coverage-missed dl { display: grid; gap: var(--space-1); margin: var(--space-2) 0; }
+.scenario-coverage-missed dl > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: var(--space-2); }
+.scenario-coverage-missed dt { color: var(--text-muted); }
+.scenario-coverage-missed dd { margin: 0; color: var(--text); font-size: var(--fs-xs); overflow-wrap: anywhere; }

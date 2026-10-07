@@ -276,6 +276,21 @@ export interface StepResult {
   error?: string
 }
 
+export interface CoverageMetric {
+  covered: number
+  total: number
+  /** Declared items the run did not exercise. */
+  missed: string[]
+}
+
+export type CoverageMetricName = 'commands' | 'registers' | 'states' | 'transitions' | 'faults'
+
+export type DeviceCoverage = { device_id: string } & Record<CoverageMetricName, CoverageMetric>
+
+export interface ScenarioCoverage {
+  devices: DeviceCoverage[]
+}
+
 export interface ScenarioResult {
   scenario_id: string
   status: StepStatus
@@ -287,6 +302,8 @@ export interface ScenarioResult {
   steps_failed: number
   steps_skipped: number
   steps: StepResult[]
+  /** Declared device behavior the run exercised (ADR 0013). */
+  coverage?: ScenarioCoverage
 }
 
 export interface RunRecord {
