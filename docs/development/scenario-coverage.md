@@ -43,6 +43,8 @@ are reported. A metric whose model declares nothing reports `0/0`.
 
 - The Visual Scenario Editor result panel shows the same table, with the items
   that were not exercised listed under *Not exercised on …*.
+- The Overview's *Scenario run* panel shows a one-line summary for the latest
+  finished run.
 
 Results produced without coverage targets, for example by a custom
 `ScenarioExecutor` that does not call `with_coverage`, omit the field.

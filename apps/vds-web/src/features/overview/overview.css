@@ -83,6 +83,11 @@ a.ldp-box:hover { border-color: var(--accent-border); background: var(--bg-3); }
 .scn-progress-line { display: flex; justify-content: space-between; color: var(--text); font-size: var(--fs-md); }
 .scn-percent { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-sm); }
 .scn-progress { height: 6px; overflow: hidden; background: var(--bg-3); border-radius: 3px; }
+.scn-coverage { display: grid; gap: var(--space-1); margin: 0; font-size: var(--fs-sm); }
+.scn-coverage > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); }
+.scn-coverage dt { color: var(--text-muted); }
+.scn-coverage dd { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0; color: var(--text-muted); }
+.scn-coverage b { color: var(--text-strong); font-weight: 600; }
 .scn-progress > i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
 .scn-progress.failed > i { background: var(--err); }
 .scn-steps { display: flex; flex-direction: column; }

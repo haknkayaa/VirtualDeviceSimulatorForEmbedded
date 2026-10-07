@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scenario coverage (ADR 0013): run results report, per device the scenario
   touches, which declared commands, registers, states, state transitions and
   faults were exercised. Shown in the JSON result, as `vds4e.coverage.*` JUnit
-  properties, as a CLI summary on standard error, and in the Visual Scenario
-  Editor's result panel.
+  properties, as a CLI summary on standard error, in the Visual Scenario
+  Editor's result panel and on the Overview's *Scenario run* panel.
 - `vds-cli import dts SOURCE --output DIR` drafts a loadable device package per
   enabled SPI, I2C and GPIO Device Tree peripheral and writes a `board.md` summary
   with endpoints, interrupts, skipped nodes and the `device_packages` entries.
