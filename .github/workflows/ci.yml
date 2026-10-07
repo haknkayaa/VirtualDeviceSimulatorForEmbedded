@@ -2,13 +2,21 @@ name: Build and Test
 
 on:
   push:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "LICENSE"
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "LICENSE"
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -50,17 +58,9 @@ jobs:
       - run: npm run test:run
       - run: npm run build
 
-  native-adapters:
-    name: Native adapters (${{ matrix.name }})
+  native-and-examples:
+    name: Native adapters and C examples
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: default
-            c_flags: ""
-          - name: asan-ubsan
-            c_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -g"
     steps:
       - uses: actions/checkout@v4
       - name: Install build dependencies
@@ -69,27 +69,27 @@ jobs:
           sudo apt-get install -y --no-install-recommends cmake pkg-config build-essential libfuse3-dev
       - name: Build and test adapters
         env:
-          CFLAGS_EXTRA: ${{ matrix.c_flags }}
           ASAN_OPTIONS: detect_leaks=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: |
           set -eu
-          for adapter in spi-cuse i2c-cuse gpio-sim uart-pty; do
-            echo "::group::$adapter"
-            cmake -S "adapters/$adapter" -B "$RUNNER_TEMP/build-$adapter" \
-              -DCMAKE_BUILD_TYPE=Debug \
-              -DCMAKE_C_FLAGS="$CFLAGS_EXTRA" \
-              -DCMAKE_EXE_LINKER_FLAGS="$CFLAGS_EXTRA"
-            cmake --build "$RUNNER_TEMP/build-$adapter" --parallel
-            ctest --test-dir "$RUNNER_TEMP/build-$adapter" --output-on-failure
-            echo "::endgroup::"
+          for variant in default asan-ubsan; do
+            case "$variant" in
+              default) flags="" ;;
+              asan-ubsan) flags="-fsanitize=address,undefined -fno-omit-frame-pointer -g" ;;
+            esac
+            for adapter in spi-cuse i2c-cuse gpio-sim uart-pty; do
+              echo "::group::$variant / $adapter"
+              build_dir="$RUNNER_TEMP/build-$variant-$adapter"
+              cmake -S "adapters/$adapter" -B "$build_dir" \
+                -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_C_FLAGS="$flags" \
+                -DCMAKE_EXE_LINKER_FLAGS="$flags"
+              cmake --build "$build_dir" --parallel
+              ctest --test-dir "$build_dir" --output-on-failure
+              echo "::endgroup::"
+            done
           done
-
-  examples:
-    name: Embedded C examples
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - name: Build example applications
         run: |
           set -eu
@@ -112,6 +112,6 @@ jobs:
     name: Device ABI integration (disabled)
     if: false
     runs-on: ubuntu-latest
-    needs: [rust, native-adapters]
+    needs: [rust, native-and-examples]
     steps:
       - run: echo "TODO - see comment above"

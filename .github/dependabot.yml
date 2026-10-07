@@ -4,11 +4,31 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      cargo-dependencies:
+        patterns:
+          - "*"
+
   - package-ecosystem: npm
     directory: /apps/vds-web
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      web-dependencies:
+        patterns:
+          - "*"
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      actions-dependencies:
+        patterns:
+          - "*"
+    # CodeQL is manual-only while code scanning is unavailable on this private repo.
+    ignore:
+      - dependency-name: github/codeql-action
