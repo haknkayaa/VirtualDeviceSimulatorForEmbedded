@@ -10,6 +10,7 @@ const AdaptersPage = lazy(() => import('./features/adapters/AdaptersPage').then(
 const TransactionsPage = lazy(() => import('./features/transactions/TransactionsPage').then((module) => ({ default: module.TransactionsPage })))
 const DeviceLibraryPage = lazy(() => import('./features/device-library/DeviceLibraryPage').then((module) => ({ default: module.DeviceLibraryPage })))
 const LogsPage = lazy(() => import('./features/logs/LogsPage').then((module) => ({ default: module.LogsPage })))
+const WaveformPage = lazy(() => import('./features/waveform/WaveformPage').then((module) => ({ default: module.WaveformPage })))
 const ScenarioFlowEditorPage = lazy(() => import('./features/devices/scenario-flows/routes/ScenarioFlowEditorPage').then((module) => ({ default: module.ScenarioFlowEditorPage })))
 const DeviceBehaviorEditorPage = lazy(() => import('./features/devices/behavior/routes/DeviceBehaviorEditorPage').then((module) => ({ default: module.DeviceBehaviorEditorPage })))
 
@@ -29,6 +30,7 @@ export function App() {
           <Route element={<DeviceBehaviorEditorPage />} path="devices/:deviceId/flows/:flowId" />
           <Route element={<AdaptersPage />} path="adapters" />
           <Route element={<TransactionsPage />} path="transactions" />
+          <Route element={<WaveformPage />} path="waveform" />
           <Route element={<DeviceLibraryPage />} path="device-library" />
           <Route element={<LogsPage />} path="logs" />
           <Route element={<Navigate replace to="/" />} path="*" />

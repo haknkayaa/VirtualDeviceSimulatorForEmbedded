@@ -5,6 +5,7 @@ members = [
     "crates/vds-core",
     "crates/vds-device-model",
     "crates/vds-events",
+    "crates/vds-importer",
     "crates/vds-protocol",
     "crates/vds-registers",
     "crates/vds-scenario",
