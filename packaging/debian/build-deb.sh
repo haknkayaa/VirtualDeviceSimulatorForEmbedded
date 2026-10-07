@@ -45,6 +45,8 @@ install -D -m 0644 \
   "$PACKAGE_ROOT/etc/vds4e/vds-server.yaml"
 install -D -m 0644 "$ROOT_DIR/config/topology.example.yaml" \
   "$PACKAGE_ROOT/usr/share/vds4e/topology.example.yaml"
+install -D -m 0644 "$ROOT_DIR/packaging/debian/vds4e.service" \
+  "$PACKAGE_ROOT/lib/systemd/system/vds4e.service"
 
 install -D -m 0644 "$ROOT_DIR/README.md" \
   "$PACKAGE_ROOT/usr/share/doc/vds4e/README.md"
@@ -55,7 +57,7 @@ install -D -m 0644 "$ROOT_DIR/LICENSE" \
 
 printf '%s\n' '/etc/vds4e/vds-server.yaml' > "$DEBIAN_DIR/conffiles"
 
-INSTALLED_SIZE="$(du -sk "$PACKAGE_ROOT/usr" "$PACKAGE_ROOT/etc" | awk '{sum += $1} END {print sum}')"
+INSTALLED_SIZE="$(du -sk "$PACKAGE_ROOT/usr" "$PACKAGE_ROOT/etc" "$PACKAGE_ROOT/lib" | awk '{sum += $1} END {print sum}')"
 cat > "$DEBIAN_DIR/control" <<EOF
 Package: $PACKAGE
 Version: $VERSION
@@ -75,7 +77,37 @@ Description: Virtual Device Simulator for Embedded Linux
  bundled device models, and example tools.
 EOF
 
-find "$PACKAGE_ROOT/usr" "$PACKAGE_ROOT/etc" -type f -print0 \
+cat > "$DEBIAN_DIR/postinst" <<'EOF'
+#!/bin/sh
+set -e
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl daemon-reload >/dev/null 2>&1 || true
+fi
+exit 0
+EOF
+
+cat > "$DEBIAN_DIR/prerm" <<'EOF'
+#!/bin/sh
+set -e
+if [ "$1" = "remove" ] && command -v systemctl >/dev/null 2>&1; then
+  systemctl stop vds4e.service >/dev/null 2>&1 || true
+  systemctl disable vds4e.service >/dev/null 2>&1 || true
+fi
+exit 0
+EOF
+
+cat > "$DEBIAN_DIR/postrm" <<'EOF'
+#!/bin/sh
+set -e
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl daemon-reload >/dev/null 2>&1 || true
+fi
+exit 0
+EOF
+
+chmod 0755 "$DEBIAN_DIR/postinst" "$DEBIAN_DIR/prerm" "$DEBIAN_DIR/postrm"
+
+find "$PACKAGE_ROOT/usr" "$PACKAGE_ROOT/etc" "$PACKAGE_ROOT/lib" -type f -print0 \
   | sort -z \
   | xargs -0 md5sum \
   | sed "s#  $PACKAGE_ROOT/#  #" \

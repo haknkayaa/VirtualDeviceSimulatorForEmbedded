@@ -70,13 +70,18 @@ asset, install it with:
 
 ```shell
 sudo apt install ./vds4e_<version>_amd64.deb
-vds-server --config /etc/vds4e/vds-server.yaml --check-config
+vds4e --check-config
+vds4e
 ```
 
 The package includes the server, CLI, host adapters, Web UI, schemas, bundled
 device models, and example tools. It does not automatically load `cuse` or
 `gpio-sim`; kernel-backed adapters still need the host modules and the same
 privileges described above.
+
+The packaged server serves the built Web UI at `http://127.0.0.1:8080/`.
+A systemd unit is also installed; enable it explicitly with
+`sudo systemctl enable --now vds4e` if a background service is preferred.
 
 Each release also publishes a matching `.deb.sha256` file. Verify it with:
 

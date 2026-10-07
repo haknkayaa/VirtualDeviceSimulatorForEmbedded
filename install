@@ -63,6 +63,8 @@ install_file 0755 "$ROOT_DIR/build/rust/release/vds-server" \
   "$INSTALL_ROOT/bin/vds-server"
 install_file 0755 "$ROOT_DIR/build/rust/release/vds-cli" \
   "$INSTALL_ROOT/bin/vds-cli"
+install_file 0755 "$ROOT_DIR/packaging/vds4e" \
+  "$INSTALL_ROOT/bin/vds4e"
 install_file 0755 "$ADAPTER_BUILD_DIR/spi-cuse/vds4e-spi-cuse" \
   "$INSTALL_ROOT/bin/vds4e-spi-cuse"
 install_file 0755 "$ADAPTER_BUILD_DIR/i2c-cuse/vds4e-i2c-cuse" \

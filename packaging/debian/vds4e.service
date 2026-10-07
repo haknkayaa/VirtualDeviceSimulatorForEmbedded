@@ -1,0 +1,17 @@
+[Unit]
+Description=VDS4E Virtual Device Simulator for Embedded Linux
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/vds-server --config /etc/vds4e/vds-server.yaml
+Environment=HOME=/var/lib/vds4e
+Environment=VDS4E_WEB_ROOT=/usr/share/vds4e/web
+StateDirectory=vds4e
+WorkingDirectory=/var/lib/vds4e
+Restart=on-failure
+RestartSec=2
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

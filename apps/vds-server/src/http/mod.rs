@@ -29,18 +29,19 @@ use events::events;
 use std::{
     collections::HashMap,
     fs,
-    path::{Component, PathBuf},
+    path::{Component, Path as FsPath, PathBuf},
     sync::{Arc, RwLock},
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use axum::{
     Json, Router,
+    body::Body,
     extract::{
         DefaultBodyLimit, Path, Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
-    http::{StatusCode, header},
+    http::{StatusCode, Uri, header},
     response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
@@ -77,6 +78,7 @@ pub struct ApiState {
     device_template_instances: Arc<RwLock<HashMap<String, String>>>,
     clock: Arc<dyn SimulatorClock>,
     host_telemetry: Arc<std::sync::Mutex<host_telemetry::HostTelemetrySampler>>,
+    web_root: Option<PathBuf>,
 }
 
 impl ApiState {
@@ -176,6 +178,7 @@ impl ApiState {
             host_telemetry: Arc::new(std::sync::Mutex::new(
                 host_telemetry::HostTelemetrySampler::new(),
             )),
+            web_root: discover_web_root(),
         })
     }
 }
@@ -228,7 +231,101 @@ pub fn router(state: ApiState) -> Router {
         .route("/api/v1/faults/{id}/disable", post(disable_fault))
         .route("/api/v1/telemetry/buses", get(telemetry::bus_telemetry))
         .route("/api/v1/events", get(events))
+        .fallback(serve_web)
         .with_state(state)
+}
+
+fn discover_web_root() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("VDS4E_WEB_ROOT").map(PathBuf::from) {
+        return path.join("index.html").is_file().then_some(path);
+    }
+    [
+        PathBuf::from("build/web"),
+        PathBuf::from("/usr/local/share/vds4e/web"),
+        PathBuf::from("/usr/share/vds4e/web"),
+    ]
+    .into_iter()
+    .find(|path| path.join("index.html").is_file())
+}
+
+async fn serve_web(State(state): State<ApiState>, uri: Uri) -> Response {
+    if uri.path() == "/api" || uri.path().starts_with("/api/") {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let Some(root) = state.web_root.as_ref() else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let Some(relative) = safe_web_path(uri.path()) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+
+    let requested = root.join(&relative);
+    let selected = if relative.as_os_str().is_empty() {
+        root.join("index.html")
+    } else if tokio::fs::metadata(&requested)
+        .await
+        .is_ok_and(|metadata| metadata.is_file())
+    {
+        requested
+    } else if relative.extension().is_none() {
+        root.join("index.html")
+    } else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+
+    match tokio::fs::read(&selected).await {
+        Ok(bytes) => {
+            let cache_control = if uri.path().starts_with("/assets/") {
+                "public, max-age=31536000, immutable"
+            } else {
+                "no-cache"
+            };
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, web_content_type(&selected))
+                .header(header::CACHE_CONTROL, cache_control)
+                .body(Body::from(bytes))
+                .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            StatusCode::NOT_FOUND.into_response()
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
+fn safe_web_path(path: &str) -> Option<PathBuf> {
+    let trimmed = path.trim_start_matches('/');
+    if trimmed.is_empty() {
+        return Some(PathBuf::new());
+    }
+    let path = PathBuf::from(trimmed);
+    path.components()
+        .all(|component| matches!(component, Component::Normal(_)))
+        .then_some(path)
+}
+
+fn web_content_type(path: &FsPath) -> &'static str {
+    match path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("html") => "text/html; charset=utf-8",
+        Some("css") => "text/css; charset=utf-8",
+        Some("js" | "mjs") => "text/javascript; charset=utf-8",
+        Some("json" | "map") => "application/json; charset=utf-8",
+        Some("svg") => "image/svg+xml",
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
+        Some("gif") => "image/gif",
+        Some("ico") => "image/x-icon",
+        Some("woff") => "font/woff",
+        Some("woff2") => "font/woff2",
+        _ => "application/octet-stream",
+    }
 }
 
 #[derive(Serialize)]
@@ -363,5 +460,28 @@ impl IntoResponse for ApiError {
             }),
         )
             .into_response()
+    }
+}
+
+
+#[cfg(test)]
+mod web_asset_tests {
+    use super::{safe_web_path, web_content_type};
+    use std::path::Path;
+
+    #[test]
+    fn web_paths_reject_parent_traversal() {
+        assert!(safe_web_path("/assets/app.js").is_some());
+        assert!(safe_web_path("/devices/example").is_some());
+        assert!(safe_web_path("/../etc/passwd").is_none());
+        assert!(safe_web_path("/assets/../secret").is_none());
+    }
+
+    #[test]
+    fn web_content_types_cover_vite_assets() {
+        assert_eq!(web_content_type(Path::new("index.html")), "text/html; charset=utf-8");
+        assert_eq!(web_content_type(Path::new("assets/app.js")), "text/javascript; charset=utf-8");
+        assert_eq!(web_content_type(Path::new("assets/app.css")), "text/css; charset=utf-8");
+        assert_eq!(web_content_type(Path::new("assets/logo.svg")), "image/svg+xml");
     }
 }
