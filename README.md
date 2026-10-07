@@ -74,24 +74,35 @@ Tagged releases publish an `amd64` Debian package and SHA-256 checksum.
 Download the package from [GitHub Releases](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/releases), then install it:
 
 ```shell
-sudo apt install ./vds4e_0.1.0_amd64.deb
+sudo apt install ./vds4e_0.1.1_amd64.deb
 ```
 
 Validate the installed configuration:
 
 ```shell
-vds-server --config /etc/vds4e/vds-server.yaml --check-config
+vds4e --check-config
 ```
 
-Start the runtime:
+Start VDS4E:
 
 ```shell
-vds-server --config /etc/vds4e/vds-server.yaml
+vds4e
 ```
+
+Then open `http://127.0.0.1:8080/`. The same process serves the Web UI,
+REST API, WebSocket event stream, and Unix-socket transaction data plane.
+
+To run it as a system service instead:
+
+```shell
+sudo systemctl enable --now vds4e
+```
+
+The package installs the unit but does not enable or start it automatically.
 
 The package installs:
 
-- `vds-server` and `vds-cli`
+- `vds4e`, `vds-server` and `vds-cli`
 - SPI, I²C, GPIO and UART host adapters
 - the built Web UI assets
 - schemas and bundled example device models
