@@ -172,7 +172,7 @@ Start a configured scenario:
 
 ```shell
 curl -sS -X POST \
-  'http://127.0.0.1:8080/api/v1/scenarios/read-jedec-id/run?revision=1' | jq
+  'http://127.0.0.1:8080/api/v1/scenarios/mt25ql256-read-jedec-id/run?revision=1' | jq
 ```
 
 The run endpoint can also accept a scenario JSON document in the request body.
