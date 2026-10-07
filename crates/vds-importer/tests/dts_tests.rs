@@ -144,3 +144,34 @@ fn merges_dts_stub_with_svd_registers_and_validates() {
     assert_eq!(validated.device.registers.len(), 1);
     assert_eq!(validated.device.registers[0].name, "CONV_RES");
 }
+
+#[test]
+fn keeps_the_same_part_on_two_buses_as_two_devices() {
+    let board = import_dts(
+        r#"
+/dts-v1/;
+&i2c1 {
+    status = "okay";
+    bme280@76 { compatible = "bosch,bme280"; reg = <0x76>; };
+};
+&i2c1 {
+    bme280@76 { compatible = "bosch,bme280"; reg = <0x76>; };
+};
+&i2c2 {
+    status = "okay";
+    bme280@76 { compatible = "bosch,bme280"; reg = <0x76>; };
+};
+"#,
+    )
+    .expect("importing DTS succeeds");
+    let devices = board
+        .devices
+        .iter()
+        .map(|device| (device.id.as_str(), device.bus_name.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        devices,
+        [("bme280-76", "i2c1"), ("i2c2-bme280-76", "i2c2")],
+        "a repeated node on one bus is one device; another bus is another device"
+    );
+}

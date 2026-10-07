@@ -1636,6 +1636,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "vds-core",
+ "vds-importer",
  "vds-protocol",
  "vds-scenario",
  "vds-server",

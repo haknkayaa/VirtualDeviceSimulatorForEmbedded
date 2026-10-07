@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   faults were exercised. Shown in the JSON result, as `vds4e.coverage.*` JUnit
   properties, as a CLI summary on standard error, and in the Visual Scenario
   Editor's result panel.
+- `vds-cli import dts SOURCE --output DIR` drafts a loadable device package per
+  enabled SPI, I2C and GPIO Device Tree peripheral and writes a `board.md` summary
+  with endpoints, interrupts, skipped nodes and the `device_packages` entries.
 
 ### Changed
 - The Web UI Overview shows the live device path from the application under
@@ -30,6 +33,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Failures only" filter.
 - Web UI visual system: navy surfaces, a larger type scale and sentence-case
   headings instead of uppercase labels.
+
+### Fixed
+- The Device Tree importer no longer drops the second of two identical parts
+  on different buses; the second gets a bus-prefixed ID.
 
 ## [0.1.2] - 2026-10-07
 
