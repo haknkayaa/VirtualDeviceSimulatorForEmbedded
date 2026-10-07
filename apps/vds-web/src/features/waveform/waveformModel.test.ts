@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LiveTransaction } from '../transactions/transactionModel'
-import { formatFrequency } from './TimingCursors'
+import { formatFrequency } from './frequency'
 import { exportToCsv, exportToJson, exportToVcd } from './waveformExport'
 import { synthesizeWaveforms } from './waveformSynthesizer'
 
@@ -129,8 +129,8 @@ describe('waveformExport', () => {
 
   it('generates CSV export with timestamps and decoded labels', () => {
     const txn = createTxn('i2c', [0x50], [0x12])
-    const { channels, allPackets } = synthesizeWaveforms([txn])
-    const csv = exportToCsv(channels, allPackets)
+    const { channels } = synthesizeWaveforms([txn])
+    const csv = exportToCsv(channels)
 
     expect(csv).toContain('Timestamp_ns,Bus,Device,Channel,Signal_State,Decoded_Label,Decoded_Detail')
     expect(csv).toContain('I2C')

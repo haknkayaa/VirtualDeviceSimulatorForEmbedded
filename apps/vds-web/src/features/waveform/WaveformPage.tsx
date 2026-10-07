@@ -1,11 +1,9 @@
 import {
   Activity,
   Circle,
-  Clock,
   Download,
   FileCode,
   FileSpreadsheet,
-  FileText,
   Pause,
   RotateCcw,
   SlidersHorizontal,
@@ -14,16 +12,15 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
-import { useAdapters, useDevices } from '../../api/queries'
+import { useDevices } from '../../api/queries'
 import { AsyncState } from '../../components/AsyncState'
 import { GlassPanel } from '../../components/GlassPanel'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useEventStore } from '../../stores/eventStore'
 import { formatVirtualTime } from '../../utils/format'
-import { buildLiveTransactions, type LiveTransaction } from '../transactions/transactionModel'
+import { buildLiveTransactions } from '../transactions/transactionModel'
 import { ChannelList } from './ChannelList'
-import { formatFrequency } from './TimingCursors'
-import type { WaveformChannel } from './types'
+import { formatFrequency } from './frequency'
 import { downloadFile, exportToCsv, exportToJson, exportToVcd } from './waveformExport'
 import { synthesizeWaveforms } from './waveformSynthesizer'
 import { WaveformTimeline } from './WaveformTimeline'
@@ -35,7 +32,6 @@ export function WaveformPage() {
   const initialDevice = searchParams.get('device') ?? 'all'
 
   const devices = useDevices()
-  const adapters = useAdapters()
   const connectionStatus = useEventStore((state) => state.connectionStatus)
   const events = useEventStore((state) => state.events)
   const lastEventId = useEventStore((state) => state.lastEventId)
@@ -139,7 +135,7 @@ export function WaveformPage() {
   }
 
   const handleExportCsv = () => {
-    const csv = exportToCsv(channels, allPackets)
+    const csv = exportToCsv(channels)
     downloadFile(csv, `vds4e-waveform-${Date.now()}.csv`, 'text/csv')
   }
 
