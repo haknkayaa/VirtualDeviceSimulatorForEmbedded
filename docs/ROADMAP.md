@@ -67,6 +67,9 @@ responsibilities of the VDS4E device runtime.
 ### Platform import and generation
 
 - Import Device Tree sources and overlays into a reviewable topology draft.
+  (`vds-cli import dts` already drafts loadable device packages per
+  peripheral; interrupt and GPIO connections are not yet turned into
+  `topology.yaml`.)
 - Generate a virtual-board draft from DTS connectivity, addresses, interrupts,
   and compatible strings without claiming unsupported device behavior.
 - Import relevant Yocto machine and distribution metadata. `SDKMACHINE=x86_64`

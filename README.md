@@ -237,6 +237,19 @@ The `vds-importer` crate can draft declarative models from:
 
 Importer output is intentionally a starting point rather than a finished behavioral model. Device-specific semantics still need to be reviewed and completed by the model author.
 
+Draft one device package per enabled SPI, I2C and GPIO peripheral of a board's Device Tree:
+
+```shell
+vds-cli import dts board.dts --output drafts/
+```
+
+Every draft is loaded the way the server loads packages before the command
+succeeds. `drafts/board.md` lists each package with its bus controller,
+endpoint (SPI chip select or I2C address), compatible strings and interrupts,
+the nodes that were skipped (disabled, or a bus without a VDS4E runtime), and
+the `device_packages` entries to add to `vds-server.yaml`. Pass
+`--include-disabled` to draft `status = "disabled"` nodes too.
+
 ## What VDS4E does not simulate
 
 VDS4E provides functional peripheral simulation. It does not currently model:
