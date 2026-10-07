@@ -119,7 +119,7 @@ fn merges_dts_stub_with_svd_registers_and_validates() {
         .find(|d| d.id.starts_with("ad7991"))
         .unwrap();
 
-    let svd_content = r#"
+    let svd_content = r"
       <peripheral>
         <name>AD7991</name>
         <baseAddress>0x28</baseAddress>
@@ -133,7 +133,7 @@ fn merges_dts_stub_with_svd_registers_and_validates() {
           </register>
         </registers>
       </peripheral>
-    "#;
+    ";
 
     let svd = SvdPeripheral::from_xml(svd_content).expect("SVD XML");
     let merged = merge_stub_and_svd(ad7991_stub, &svd).expect("merges stub and svd");

@@ -534,29 +534,23 @@ fn parse_bit_range(node: &XmlElement) -> Result<(u8, u8)> {
     }
 
     // Format 2: <bitRange>[msb:lsb]</bitRange>
-    if let Some(range_str) = node.child_text("bitRange") {
-        if let Some(clean) = range_str
+    if let Some(range_str) = node.child_text("bitRange")
+        && let Some(clean) = range_str
             .trim()
             .strip_prefix('[')
             .and_then(|s| s.strip_suffix(']'))
-        {
-            if let Some((msb_str, lsb_str)) = clean.split_once(':') {
-                if let (Ok(msb), Ok(lsb)) =
-                    (msb_str.trim().parse::<u8>(), lsb_str.trim().parse::<u8>())
-                {
-                    if msb >= lsb {
-                        return Ok((lsb, msb - lsb + 1));
-                    }
-                }
-            }
-        }
+        && let Some((msb_str, lsb_str)) = clean.split_once(':')
+        && let (Ok(msb), Ok(lsb)) = (msb_str.trim().parse::<u8>(), lsb_str.trim().parse::<u8>())
+        && msb >= lsb
+    {
+        return Ok((lsb, msb - lsb + 1));
     }
 
     // Format 3: <lsb> and <msb>
-    if let (Some(lsb), Some(msb)) = (node.parse_child_u8("lsb")?, node.parse_child_u8("msb")?) {
-        if msb >= lsb {
-            return Ok((lsb, msb - lsb + 1));
-        }
+    if let (Some(lsb), Some(msb)) = (node.parse_child_u8("lsb")?, node.parse_child_u8("msb")?)
+        && msb >= lsb
+    {
+        return Ok((lsb, msb - lsb + 1));
     }
 
     Err(ImporterError::InvalidSvd(format!(
@@ -580,14 +574,12 @@ fn parse_dim_indices(raw: Option<&str>, dim: u64) -> Vec<String> {
         if s.contains(',') {
             return s.split(',').map(|p| p.trim().to_string()).collect();
         }
-        if let Some((start_s, end_s)) = s.split_once('-') {
-            if let (Ok(start), Ok(end)) =
+        if let Some((start_s, end_s)) = s.split_once('-')
+            && let (Ok(start), Ok(end)) =
                 (start_s.trim().parse::<u64>(), end_s.trim().parse::<u64>())
-            {
-                if end >= start {
-                    return (start..=end).map(|i| i.to_string()).collect();
-                }
-            }
+            && end >= start
+        {
+            return (start..=end).map(|i| i.to_string()).collect();
         }
     }
     (0..dim).map(|i| i.to_string()).collect()
@@ -596,15 +588,15 @@ fn parse_dim_indices(raw: Option<&str>, dim: u64) -> Vec<String> {
 fn resolve_derived_peripherals(peripherals: &mut [SvdPeripheral]) {
     let count = peripherals.len();
     for i in 0..count {
-        if let Some(base_name) = peripherals[i].derived_from.as_deref() {
-            if peripherals[i].registers.is_empty() {
-                let base_regs = peripherals
-                    .iter()
-                    .find(|p| p.name == base_name)
-                    .map(|p| p.registers.clone());
-                if let Some(regs) = base_regs {
-                    peripherals[i].registers = regs;
-                }
+        if let Some(base_name) = peripherals[i].derived_from.as_deref()
+            && peripherals[i].registers.is_empty()
+        {
+            let base_regs = peripherals
+                .iter()
+                .find(|p| p.name == base_name)
+                .map(|p| p.registers.clone());
+            if let Some(regs) = base_regs {
+                peripherals[i].registers = regs;
             }
         }
     }

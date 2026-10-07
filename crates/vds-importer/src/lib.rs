@@ -86,7 +86,7 @@ mod tests {
             };
         "#;
 
-        let svd = r#"
+        let svd = r"
             <peripheral>
                 <name>BME280</name>
                 <baseAddress>0x76</baseAddress>
@@ -100,7 +100,7 @@ mod tests {
                     </register>
                 </registers>
             </peripheral>
-        "#;
+        ";
 
         let board = import_dts(dts).expect("DTS import succeeds");
         assert_eq!(board.devices.len(), 1);

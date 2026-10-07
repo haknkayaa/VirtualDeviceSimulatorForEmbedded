@@ -168,7 +168,7 @@ fn parses_comprehensive_svd_with_arrays_and_bitfield_formats() {
 
 #[test]
 fn converts_svd_to_schema_valid_device_model() {
-    let raw_periph = r#"
+    let raw_periph = r"
       <peripheral>
         <name>AD7991</name>
         <description>Analog Devices 4-channel 12-bit ADC</description>
@@ -192,7 +192,7 @@ fn converts_svd_to_schema_valid_device_model() {
           </register>
         </registers>
       </peripheral>
-    "#;
+    ";
 
     let periph = SvdPeripheral::from_xml(raw_periph).expect("SVD snippet");
     let model = periph.to_device_model("i2c").expect("generates model");

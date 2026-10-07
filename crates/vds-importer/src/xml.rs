@@ -371,38 +371,38 @@ fn unescape_xml(raw: &str) -> String {
     let bytes = raw.as_bytes();
 
     while i < bytes.len() {
-        if bytes[i] == b'&' {
-            if let Some(end_rel) = raw[i..].find(';') {
-                let entity = &raw[i + 1..i + end_rel];
-                match entity {
-                    "lt" => out.push('<'),
-                    "gt" => out.push('>'),
-                    "amp" => out.push('&'),
-                    "apos" => out.push('\''),
-                    "quot" => out.push('"'),
-                    _ if entity.starts_with("#x") || entity.starts_with("#X") => {
-                        if let Ok(cp) = u32::from_str_radix(&entity[2..], 16) {
-                            if let Some(ch) = char::from_u32(cp) {
-                                out.push(ch);
-                            }
-                        }
-                    }
-                    _ if entity.starts_with('#') => {
-                        if let Ok(cp) = entity[1..].parse::<u32>() {
-                            if let Some(ch) = char::from_u32(cp) {
-                                out.push(ch);
-                            }
-                        }
-                    }
-                    _ => {
-                        out.push('&');
-                        out.push_str(entity);
-                        out.push(';');
+        if bytes[i] == b'&'
+            && let Some(end_rel) = raw[i..].find(';')
+        {
+            let entity = &raw[i + 1..i + end_rel];
+            match entity {
+                "lt" => out.push('<'),
+                "gt" => out.push('>'),
+                "amp" => out.push('&'),
+                "apos" => out.push('\''),
+                "quot" => out.push('"'),
+                _ if entity.starts_with("#x") || entity.starts_with("#X") => {
+                    if let Ok(cp) = u32::from_str_radix(&entity[2..], 16)
+                        && let Some(ch) = char::from_u32(cp)
+                    {
+                        out.push(ch);
                     }
                 }
-                i += end_rel + 1;
-                continue;
+                _ if entity.starts_with('#') => {
+                    if let Ok(cp) = entity[1..].parse::<u32>()
+                        && let Some(ch) = char::from_u32(cp)
+                    {
+                        out.push(ch);
+                    }
+                }
+                _ => {
+                    out.push('&');
+                    out.push_str(entity);
+                    out.push(';');
+                }
             }
+            i += end_rel + 1;
+            continue;
         }
         out.push(raw[i..].chars().next().unwrap());
         i += raw[i..].chars().next().unwrap().len_utf8();

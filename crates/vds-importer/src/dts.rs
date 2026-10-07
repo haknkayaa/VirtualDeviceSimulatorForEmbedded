@@ -474,23 +474,23 @@ fn extract_topology(
             next_bus = target_name;
             is_new_bus = true;
         }
-    } else if current_bus.is_empty() || node.properties.contains_key("gpio-controller") {
-        if let Some(bt) = detect_bus_type(node) {
-            let bus_id = bus_name_for_node(node, bt);
-            if !buses.iter().any(|b| b.name == bus_id) {
-                let mut props = BTreeMap::new();
-                for (k, v) in &node.properties {
-                    props.insert(k.clone(), format_dts_value(v));
-                }
-                buses.push(VirtualBusDraft {
-                    name: bus_id.clone(),
-                    bus_type: bt,
-                    properties: props,
-                });
+    } else if (current_bus.is_empty() || node.properties.contains_key("gpio-controller"))
+        && let Some(bt) = detect_bus_type(node)
+    {
+        let bus_id = bus_name_for_node(node, bt);
+        if !buses.iter().any(|b| b.name == bus_id) {
+            let mut props = BTreeMap::new();
+            for (k, v) in &node.properties {
+                props.insert(k.clone(), format_dts_value(v));
             }
-            next_bus = bus_id;
-            is_new_bus = true;
+            buses.push(VirtualBusDraft {
+                name: bus_id.clone(),
+                bus_type: bt,
+                properties: props,
+            });
         }
+        next_bus = bus_id;
+        is_new_bus = true;
     }
 
     // If current node is inside a detected bus and has 'compatible' or 'reg', treat as peripheral
@@ -505,13 +505,11 @@ fn extract_topology(
             || node.name.starts_with('&')
             || node.name.starts_with("fragment@");
 
-        if !is_bus_controller {
-            if let Some(parent_bus) = buses.iter().find(|b| b.name == next_bus) {
-                let peripheral_bus_type = parent_bus.bus_type;
-                let stub = build_device_stub(node, peripheral_bus_type, &next_bus);
-                if !devices.iter().any(|d| d.id == stub.id) {
-                    devices.push(stub);
-                }
+        if !is_bus_controller && let Some(parent_bus) = buses.iter().find(|b| b.name == next_bus) {
+            let peripheral_bus_type = parent_bus.bus_type;
+            let stub = build_device_stub(node, peripheral_bus_type, &next_bus);
+            if !devices.iter().any(|d| d.id == stub.id) {
+                devices.push(stub);
             }
         }
     }
