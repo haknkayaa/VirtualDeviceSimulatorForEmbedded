@@ -45,7 +45,9 @@ export function useEventStream() {
           invalidateDevices = true
           stateDevices.add(deviceId)
         }
-        if (deviceId && ['register_read', 'register_write', 'device_reset'].includes(event.event_type)) {
+        // A delivered signal drives a GPIO line register without a register_write event.
+        const signalDelivered = event.payload.kind === 'signal_changed' && event.payload.phase === 'delivered'
+        if (deviceId && (signalDelivered || ['register_read', 'register_write', 'device_reset'].includes(event.event_type))) {
           registerDevices.add(deviceId)
         }
         if (event.event_type === 'scenario_step_completed' || event.event_type === 'scenario_completed') {

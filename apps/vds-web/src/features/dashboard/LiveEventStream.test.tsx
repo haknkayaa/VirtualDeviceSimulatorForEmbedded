@@ -36,6 +36,21 @@ const events: DomainEvent[] = [
       error_code: 'fault_timeout',
     },
   },
+  {
+    event_id: 44,
+    event_type: 'signal_changed',
+    timestamp_virtual_ns: 7_000_000,
+    timestamp_wall_ns: 0,
+    device_id: 'generic-gpio-bank-32',
+    payload: {
+      kind: 'signal_changed',
+      phase: 'delivered',
+      source: 'spi-sensor-drdy.drdy',
+      target: 'generic-gpio-bank-32.GPIO16',
+      value: true,
+      delay_ns: 500_000,
+    },
+  },
 ]
 
 describe('dashboard live event stream', () => {
@@ -51,6 +66,9 @@ describe('dashboard live event stream', () => {
     expect(screen.getByText('5.000 ms')).toBeInTheDocument()
     expect(screen.getByText('read-timeout · timeout')).toBeInTheDocument()
     expect(screen.getByText('fault_timeout')).toBeInTheDocument()
+    expect(
+      screen.getByText('spi-sensor-drdy.drdy → generic-gpio-bank-32.GPIO16 = high · delivered (+500.000 µs)'),
+    ).toBeInTheDocument()
   })
 
   it('opens the existing event detail selection path', () => {

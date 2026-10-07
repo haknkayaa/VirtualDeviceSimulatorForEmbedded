@@ -61,6 +61,8 @@ function eventDetail(event: DomainEvent) {
       return `${payload.scenario_id} · ${payload.status}`
     case 'device_reset':
       return payload.result
+    case 'signal_changed':
+      return `${payload.source} → ${payload.target} = ${payload.value ? 'high' : 'low'} · ${payload.phase}${payload.delay_ns > 0 ? ` (+${formatVirtualTime(payload.delay_ns)})` : ''}`
   }
 }
 
