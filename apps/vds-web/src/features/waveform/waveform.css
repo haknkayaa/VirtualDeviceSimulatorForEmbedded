@@ -107,15 +107,16 @@
 /* Decoded packet table */
 .wfa-packets-panel > .panel-body { display: flex; flex-direction: column; overflow: hidden; }
 .wfa-packets-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
-.wfa-packets { table-layout: fixed; min-width: 820px; }
+.wfa-packets { table-layout: fixed; min-width: 900px; }
+.wfa-packets th, .wfa-packets td { padding-left: var(--space-2); padding-right: var(--space-2); }
 .wfa-packets td { height: 24px; overflow: hidden; text-overflow: ellipsis; }
 .wfa-col-time { width: 104px; }
 .wfa-col-dur { width: 84px; }
-.wfa-col-bus { width: 58px; }
+.wfa-col-bus { width: 68px; }
 .wfa-col-device { width: 180px; }
-.wfa-col-type { width: 78px; }
+.wfa-col-type { width: 96px; }
 .wfa-col-label { width: 22%; }
-.wfa-col-hex { width: 64px; }
+.wfa-col-hex { width: 76px; }
 .wfa-spacer td, .data-table tbody tr.wfa-spacer:hover td { padding: 0; background: none; border: 0; }
 .wfa-packet-device { color: var(--text-strong); }
 .wfa-packet-label { color: var(--text-strong) !important; }

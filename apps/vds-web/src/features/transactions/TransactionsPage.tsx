@@ -38,9 +38,10 @@ export function TransactionsPage() {
   const lastEventId = useEventStore((state) => state.lastEventId)
   const [searchParams, setSearchParams] = useSearchParams()
   const lockedId = searchParams.get('transaction')
-  const [busFilter, setBusFilter] = useState('all')
+  const [busFilter, setBusFilter] = useState(() => searchParams.get('bus')?.toLowerCase() ?? 'all')
   const [deviceFilter, setDeviceFilter] = useState('all')
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>('all')
+  const [failuresOnly, setFailuresOnly] = useState(() => searchParams.get('result') === 'failed')
   const [pausedAtEventId, setPausedAtEventId] = useState<number | null>(null)
   const [clearedThroughEventId, setClearedThroughEventId] = useState(0)
   const capturing = pausedAtEventId === null
@@ -62,9 +63,10 @@ export function TransactionsPage() {
       (transaction.busType.toLowerCase() !== 'gpio' || (transaction.gpioEdges?.length ?? 0) > 0) &&
       (busFilter === 'all' || transaction.busType.toLowerCase() === busFilter) &&
       (deviceFilter === 'all' || transaction.deviceId === deviceFilter) &&
-      (directionFilter === 'all' || transactionDirection(transaction) === directionFilter),
+      (directionFilter === 'all' || transactionDirection(transaction) === directionFilter) &&
+      (!failuresOnly || transaction.status === 'error'),
     ),
-    [busFilter, deviceFilter, directionFilter, transactions],
+    [busFilter, deviceFilter, directionFilter, failuresOnly, transactions],
   )
   const errorCount = useMemo(
     () => filteredTransactions.reduce((count, transaction) => count + (transaction.status === 'error' ? 1 : 0), 0),
@@ -158,6 +160,15 @@ export function TransactionsPage() {
             <option value="all">All devices</option>
             {devices.data?.map((device) => <option key={device.id} value={device.id}>{device.id}</option>)}
           </select>
+          <button
+            aria-pressed={failuresOnly}
+            className="button button-sm"
+            onClick={() => setFailuresOnly((current) => !current)}
+            title="Show only transactions that completed with an error"
+            type="button"
+          >
+            Failures only
+          </button>
         </div>
       </PageHeader>
 

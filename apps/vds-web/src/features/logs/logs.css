@@ -13,7 +13,7 @@
 }
 .logs-head {
   flex: 0 0 auto; height: 26px; color: var(--text-faint); background: var(--bg-1); border-bottom: 1px solid var(--border);
-  font-size: var(--fs-2xs); font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  font-size: var(--fs-xs); font-weight: 600;
 }
 .logs-head > span:first-child { text-align: right; }
 .logs-table-body { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; outline: none; }

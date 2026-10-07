@@ -16,8 +16,8 @@ interface VirtualEventListProps {
 const ROW_HEIGHT = 24
 
 /**
- * Virtualised variant of the shared EventTail: identical row markup and
- * classes, but only the visible rows are mounted so long histories stay cheap.
+ * Virtualised compact event list using the shared `.event-tail` row styles;
+ * only the visible rows are mounted so long histories stay cheap.
  */
 export function VirtualEventList({ events, showSource = true, 'aria-label': ariaLabel = 'Event stream' }: VirtualEventListProps) {
   const parentRef = useRef<HTMLDivElement>(null)

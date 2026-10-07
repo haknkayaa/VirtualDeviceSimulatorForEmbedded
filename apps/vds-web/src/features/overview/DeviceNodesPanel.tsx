@@ -1,5 +1,5 @@
-import { Network } from 'lucide-react'
-import { useMemo } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAdapters, useBusTelemetry, useDevices } from '../../api/queries'
@@ -8,36 +8,87 @@ import { BusTag } from '../../components/BusTag'
 import { Panel } from '../../components/Panel'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useEventStore } from '../../stores/eventStore'
-import { formatWallTime } from '../../utils/events'
+import type { Adapter } from '../../types/api'
 import { formatEndpoint } from '../../utils/endpoints'
-import { buildDeviceNodeRows } from './overviewModel'
+import { buildDeviceNodeRows, type DeviceNodeRow } from './overviewModel'
 
-function adapterTone(state: string) {
+function adapterTone(state: Adapter['state']) {
   if (state === 'loaded') return 'ok'
   if (state === 'error') return 'err'
   if (state === 'loading' || state === 'unloading') return 'warn'
-  return ''
+  return 'warn'
 }
 
-/** Linux device node → adapter → virtual device, with live bus counters. */
+function adapterStateLabel(adapter: Adapter) {
+  if (adapter.state === 'unloaded') return 'not loaded'
+  return adapter.state
+}
+
+function DeviceState({ state }: { state: string | null | undefined }) {
+  if (!state) return <span className="dim" title="The device model does not report a runtime state">—</span>
+  return <StatusBadge status={state} />
+}
+
+function NodeRow({ row, onOpen }: { row: DeviceNodeRow; onOpen: (row: DeviceNodeRow) => void }) {
+  const adapter = row.adapter
+  const loaded = adapter?.state === 'loaded'
+  const errors = row.telemetry?.errors.count ?? 0
+  return (
+    <tr className="clickable" onClick={() => onOpen(row)}>
+      <td>
+        <span className="node-cell">
+          <BusTag bus={adapter?.bus_type ?? row.device?.bus} />
+          {row.binding
+            ? <code className={loaded ? 'node-path' : 'node-path node-path-down'} title={loaded ? 'Open for applications' : 'Not open: the adapter is not loaded'}>{row.binding.device_path}</code>
+            : <span className="dim">no node</span>}
+          {row.binding && adapter && <span className="node-endpoint">{formatEndpoint(adapter.bus_type, row.binding.endpoint)}</span>}
+        </span>
+      </td>
+      <td>
+        {adapter
+          ? <span className="node-adapter"><i className={`status-dot ${adapterTone(adapter.state)}`} /><code>{adapter.id}</code><span className={loaded ? 'dim' : 'node-adapter-state'}>{adapterStateLabel(adapter)}</span></span>
+          : <span className="dim">not bound</span>}
+      </td>
+      <td>{row.deviceId ? <strong className="node-device">{row.device?.name ?? row.deviceId}</strong> : <span className="dim">no device attached</span>}</td>
+      <td>{row.deviceId ? <DeviceState state={row.device?.state} /> : null}</td>
+      <td className="num">
+        {row.telemetry ? `${row.telemetry.transactions_total} txns` : '—'}
+        {errors > 0 && <span className="text-err"> · {errors} err</span>}
+      </td>
+    </tr>
+  )
+}
+
+/** One row per Linux device node an application can open; unbound items fold below. */
 export function DeviceNodesPanel() {
   const navigate = useNavigate()
   const adapters = useAdapters()
   const devices = useDevices()
   const telemetry = useBusTelemetry()
   const events = useEventStore((state) => state.events)
+  const [showUnbound, setShowUnbound] = useState(false)
   const rows = useMemo(
     () => buildDeviceNodeRows(adapters.data, devices.data, telemetry.data?.buses, events),
     [adapters.data, devices.data, events, telemetry.data?.buses],
   )
-  const exposed = rows.filter((row) => row.binding && row.adapter?.state === 'loaded').length
+  const bound = rows.filter((row) => row.binding)
+  const unbound = rows.filter((row) => !row.binding)
+  const open = bound.filter((row) => row.adapter?.state === 'loaded').length
+  const unboundDevices = unbound.filter((row) => row.deviceId)
+  const emptyAdapters = unbound.filter((row) => !row.deviceId)
+  const openRow = (row: DeviceNodeRow) => navigate(row.deviceId
+    ? `/devices/${encodeURIComponent(row.deviceId)}`
+    : `/adapters?adapter=${encodeURIComponent(row.adapter?.id ?? '')}`)
+  const unboundSummary = [
+    unboundDevices.length ? `${unboundDevices.length} device${unboundDevices.length === 1 ? '' : 's'} not bound to an adapter` : '',
+    emptyAdapters.length ? `${emptyAdapters.length} adapter${emptyAdapters.length === 1 ? '' : 's'} without a device` : '',
+  ].filter(Boolean).join(' · ')
 
   return (
     <Panel
       className="overview-nodes"
       flush
-      icon={Network}
-      meta={adapters.data ? `${exposed} exposed · ${rows.filter((row) => row.binding).length} bound` : undefined}
+      meta={adapters.data ? `${open} open · ${bound.length} bound` : undefined}
       title="Device nodes"
     >
       {(adapters.isPending || devices.isPending) && <AsyncState kind="loading" title="Reading topology" />}
@@ -50,49 +101,25 @@ export function DeviceNodesPanel() {
           <thead>
             <tr>
               <th>Node</th>
-              <th>Bus</th>
               <th>Adapter</th>
-              <th>EP</th>
               <th>Device</th>
               <th>State</th>
-              <th className="num">Txns</th>
-              <th className="num">Err</th>
-              <th className="num">p95</th>
-              <th>Last seen</th>
+              <th className="num">Traffic</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
-              const loaded = row.adapter?.state === 'loaded'
-              const bus = row.adapter?.bus_type ?? row.device?.bus
-              const errors = row.telemetry?.errors.count ?? 0
-              return (
-                <tr
-                  className="clickable"
-                  key={row.key}
-                  onClick={() => navigate(row.deviceId ? `/devices/${encodeURIComponent(row.deviceId)}` : `/adapters?adapter=${encodeURIComponent(row.adapter?.id ?? '')}`)}
-                >
-                  <td>
-                    {row.binding
-                      ? <code className={loaded ? 'node-path' : 'node-path node-path-down'} title={loaded ? 'Exposed to applications' : 'Not exposed: adapter is not loaded'}>{row.binding.device_path}</code>
-                      : <span className="dim">—</span>}
-                  </td>
-                  <td><BusTag bus={bus} /></td>
-                  <td>
-                    {row.adapter
-                      ? <span className="node-adapter"><i className={`status-dot ${adapterTone(row.adapter.state)}`} /><code>{row.adapter.id}</code><span className="dim">{row.adapter.state}</span></span>
-                      : <span className="dim">unbound</span>}
-                  </td>
-                  <td className="mono">{row.binding && row.adapter ? formatEndpoint(row.adapter.bus_type, row.binding.endpoint) : '—'}</td>
-                  <td>{row.deviceId ? <strong className="node-device">{row.device?.name ?? row.deviceId}</strong> : <span className="dim">no device attached</span>}</td>
-                  <td>{row.deviceId ? <StatusBadge status={row.device?.state ?? 'unknown'} /> : null}</td>
-                  <td className="num">{row.telemetry?.transactions_total ?? '—'}</td>
-                  <td className={`num${errors ? ' text-err' : ''}`}>{row.telemetry ? errors : '—'}</td>
-                  <td className="num">{row.telemetry && row.telemetry.transactions_total > 0 ? `${row.telemetry.latency.wall_p95_us.toFixed(0)} µs` : '—'}</td>
-                  <td className="mono dim">{row.lastActivityWallNs ? formatWallTime(row.lastActivityWallNs) : '—'}</td>
-                </tr>
-              )
-            })}
+            {bound.map((row) => <NodeRow key={row.key} onOpen={openRow} row={row} />)}
+            {unbound.length > 0 && (
+              <tr className="group-row unbound-toggle">
+                <td colSpan={5}>
+                  <button aria-expanded={showUnbound} onClick={() => setShowUnbound((current) => !current)} type="button">
+                    {showUnbound ? <ChevronDown aria-hidden="true" size={14} /> : <ChevronRight aria-hidden="true" size={14} />}
+                    {unboundSummary}
+                  </button>
+                </td>
+              </tr>
+            )}
+            {showUnbound && unbound.map((row) => <NodeRow key={row.key} onOpen={openRow} row={row} />)}
           </tbody>
         </table>
       )}

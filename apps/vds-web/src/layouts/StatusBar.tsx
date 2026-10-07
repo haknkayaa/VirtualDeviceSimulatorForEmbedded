@@ -44,6 +44,24 @@ function StreamStatus() {
   )
 }
 
+function gigabytes(bytes: number) {
+  return (bytes / 1_000_000_000).toFixed(1)
+}
+
+function HostLoad() {
+  const health = useHealth()
+  const system = health.data?.system
+  if (system?.cpu_percent === undefined && system?.memory_used_bytes === undefined) return null
+  const memory = system.memory_used_bytes !== undefined && system.memory_total_bytes
+    ? `RAM ${gigabytes(system.memory_used_bytes)}/${gigabytes(system.memory_total_bytes)} GB`
+    : undefined
+  return (
+    <span className="statusbar-item statusbar-dim" title="Host load reported by vds-server">
+      <span className="mono">{[system.cpu_percent === undefined ? undefined : `CPU ${system.cpu_percent.toFixed(0)}%`, memory].filter(Boolean).join(' · ')}</span>
+    </span>
+  )
+}
+
 function ProblemCounter() {
   const { errors, warnings } = countProblems(useWorkspaceProblems())
   return (
@@ -62,6 +80,7 @@ export function StatusBar({ theme, onToggleTheme }: { theme: Theme; onToggleThem
       <VirtualClock />
       <ProblemCounter />
       <span className="statusbar-spacer" />
+      <HostLoad />
       <span className="statusbar-item statusbar-dim" title="Workspace environment">local simulator</span>
       <button
         aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
