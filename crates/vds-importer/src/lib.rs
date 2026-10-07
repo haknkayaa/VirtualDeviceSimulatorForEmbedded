@@ -10,6 +10,7 @@
 pub mod dts;
 pub mod error;
 pub mod svd;
+pub mod wiring;
 pub mod xml;
 
 use std::path::Path;
@@ -17,7 +18,11 @@ use std::path::Path;
 pub use dts::{BusType, DeviceStubDraft, DtsNode, DtsValue, VirtualBoardDraft, VirtualBusDraft};
 pub use error::{ImporterError, Result};
 pub use svd::{SvdDevice, SvdField, SvdPeripheral, SvdRegister};
-use vds_device_model::DeviceModel;
+pub use vds_device_model::DeviceModel;
+pub use wiring::{
+    DEFAULT_GPIO_LINES, GpioInterruptDraft, IRQ_REGISTER, IRQ_SIGNAL, add_interrupt_output,
+    interrupt_topology_yaml,
+};
 pub use xml::XmlElement;
 
 /// Parses a CMSIS-SVD document from an XML string.
@@ -50,6 +55,14 @@ pub fn import_dts(dts_source: &str) -> Result<VirtualBoardDraft> {
 /// Returns [`ImporterError`] on file I/O or parsing errors.
 pub fn import_dts_file(path: impl AsRef<Path>) -> Result<VirtualBoardDraft> {
     VirtualBoardDraft::from_file(path)
+}
+
+/// Serializes a device model as package `model/device.yaml` content.
+///
+/// # Errors
+/// Returns [`ImporterError`] on serialization failure.
+pub fn export_model_yaml(model: &DeviceModel) -> Result<String> {
+    serde_yaml::to_string(model).map_err(ImporterError::from)
 }
 
 /// Merges a Device Tree peripheral stub with register definitions from an SVD peripheral.

@@ -81,6 +81,15 @@ stream and shown in the Web UI event views. `phase: emitted` marks a source port
 change; `phase: delivered` marks the target GPIO line being driven (later than
 `emitted` when the connection has `delay_ns`).
 
+## Drafting a topology from a Device Tree
+
+`vds-cli import dts board.dts --output drafts/` writes `drafts/topology.yaml`
+for every peripheral whose `interrupt-parent` is a GPIO controller of the
+board. The peripheral draft gets an `irq` output bound to bit 0 of a
+placeholder `IRQ_STATE` register, and the controller becomes a GPIO bank draft
+whose interrupt lines are device-driven outputs. Replace the placeholder
+binding with the device's real interrupt condition.
+
 ## Inspecting connections
 
 `GET /api/v1/topology` returns the attached topology file and each connection

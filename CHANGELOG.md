@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `vds-cli import dts SOURCE --output DIR` drafts a loadable device package per
   enabled SPI, I2C and GPIO Device Tree peripheral and writes a `board.md` summary
   with endpoints, interrupts, skipped nodes and the `device_packages` entries.
+  Interrupts routed to a board GPIO controller become a GPIO bank draft and a
+  `topology.yaml` that wires the peripheral's `irq` output to that line.
 
 ### Changed
 - The Web UI Overview shows the live device path from the application under
