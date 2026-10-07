@@ -288,16 +288,38 @@ async fn serve(config: ServerConfig) -> Result<(), ServerError> {
     }
 }
 
+/// Interval of the live-server due-event pump.
+const SIGNAL_PUMP_INTERVAL: std::time::Duration = std::time::Duration::from_millis(2);
+
 /// Applies due device events on the live server so timer-driven signals reach
 /// their connections without waiting for another bus transaction.
+///
+/// Device schedulers are evaluated lazily, only inside that device's own
+/// transactions. A sensor that raises DRDY when a timer expires would otherwise
+/// stay silent until the next SPI/I2C access, which never comes while the
+/// application waits for the edge. The pump runs only when a topology is
+/// attached. Events it applies are logged exactly like transaction-path events.
 fn spawn_signal_pump(registry: Arc<DeviceRegistry>) {
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_millis(2));
+        let mut interval = tokio::time::interval(SIGNAL_PUMP_INTERVAL);
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        let mut failing = false;
         loop {
             interval.tick().await;
-            if let Err(error) = registry.run_due_events() {
-                warn!(component = "signals", %error, "signal pump failed");
+            match registry.run_due_events() {
+                Ok(events) => {
+                    failing = false;
+                    for (device_id, event) in events {
+                        log_device_events(&device_id, std::slice::from_ref(&event));
+                    }
+                }
+                Err(error) => {
+                    // Report a persistent failure once instead of every tick.
+                    if !failing {
+                        warn!(component = "signals", %error, "signal pump failed");
+                    }
+                    failing = true;
+                }
             }
         }
     });
