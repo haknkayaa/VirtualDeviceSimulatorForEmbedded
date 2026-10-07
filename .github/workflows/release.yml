@@ -2,8 +2,13 @@ name: Release Debian package
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
+    paths:
+      - ".github/release-version"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -40,17 +45,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
           workspace_version="$(awk -F'"' '/^\[workspace.package\]/{in_workspace=1; next} in_workspace && /^version = / {print $2; exit}' Cargo.toml)"
-          if [[ -z "$version" || "$version" == "$GITHUB_REF_NAME" ]]; then
-            echo "Release tag must have the form vX.Y.Z" >&2
-            exit 1
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            release_tag="$GITHUB_REF_NAME"
+            version="${release_tag#v}"
+            if [[ -z "$version" || "$version" == "$release_tag" ]]; then
+              echo "Release tag must have the form vX.Y.Z" >&2
+              exit 1
+            fi
+          else
+            version="$(tr -d '[:space:]' < .github/release-version)"
+            release_tag="v$version"
+            if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" >/dev/null 2>&1; then
+              echo "Release tag $release_tag already exists" >&2
+              exit 1
+            fi
           fi
           if [[ "$version" != "$workspace_version" ]]; then
-            echo "Tag version $version does not match workspace version $workspace_version" >&2
+            echo "Release version $version does not match workspace version $workspace_version" >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
 
       - name: Configure
         run: ./configure
@@ -110,18 +126,30 @@ jobs:
           wait "$server_pid" || true
           trap - EXIT
 
+      - name: Create release tag
+        if: github.ref_type != 'tag'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$RELEASE_TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$RELEASE_TAG"
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
         run: |
           set -euo pipefail
           package="dist/vds4e_${{ steps.version.outputs.version }}_amd64.deb"
           checksum="$package.sha256"
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$package" "$checksum" --clobber
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$package" "$checksum" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "$package" "$checksum" \
-              --title "VDS4E $GITHUB_REF_NAME" \
+            gh release create "$RELEASE_TAG" "$package" "$checksum" \
+              --title "VDS4E $RELEASE_TAG" \
               --generate-notes \
               --verify-tag
           fi
