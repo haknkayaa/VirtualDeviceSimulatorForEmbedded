@@ -73,3 +73,17 @@ offset. A line can have one driver. See `config/topology.example.yaml` and the
   inverted.
 - `gpiomon` sees the edge with the GPIO adapter's polling latency, which is
   outside the virtual-time guarantee.
+
+## Observing signals
+
+Every propagation step is published as a `signal_changed` event on the event
+stream and shown in the Web UI event views. `phase: emitted` marks a source port
+change; `phase: delivered` marks the target GPIO line being driven (later than
+`emitted` when the connection has `delay_ns`).
+
+## Verified against the real ABI
+
+`tests/e2e/drdy` runs the chain with unmodified tools: `spidev_test` (SPI sensor) or
+`i2cget`/`i2ctransfer` (generic I2C sensor), `gpiomon` and `gpioget` on a real
+`gpio-sim` controller. Start it on demand with the *Device ABI E2E* workflow or
+`tests/e2e/drdy/run-qemu.sh`.

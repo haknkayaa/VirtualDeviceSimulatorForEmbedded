@@ -535,10 +535,17 @@ participate in the earliest-deadline calculation. Propagation is never recursive
 
 The router drives the target GPIO bank's backing register. The existing path
 from the bank through the GPIO adapter and kernel `gpio-sim` carries the level
-to `/dev/gpiochipN`, so the router and host adapters stay independent. The live
-server runs a short pump that applies due events when a topology is attached,
-so timer-driven signals do not wait for another bus transaction. Read-clear
-behavior ("reading the sample drops DRDY") belongs to the register/model layer.
+to `/dev/gpiochipN`, so the router and host adapters stay independent. When a
+topology is attached, the live server runs a pump that sleeps until the earliest
+scheduled device or connection deadline and is woken by every transaction, so
+timer-driven signals do not wait for another bus transaction and an idle server
+does not poll (ADR 0012). Read-clear behavior ("reading the sample drops DRDY")
+belongs to the register/model layer.
+
+Each propagation step is reported to an observer and published as a
+`signal_changed` domain event (`phase` `emitted` or `delivered`, with the source
+port, target line, value and connection delay). Scenario runs publish them with
+their run ID. The Web UI shows them in the event stream and log filters.
 
 ## 9. Bus runtime drivers
 
@@ -973,7 +980,8 @@ The current ADR set records:
 - managed host adapters;
 - behavior-flow compilation;
 - kernel gpio-sim integration;
-- public signal ports and board topology.
+- public signal ports and board topology;
+- signal observability and deadline-driven timers.
 
 ## 21. Final architectural constraint
 

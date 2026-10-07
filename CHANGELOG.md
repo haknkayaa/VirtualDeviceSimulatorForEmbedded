@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Debian `amd64` package builder and tag-driven GitHub Release workflow that
   publishes the `.deb` and SHA-256 checksum.
+- `signal_changed` domain event for every signal propagation step, shown in the Web
+  UI event stream and filters (ADR 0012).
+- `i2c-sensor-drdy` example and an I2C + GPIO real-ABI E2E test (i2c-tools, gpiomon).
+- On-demand `Device ABI E2E` workflow (QEMU on hosted runners, or a self-hosted
+  privileged runner).
 - `tests/e2e/drdy`: real-ABI end-to-end test (spidev_test, gpio-sim, gpiomon) for
   the signal topology flow, with a QEMU runner.
 - Public device signal ports, `signal_bindings`, and a `topology.yaml` that
@@ -29,5 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   persistent failure once.
 
 ### Changed
+- The live-server timer pump sleeps until the next scheduled deadline and is woken
+  by transactions instead of ticking every 2 ms.
 - `uart-pty` adapter builds the shared bridge via `add_subdirectory`.
 - Workspace `rust-version` aligned with the pinned 1.91.1 toolchain; repository metadata corrected.
