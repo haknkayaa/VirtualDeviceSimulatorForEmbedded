@@ -179,6 +179,11 @@ impl RunManager {
                 let clock = Arc::new(ManualClock::default());
                 let registry = crate::load_registry_with_clock(&config, clock.clone())
                     .map_err(|error| error.to_string())?;
+                crate::publish_signal_events(
+                    &registry,
+                    Arc::clone(&events),
+                    Some(task_run_id.clone()),
+                );
                 let runtime = RegistryRuntime::new(Arc::new(registry), clock);
                 let mut executor = ScenarioExecutor::new(runtime)
                     .with_event_bus(events, task_run_id)

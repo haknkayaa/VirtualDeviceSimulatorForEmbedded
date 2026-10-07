@@ -214,7 +214,8 @@ async fn serve(config: ServerConfig) -> Result<(), ServerError> {
     };
     spawn_event_logger(Arc::clone(&events));
     if registry.has_topology() {
-        spawn_signal_pump(Arc::clone(&registry));
+        publish_signal_events(&registry, Arc::clone(&events), None);
+        spawn_signal_pump(Arc::clone(&registry), Arc::clone(&clock));
     }
     let api_state = http::ApiState::new_persistent(
         config.clone(),
@@ -288,8 +289,35 @@ async fn serve(config: ServerConfig) -> Result<(), ServerError> {
     }
 }
 
-/// Interval of the live-server due-event pump.
-const SIGNAL_PUMP_INTERVAL: std::time::Duration = std::time::Duration::from_millis(2);
+/// Publishes every signal propagation step of the registry's topology as a
+/// `signal_changed` domain event. Does nothing without a topology.
+pub fn publish_signal_events(
+    registry: &DeviceRegistry,
+    events: Arc<EventBus>,
+    scenario_run_id: Option<String>,
+) {
+    registry.set_signal_observer(Arc::new(move |step| {
+        let _ = events.publish(EventDraft::from_signal(step, scenario_run_id.clone()));
+    }));
+}
+
+/// Longest the pump sleeps without a known deadline. Transactions wake the pump
+/// directly; this only bounds the delay if a schedule change were ever missed.
+const SIGNAL_PUMP_MAX_SLEEP: std::time::Duration = std::time::Duration::from_millis(50);
+/// Floor that keeps a persistently due deadline from spinning the pump.
+const SIGNAL_PUMP_MIN_SLEEP: std::time::Duration = std::time::Duration::from_millis(1);
+
+/// Time until the pump must run again: the earliest device or connection
+/// deadline, clamped to `[SIGNAL_PUMP_MIN_SLEEP, SIGNAL_PUMP_MAX_SLEEP]`.
+fn next_pump_delay(registry: &DeviceRegistry, now_ns: u64) -> std::time::Duration {
+    match registry.next_event_deadline_ns() {
+        Ok(Some(deadline_ns)) => {
+            std::time::Duration::from_nanos(deadline_ns.saturating_sub(now_ns))
+                .clamp(SIGNAL_PUMP_MIN_SLEEP, SIGNAL_PUMP_MAX_SLEEP)
+        }
+        _ => SIGNAL_PUMP_MAX_SLEEP,
+    }
+}
 
 /// Applies due device events on the live server so timer-driven signals reach
 /// their connections without waiting for another bus transaction.
@@ -297,15 +325,26 @@ const SIGNAL_PUMP_INTERVAL: std::time::Duration = std::time::Duration::from_mill
 /// Device schedulers are evaluated lazily, only inside that device's own
 /// transactions. A sensor that raises DRDY when a timer expires would otherwise
 /// stay silent until the next SPI/I2C access, which never comes while the
-/// application waits for the edge. The pump runs only when a topology is
-/// attached. Events it applies are logged exactly like transaction-path events.
-fn spawn_signal_pump(registry: Arc<DeviceRegistry>) {
+/// application waits for the edge. The pump sleeps until the earliest scheduled
+/// deadline and is woken by every transaction, which is the only way new
+/// deadlines appear, so an idle server does not wake at all beyond a 50 ms
+/// safety backstop. It runs only when a topology is attached. Events it applies
+/// are logged like transaction-path events.
+pub fn spawn_signal_pump(
+    registry: Arc<DeviceRegistry>,
+    clock: Arc<dyn SimulatorClock>,
+) -> tokio::task::JoinHandle<()> {
+    let wake = Arc::new(tokio::sync::Notify::new());
+    let listener_wake = Arc::clone(&wake);
+    registry.set_schedule_listener(Arc::new(move || listener_wake.notify_one()));
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(SIGNAL_PUMP_INTERVAL);
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         let mut failing = false;
         loop {
-            interval.tick().await;
+            let delay = next_pump_delay(&registry, clock.now_ns());
+            tokio::select! {
+                () = wake.notified() => {}
+                () = tokio::time::sleep(delay) => {}
+            }
             match registry.run_due_events() {
                 Ok(events) => {
                     failing = false;
@@ -314,7 +353,7 @@ fn spawn_signal_pump(registry: Arc<DeviceRegistry>) {
                     }
                 }
                 Err(error) => {
-                    // Report a persistent failure once instead of every tick.
+                    // Report a persistent failure once instead of every wake-up.
                     if !failing {
                         warn!(component = "signals", %error, "signal pump failed");
                     }
@@ -322,7 +361,7 @@ fn spawn_signal_pump(registry: Arc<DeviceRegistry>) {
                 }
             }
         }
-    });
+    })
 }
 
 fn spawn_event_logger(events: Arc<EventBus>) {

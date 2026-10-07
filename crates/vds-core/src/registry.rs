@@ -25,7 +25,11 @@ pub struct DeviceFaultSnapshot {
 pub struct DeviceRegistry {
     devices: RwLock<HashMap<String, Arc<dyn Device>>>,
     router: RwLock<Option<Arc<crate::topology::SignalRouter>>>,
+    schedule_listener: RwLock<Option<ScheduleListener>>,
 }
+
+/// Called after a transaction that may have scheduled new device events.
+pub type ScheduleListener = Arc<dyn Fn() + Send + Sync>;
 
 impl DeviceRegistry {
     #[must_use]
@@ -74,6 +78,24 @@ impl DeviceRegistry {
             .map_err(|error| crate::topology::TopologyError::Validation(error.to_string()))
     }
 
+    /// Installs an observer for signal propagation steps. Returns `false`
+    /// when no topology is attached, in which case nothing can be observed.
+    pub fn set_signal_observer(&self, observer: crate::topology::SignalObserver) -> bool {
+        self.router().is_some_and(|router| {
+            router.set_observer(Some(observer));
+            true
+        })
+    }
+
+    /// Registers a callback invoked after each transaction, so a timer driver
+    /// can recompute its next deadline without polling.
+    pub fn set_schedule_listener(&self, listener: ScheduleListener) {
+        *self
+            .schedule_listener
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(listener);
+    }
+
     /// Returns whether a topology with at least one connection is active.
     #[must_use]
     pub fn has_topology(&self) -> bool {
@@ -98,6 +120,14 @@ impl DeviceRegistry {
     /// Returns the transaction result unless signal propagation itself failed.
     fn after_transaction<T>(&self, result: Result<T, DeviceError>) -> Result<T, DeviceError> {
         let settled = self.settle();
+        let listener = self
+            .schedule_listener
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(listener) = listener {
+            listener();
+        }
         let value = result?;
         settled?;
         Ok(value)

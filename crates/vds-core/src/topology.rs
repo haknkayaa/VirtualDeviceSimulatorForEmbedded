@@ -25,6 +25,44 @@ const TOPOLOGY_SCHEMA: &str = include_str!("../../../schemas/topology.schema.jso
 /// Resolves a device ID to a live device; used by the router while settling.
 pub type DeviceLookup<'a> = &'a dyn Fn(&str) -> Result<Arc<dyn Device>, DeviceError>;
 
+/// Phase of a signal change as seen by the router.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SignalPhase {
+    /// A source port changed value and the change entered the router.
+    Emitted,
+    /// The change was applied to the target GPIO line.
+    Delivered,
+}
+
+impl SignalPhase {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Emitted => "emitted",
+            Self::Delivered => "delivered",
+        }
+    }
+}
+
+/// One observable step of signal propagation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignalTransition {
+    pub phase: SignalPhase,
+    pub source_device: String,
+    pub source_signal: String,
+    pub target_device: String,
+    pub target_line: String,
+    pub value: bool,
+    /// Configured connection delay; zero for immediate propagation.
+    pub delay_ns: u64,
+    /// Clock time at which the router observed this step.
+    pub time_ns: u64,
+}
+
+/// Receives propagation steps. Called while the router holds its internal lock,
+/// so it must be cheap, must not block, and must not call back into the registry.
+pub type SignalObserver = Arc<dyn Fn(&SignalTransition) + Send + Sync>;
+
 /// Runtime safety limit for stabilization passes in one settle operation.
 pub const MAX_SETTLE_PASSES: usize = 64;
 
@@ -155,6 +193,7 @@ pub struct SignalRouter {
     sources: Vec<String>,
     clock: Arc<dyn SimulatorClock>,
     state: Mutex<RouterState>,
+    observer: Mutex<Option<SignalObserver>>,
 }
 
 impl SignalRouter {
@@ -234,7 +273,36 @@ impl SignalRouter {
                 last,
                 ..RouterState::default()
             }),
+            observer: Mutex::new(None),
         })
+    }
+
+    /// Installs or removes the propagation observer.
+    pub fn set_observer(&self, observer: Option<SignalObserver>) {
+        *self
+            .observer
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = observer;
+    }
+
+    fn notify(&self, phase: SignalPhase, edge: &Edge, value: bool, time_ns: u64) {
+        let observer = self
+            .observer
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(observer) = observer {
+            observer(&SignalTransition {
+                phase,
+                source_device: edge.source_device.clone(),
+                source_signal: edge.source_port.clone(),
+                target_device: edge.target_device.clone(),
+                target_line: edge.target_line.clone(),
+                value,
+                delay_ns: edge.delay_ns,
+                time_ns,
+            });
+        }
     }
 
     /// Earliest pending delayed delivery, in virtual time.
@@ -289,6 +357,7 @@ impl SignalRouter {
             while let Some((index, value)) = ready.pop_front() {
                 let edge = &self.edges[index];
                 lookup(&edge.target_device)?.drive_gpio_line(&edge.target_line, value)?;
+                self.notify(SignalPhase::Delivered, edge, value, now);
             }
         }
     }
@@ -316,6 +385,7 @@ impl SignalRouter {
                 continue;
             }
             state.last[index] = Some(value);
+            self.notify(SignalPhase::Emitted, edge, value, now);
             if edge.delay_ns == 0 {
                 ready.push_back((index, value));
             } else {
@@ -572,6 +642,81 @@ mod tests {
         fixture.registry.run_due_events().unwrap();
         assert!(fixture.bank.levels.lock().unwrap()["DRDY"]);
         assert_eq!(fixture.registry.next_event_deadline_ns().unwrap(), None);
+    }
+
+    fn recorder(fixture: &Fixture) -> Arc<Mutex<Vec<SignalTransition>>> {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let sink = Arc::clone(&seen);
+        assert!(fixture.registry.set_signal_observer(Arc::new(move |step| {
+            sink.lock().unwrap().push(step.clone());
+        })));
+        seen
+    }
+
+    #[test]
+    fn observer_sees_emitted_then_delivered_at_the_same_time() {
+        let fixture = fixture();
+        attach(&fixture, WIRED).unwrap();
+        let seen = recorder(&fixture);
+        fixture.clock.advance(Duration::from_nanos(40)).unwrap();
+        fixture.source.level.store(true, Ordering::SeqCst);
+        poke(&fixture);
+        poke(&fixture);
+        let steps = seen.lock().unwrap();
+        assert_eq!(steps.len(), 2, "unchanged values are not reported again");
+        assert_eq!(
+            (steps[0].phase, steps[1].phase),
+            (SignalPhase::Emitted, SignalPhase::Delivered)
+        );
+        assert!(steps.iter().all(|step| step.value && step.time_ns == 40));
+        assert_eq!(steps[1].source_device, "imu0");
+        assert_eq!(steps[1].source_signal, "ready");
+        assert_eq!(steps[1].target_device, "gpio0");
+        assert_eq!(steps[1].target_line, "DRDY");
+    }
+
+    #[test]
+    fn observer_reports_delayed_delivery_when_it_happens() {
+        let fixture = fixture();
+        attach(
+            &fixture,
+            "schema_version: 1\nconnections:\n  - { from: imu0.ready, to: gpio0.DRDY, delay_ns: 500 }\n",
+        )
+        .unwrap();
+        let seen = recorder(&fixture);
+        fixture.source.level.store(true, Ordering::SeqCst);
+        poke(&fixture);
+        assert_eq!(seen.lock().unwrap().len(), 1);
+        fixture.clock.advance(Duration::from_nanos(500)).unwrap();
+        fixture.registry.run_due_events().unwrap();
+        let steps = seen.lock().unwrap();
+        // The initial low level synchronized at attach time is delivered through the
+        // same 500 ns wire, immediately before the later high level.
+        assert_eq!(steps.len(), 3);
+        assert_eq!(steps[0].phase, SignalPhase::Emitted);
+        let delivered: Vec<_> = steps[1..]
+            .iter()
+            .map(|step| (step.phase, step.value, step.time_ns, step.delay_ns))
+            .collect();
+        assert_eq!(
+            delivered,
+            [
+                (SignalPhase::Delivered, false, 500, 500),
+                (SignalPhase::Delivered, true, 500, 500)
+            ]
+        );
+    }
+
+    #[test]
+    fn schedule_listener_runs_after_transactions() {
+        let fixture = fixture();
+        let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counter = Arc::clone(&calls);
+        fixture.registry.set_schedule_listener(Arc::new(move || {
+            counter.fetch_add(1, Ordering::SeqCst);
+        }));
+        poke(&fixture);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]

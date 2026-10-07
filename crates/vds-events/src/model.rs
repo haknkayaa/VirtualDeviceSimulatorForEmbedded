@@ -24,6 +24,7 @@ pub enum EventType {
     ScenarioStepCompleted,
     ScenarioCompleted,
     DeviceReset,
+    SignalChanged,
 }
 
 impl EventType {
@@ -43,6 +44,7 @@ impl EventType {
             Self::ScenarioStepCompleted => "scenario_step_completed",
             Self::ScenarioCompleted => "scenario_completed",
             Self::DeviceReset => "device_reset",
+            Self::SignalChanged => "signal_changed",
         }
     }
 }
@@ -120,6 +122,18 @@ pub enum EventPayload {
     DeviceReset {
         result: String,
     },
+    /// One step of cross-device signal propagation (ADR 0012).
+    SignalChanged {
+        /// `emitted` when a source port changed, `delivered` when the target
+        /// GPIO line was driven.
+        phase: String,
+        /// `<device>.<signal>` of the source port.
+        source: String,
+        /// `<device>.<line>` of the target GPIO line.
+        target: String,
+        value: bool,
+        delay_ns: u64,
+    },
 }
 
 impl EventPayload {
@@ -139,6 +153,7 @@ impl EventPayload {
             Self::ScenarioStepCompleted { .. } => EventType::ScenarioStepCompleted,
             Self::ScenarioCompleted { .. } => EventType::ScenarioCompleted,
             Self::DeviceReset { .. } => EventType::DeviceReset,
+            Self::SignalChanged { .. } => EventType::SignalChanged,
         }
     }
 
@@ -219,6 +234,33 @@ impl EventPayload {
                 address: trace.address,
                 old_value: trace.old_value,
                 new_value: trace.new_value,
+            },
+        }
+    }
+}
+
+impl EventDraft {
+    /// Builds the draft for a signal propagation step. The event belongs to the
+    /// source device when emitted and to the target device when delivered.
+    #[must_use]
+    pub fn from_signal(
+        step: &vds_core::topology::SignalTransition,
+        scenario_run_id: Option<String>,
+    ) -> Self {
+        let device_id = match step.phase {
+            vds_core::topology::SignalPhase::Emitted => &step.source_device,
+            vds_core::topology::SignalPhase::Delivered => &step.target_device,
+        };
+        Self {
+            virtual_time_ns: step.time_ns,
+            device_id: Some(device_id.clone()),
+            scenario_run_id,
+            payload: EventPayload::SignalChanged {
+                phase: step.phase.as_str().to_owned(),
+                source: format!("{}.{}", step.source_device, step.source_signal),
+                target: format!("{}.{}", step.target_device, step.target_line),
+                value: step.value,
+                delay_ns: step.delay_ns,
             },
         }
     }
