@@ -198,7 +198,8 @@ fn converts_svd_to_schema_valid_device_model() {
     let model = periph.to_device_model("i2c").expect("generates model");
 
     let yaml = serde_yaml::to_string(&model).expect("serializes to YAML");
-    let parsed_model = DeviceModel::from_yaml(&yaml).expect("validates against DEVICE_MODEL_SCHEMA");
+    let parsed_model =
+        DeviceModel::from_yaml(&yaml).expect("validates against DEVICE_MODEL_SCHEMA");
     assert_eq!(parsed_model.device.id, "ad7991");
     assert_eq!(parsed_model.device.bus, "i2c");
     assert_eq!(parsed_model.device.registers.len(), 2);
