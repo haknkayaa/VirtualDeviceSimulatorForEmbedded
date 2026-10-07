@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The Web UI Overview is built around host bring-up: a kernel module → adapter →
+  device node → traffic pipeline names the first failing step and its fix
+  (copyable `modprobe` command or loading the ready adapters), followed by the
+  device node table, a "Needs attention" list, the last scenario run and
+  per-bus activity lanes. Recent events, signal and host panels moved out;
+  host load is in the status bar.
+- Transactions accepts `?bus=` and `?result=failed` deep links and has a
+  "Failures only" filter.
+- Web UI visual system: accent-tinted neutrals with clearer surface steps, a
+  larger type scale and sentence-case headings instead of uppercase labels.
+
 ## [0.1.2] - 2026-10-07
 
 ### Changed

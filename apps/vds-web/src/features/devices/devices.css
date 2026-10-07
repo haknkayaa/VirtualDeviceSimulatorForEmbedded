@@ -57,7 +57,7 @@
 .dv-head-actions { display: flex; flex: 0 0 auto; align-items: center; gap: var(--space-1); }
 .dv-head-meta { display: flex; flex-wrap: wrap; gap: 2px var(--space-4); margin-top: 5px; padding-left: 36px; font-size: var(--fs-xs); }
 .dv-head-meta > div { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.dv-head-meta dt { color: var(--text-faint); font-size: var(--fs-2xs); font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+.dv-head-meta dt { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
 .dv-head-meta dd { color: var(--text); white-space: nowrap; }
 .dv-head-meta dd.mono { font-size: var(--fs-xs); }
 .dv-head-adapter { display: inline-flex; align-items: center; gap: 5px; }
@@ -95,9 +95,10 @@
 
 /* --- Register map -------------------------------------------------------- */
 .dv-regmap { display: flex; flex-direction: column; overflow: hidden; container-type: inline-size; }
-@container (max-width: 680px) {
+@container (max-width: 760px) {
   .dv-regmap-table .dv-col-bits, .dv-regmap-table .dv-regmap-desc { display: none; }
-  .dv-regmap-table td.dv-regmap-name { max-width: 210px; }
+  .dv-regmap-table td.dv-regmap-name { max-width: 180px; }
+  .dv-regmap-table th, .dv-regmap-table td { padding-left: var(--space-2); padding-right: var(--space-2); }
 }
 .dv-regmap.expanded { position: absolute; inset: 0; z-index: 4; border-radius: 0; }
 .dv-regmap-search { flex: 0 1 240px; min-width: 140px; }
@@ -152,7 +153,7 @@
 .dv-bits-summary > strong { color: var(--text-strong); font-family: var(--font-mono); font-size: var(--fs-sm); }
 .dv-bits-values { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); }
 .dv-bits-values > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.dv-bits-values dt { color: var(--text-faint); font-size: var(--fs-2xs); font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+.dv-bits-values dt { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
 .dv-bits-values dt label { cursor: pointer; }
 .dv-bits-values dd { overflow: hidden; color: var(--text-strong); font-size: var(--fs-xs); text-overflow: ellipsis; white-space: nowrap; line-height: var(--control-h-sm); }
 .dv-bits-values .dv-draft-input { width: 100%; height: var(--control-h-sm) !important; padding: 0 5px !important; font-family: var(--font-mono); font-size: var(--fs-xs) !important; }
@@ -247,7 +248,7 @@
 .dv-config > .panel-body { padding: var(--space-3); overflow: auto; }
 .dv-config-note { margin-bottom: var(--space-3); }
 .dv-config-group { min-width: 0; margin: 0 0 var(--space-3); padding: 0; border: 0; }
-.dv-config-group legend { padding: 0 0 6px; color: var(--text-faint); font-size: var(--fs-2xs); font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.dv-config-group legend { padding: 0 0 6px; color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
 .dv-config-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: var(--space-2) var(--space-3); max-width: 760px; }
 .dv-config-fields select, .dv-config-fields input { width: 100%; }
 .dv-input-unit { display: flex; align-items: center; gap: 6px; }
@@ -279,7 +280,7 @@
 .dv-scn-run.other { opacity: .6; }
 .dv-scn-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); margin: 6px 0; }
 .dv-scn-metrics > div { display: flex; flex-direction: column; gap: 1px; }
-.dv-scn-metrics dt { color: var(--text-faint); font-size: var(--fs-2xs); font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+.dv-scn-metrics dt { color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600; }
 .dv-scn-metrics dd { color: var(--text-strong); font-family: var(--font-mono); font-size: var(--fs-sm); }
 .dv-scn-results { margin: 0 calc(-1 * var(--space-3)); width: calc(100% + 2 * var(--space-3)); table-layout: fixed; }
 .dv-scn-col-result { width: 86px; }

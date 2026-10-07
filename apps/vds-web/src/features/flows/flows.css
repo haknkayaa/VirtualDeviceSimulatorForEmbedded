@@ -76,7 +76,7 @@
 .flow-section-title {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
   min-height: 24px; margin: 6px 0 2px; color: var(--text-faint);
-  font-size: var(--fs-2xs); font-weight: 650; letter-spacing: .06em; text-transform: uppercase;
+  font-size: var(--fs-xs); font-weight: 600;
 }
 .flow-section-title .count { letter-spacing: 0; text-transform: none; }
 .flow-note { margin: 4px 0; color: var(--text-faint); font-size: var(--fs-xs); line-height: 1.45; }
@@ -109,7 +109,7 @@ body.flow-panel-resizing { user-select: none; }
 .flow-palette-list { flex: 1 1 auto; min-height: 0; padding-bottom: var(--space-2); overflow: auto; }
 .flow-palette-category h3 {
   display: flex; align-items: center; gap: 6px; padding: 8px var(--space-3) 3px;
-  color: var(--text-faint); font-size: var(--fs-2xs); font-weight: 650; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-muted); font-size: var(--fs-xs); font-weight: 600;
 }
 .flow-palette-category h3 .count { letter-spacing: 0; }
 .flow-palette-item {
@@ -205,7 +205,7 @@ body.flow-panel-resizing { user-select: none; }
 .flow-node-head {
   display: flex; align-items: center; gap: 6px; height: 24px; padding: 2px var(--space-2) 0;
   color: var(--text-muted); border-bottom: 1px solid var(--divider);
-  font-size: var(--fs-2xs); font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  font-size: var(--fs-xs); font-weight: 600;
 }
 .flow-node-head:last-child { height: 28px; border-bottom: 0; }
 .density-compact .flow-node-head { height: 21px; }
@@ -320,7 +320,7 @@ body.flow-panel-resizing { user-select: none; }
 .flow-validation { grid-area: bottom; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--bg-1); border-top: 1px solid var(--border); }
 .flow-validation-header { display: flex; flex: 0 0 auto; align-items: stretch; min-width: 0; border-bottom: 1px solid var(--border); }
 .flow-output-tabs { flex: 1 1 auto; min-height: 28px; border-bottom: 0; }
-.flow-output-tabs > button { gap: 6px; font-size: var(--fs-xs); font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
+.flow-output-tabs > button { gap: 6px; font-size: var(--fs-xs); font-weight: 600; }
 .flow-output-tabs .status-dot { margin-left: 2px; }
 .flow-tab-counts { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: var(--fs-2xs); letter-spacing: 0; text-transform: none; }
 .flow-tab-counts > span { display: inline-flex; align-items: center; gap: 2px; }

@@ -3,7 +3,60 @@ import { describe, expect, it } from 'vitest'
 import type { Adapter, Device } from '../../types/api'
 import type { DomainEvent } from '../../types/events'
 import { formatEndpoint } from '../../utils/endpoints'
-import { buildDeviceNodeRows, latestScenarioRun, transactionWireSummary } from './overviewModel'
+import type { LiveTransaction } from '../transactions/transactionModel'
+import { buildBringUp, buildBusLanes, buildDeviceNodeRows, laneLabel, latestScenarioRun, transactionWireSummary } from './overviewModel'
+
+const spiAdapter = (overrides: Partial<Adapter> = {}): Adapter => ({
+  id: 'spi0', name: 'SPI 0', bus_type: 'spi', driver: 'cuse', state: 'loaded', readiness: 'ready', bus_number: 0,
+  bindings: [{ device_id: 'flash', endpoint: 0, device_path: '/dev/spidev0.0' }, { device_id: 'nor', endpoint: 1, device_path: '/dev/spidev0.1' }],
+  daemon_pids: [], ...overrides,
+})
+
+const transaction = (id: number, overrides: Partial<LiveTransaction> = {}): LiveTransaction => ({
+  id: `flash:${id}`, transactionId: id, deviceId: 'flash', busType: 'spi', request: [0x9f], response: [0x20], status: 'success',
+  completedWallNs: id, ...overrides,
+})
+
+describe('bring-up pipeline', () => {
+  it('fails on missing kernel modules and blocks the steps behind them', () => {
+    const gpio = spiAdapter({ id: 'gpio0', bus_type: 'gpio', driver: 'gpio-sim', state: 'unloaded', readiness: 'authorization_required', bindings: [{ device_id: 'bank', endpoint: 0, device_path: '/dev/gpiochipX' }] })
+    const state = buildBringUp([spiAdapter({ state: 'unloaded', readiness: 'unavailable' }), gpio], [])
+    expect(state.missingModules).toEqual(['cuse', 'gpio-sim'])
+    expect(state.steps.map((step) => step.status)).toEqual(['fail', 'blocked', 'blocked', 'idle'])
+    expect(state.current?.id).toBe('modules')
+    expect(state).toMatchObject({ nodesOpen: 0, nodesTotal: 3 })
+  })
+
+  it('points at loadable adapters once modules are present', () => {
+    const state = buildBringUp([spiAdapter({ state: 'unloaded' })], [transaction(1)])
+    expect(state.current?.id).toBe('adapters')
+    expect(state.loadableAdapters.map((adapter) => adapter.id)).toEqual(['spi0'])
+    expect(state.steps[3]).toMatchObject({ status: 'ok', detail: '1 transactions' })
+  })
+
+  it('is ready when every bound node is open', () => {
+    const state = buildBringUp([spiAdapter()], [transaction(1), transaction(2, { status: 'error' })])
+    expect(state.current).toBeUndefined()
+    expect(state).toMatchObject({ nodesOpen: 2, nodesTotal: 2 })
+    expect(state.steps[3].detail).toBe('2 transactions · 1 failed')
+  })
+})
+
+describe('bus lanes', () => {
+  it('orders lane chips oldest to newest and explains silent lanes', () => {
+    const lanes = buildBusLanes([transaction(3), transaction(2, { status: 'error' }), transaction(1)], [spiAdapter(), spiAdapter({ id: 'i2c1', bus_type: 'i2c', state: 'unloaded' })])
+    const spi = lanes.find((lane) => lane.bus === 'spi')
+    expect(spi?.transactions.map((item) => item.transactionId)).toEqual([1, 2, 3])
+    expect(spi).toMatchObject({ total: 3, failed: 1 })
+    expect(lanes.find((lane) => lane.bus === 'i2c')?.silentReason).toBe('i2c1 not loaded')
+    expect(lanes.find((lane) => lane.bus === 'uart')?.silentReason).toBe('No UART adapter configured')
+  })
+
+  it('labels chips with the leading opcode bytes or the GPIO edge', () => {
+    expect(laneLabel(transaction(1, { request: [0x13, 0x01, 0x00] }))).toBe('13 01…')
+    expect(laneLabel(transaction(1, { busType: 'gpio', request: [], gpioEdges: [{ line: 16, from: 0, to: 1 }] }))).toBe('IO16 ↑')
+  })
+})
 
 describe('overview model', () => {
   it('lists bound nodes, empty adapters and unbound devices', () => {
