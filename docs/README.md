@@ -8,6 +8,8 @@ need more detail than the project README.
 | Goal | Read |
 | --- | --- |
 | Install or run VDS4E | [Getting started](guides/getting-started.md) |
+| Build a first virtual peripheral | [First virtual device tutorial](tutorials/first-virtual-device.md) |
+| Automate/control the server | [Control-plane API](guides/api.md) |
 | Understand the architecture | [Architecture](../VDS4E_ARCHITECTURE.md) |
 | Work with SPI | [SPI guide](guides/spi.md) |
 | Work with I²C | [I²C guide](guides/i2c.md) |
