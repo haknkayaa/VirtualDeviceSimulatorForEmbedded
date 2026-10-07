@@ -1,296 +1,299 @@
 # Virtual Device Simulator for Embedded (VDS4E)
 
 [![Build and Test](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/ci.yml)
+[![Debian Release](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/release.yml/badge.svg)](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/release.yml)
 
-VDS4E is an observable virtual hardware laboratory for Embedded Linux
-application development. It exposes virtual SPI, I2C, GPIO, and UART devices
-through the normal Linux userspace interfaces (`/dev/spidevX.Y`, `/dev/i2c-N`,
-`/dev/gpiochipX`, and a PTY), so an unmodified x86_64 build of a production
-application and standard tools such as `i2cget` or `gpiomon` can run on a
-workstation without the physical board.
+**Run Embedded Linux applications against virtual SPI, I²C, GPIO and UART devices without the physical target board.**
+
+VDS4E is a hardwareless integration-testing environment for Embedded Linux software. It exposes virtual peripherals through normal Linux userspace interfaces such as `/dev/spidevX.Y`, `/dev/i2c-N`, `/dev/gpiochipN` and PTYs, allowing native x86_64 builds of production applications and standard Linux tools to exercise stateful device models on a development workstation.
+
+VDS4E is not a CPU or board emulator. It focuses on the boundary between an Embedded Linux application and the device interfaces it already uses.
+
+## Why VDS4E?
+
+Traditional mocks often replace application code paths. Full-system emulators model much more of the machine than many application-level tests need. VDS4E sits between those approaches:
+
+- **No VDS-specific API in the application.** Production code continues to use the Linux device ABI.
+- **Kernel-visible interfaces.** SPI, I²C and GPIO can be exercised through normal device nodes; UART uses a standard PTY.
+- **Stateful peripherals.** Device packages can model registers, bitfields, memory, state machines, timed operations, faults and reset behavior.
+- **Declarative models.** Peripheral behavior lives in versioned device packages rather than application-side test doubles.
+- **Cross-device topology.** Public device signals can drive GPIO lines, enabling flows such as sensor DRDY → GPIO edge → bus read.
+- **Observable execution.** Transactions, registers, state, faults, scenarios and telemetry are available through the control plane.
+- **Automation friendly.** Headless scenarios can produce JSON and JUnit results for integration and CI workflows.
+
+## Architecture
 
 ```text
-Application or standard Linux tool
-    -> VDS4E host adapter (CUSE, gpio-sim, PTY)
-    -> Unix-socket transaction data plane
-    -> declarative virtual device runtime
+┌──────────────────────────────────────────────────────────────────────┐
+│ Embedded Linux application / standard Linux tool                    │
+│ spidev_test · i2c-tools · libgpiod tools · normal application code  │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │ normal Linux userspace ABI
+                                ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ VDS4E host adapters                                                  │
+│ SPI CUSE · I²C CUSE · gpio-sim · UART PTY                           │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │ framed Protobuf / Unix socket
+                                ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ VDS4E runtime                                                        │
+│ device registry · registers · behavior · virtual time · topology     │
+└───────────────────────────────┬──────────────────────────────────────┘
+                                │
+                                ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ Declarative device packages                                         │
+│ model · flows · scenarios · fixtures · docs · assets                 │
+└──────────────────────────────────────────────────────────────────────┘
+
+Control & observability: REST API · WebSocket events · React Web UI
 ```
 
-The authoritative system design is
-[VDS4E_ARCHITECTURE.md](VDS4E_ARCHITECTURE.md). Planned work is kept separately
-in [docs/ROADMAP.md](docs/ROADMAP.md).
+The detailed design and architectural boundaries are documented in [VDS4E_ARCHITECTURE.md](VDS4E_ARCHITECTURE.md).
 
-## What works today
+## Supported interfaces
 
-| Area | Implemented support |
-| --- | --- |
-| Device packages | Versioned package manifest, runtime model, behavior flow, scenarios, fixtures, documentation, and assets |
-| Runtime drivers | `generic-spi-command`, `generic-i2c-register`, `generic-gpio-bank`, `generic-uart-responder` |
-| Device behavior | Registers, bitfields, memory, state machines, virtual time, scheduled operations, faults, reset |
-| Automation | CLI package validation/scaffolding, SPI transfer, scenario execution, JSON and JUnit results |
-| Control plane | REST API, WebSocket replay/live events, React Web UI |
-| Native data plane | Length-prefixed Protobuf over `/tmp/vds4e.sock`, Rust CLI, Linux host adapters |
-| Linux SPI | Managed CUSE `/dev/spidevX.Y` adapter |
-| Linux I²C | Privileged CUSE `/dev/i2c-N` adapter with `I2C_RDWR` and common SMBus operations |
-| Linux GPIO | Kernel `gpio-sim` integration exposing a real `/dev/gpiochipX` |
-| Linux UART | Unprivileged PTY adapter exposing a standard `/dev/pts/N` TTY |
-| Observability | Transactions, registers, state, faults, runs, telemetry, bounded replay, optional SQLite persistence |
+| Interface | Linux-facing endpoint | Runtime support | Typical clients |
+| --- | --- | --- | --- |
+| SPI / spidev | `/dev/spidevX.Y` via CUSE | `generic-spi-command` | production spidev applications, upstream `spidev_test` |
+| I²C / i2c-dev | `/dev/i2c-N` via CUSE | `generic-i2c-register`, AT24C EEPROM | `i2cdetect`, `i2cget`, `i2cset`, `i2ctransfer`, libi2c applications |
+| GPIO | real `/dev/gpiochipN` via kernel `gpio-sim` | `generic-gpio-bank` | `gpiodetect`, `gpioinfo`, `gpioget`, `gpioset`, `gpiomon`, libgpiod applications |
+| UART / TTY | kernel-assigned `/dev/pts/N` | `generic-uart-responder` | applications using `open/read/write` and termios |
+| QSPI multi-lane / DTR | native VDS4E transaction path | SPI wire-setting validation | VDS4E native clients |
+| Ethernet / CAN / USB | — | not implemented | — |
 
-## Interface support
-
-| Interface | Runtime driver | Linux host interface | Compatible clients | Status |
-| --- | --- | --- | --- | --- |
-| SPI / spidev | `generic-spi-command` | `/dev/spidevX.Y` through CUSE | Normal spidev applications and upstream `spidev_test` | Supported |
-| I2C / i2c-dev | `generic-i2c-register`, `at24c-eeprom` | `/dev/i2c-N` through CUSE | `i2cdetect`, `i2cget`, `i2cset`, `i2ctransfer`, libi2c applications | Supported |
-| GPIO | `generic-gpio-bank` | Real `/dev/gpiochipX` through kernel `gpio-sim` | `gpiodetect`, `gpioinfo`, `gpioget`, `gpioset`, `gpiomon`, libgpiod applications | Supported |
-| UART / TTY | `generic-uart-responder` | Kernel-assigned `/dev/pts/N` through PTY | Applications using `open`, `read`, `write`, and termios | Supported (functional byte stream; no bit timing) |
-| QSPI multi-lane / DTR | SPI command and wire-setting validation | No dedicated host adapter | VDS4E native transaction clients | Runtime only |
-| Ethernet, CAN, USB | None | None | n/a | Not implemented |
-
-`generic-spidev` is a transport-test device for spidev compatibility. It does
-not model flash memory, JEDEC identity, registers, or vendor-specific
-behavior. Use a concrete package such as the bundled Micron MT25QL256 model
-when device-specific flash behavior is required.
-
-VDS4E provides functional simulation. It does not simulate electrical
-characteristics, controller DMA/IRQ timing, CPU execution, or a complete target
-board, and it does not replace real-target or hardware-in-the-loop testing.
-
-## Timing and determinism
-
-Determinism in VDS4E applies to the runtime's virtual-time domain, not to the
-whole system:
-
-- Device behavior (state machines, scheduled operations such as the AT24C
-  write-cycle NACK window, faults) is driven by a simulator clock.
-- Headless scenario runs, the run API, and the CLI use a manual virtual clock
-  that advances only when a scenario step advances it. Results are
-  reproducible and independent of host speed.
-- The live server that serves host adapters uses a wall-clock-backed clock
-  (`RealTimeClock`). A real application or shell script, for example one that
-  calls `sleep 0.01` after an EEPROM write, observes device timing in real
-  time and is subject to normal scheduler jitter. Such runs are not
-  bit-for-bit deterministic.
-- Checkpoint/restore and record/replay are not implemented (see the
-  [roadmap](docs/ROADMAP.md)).
-
-## Hardware import
-
-The `vds-importer` crate drafts declarative models from existing hardware
-descriptions: CMSIS-SVD register maps and Device Tree source (buses, addresses,
-compatible strings). Its output is a starting point for a device package, not a
-finished behavioral model; review and complete it before use.
-
-## How VDS4E compares with related tools
-
-VDS4E is not a CPU or full-system emulator and cannot boot Linux; it is not a
-substitute for Renode, QEMU, or commercial virtual platforms, which can be
-combined with it later. The closest alternatives for the same job (running
-application code against fake device nodes on a workstation) are:
-
-| Capability | VDS4E | umockdev | `i2c-stub` | `gpio-mockup` / `gpio-sim` | `LD_PRELOAD` mocks |
-| --- | --- | --- | --- | --- | --- |
-| Unmodified application | Yes | Yes (runs under its wrapper) | Yes | Yes | Yes, but only dynamically linked |
-| Works with static binaries | Yes (kernel-visible nodes) | No (preload based) | Yes | Yes | No |
-| Real kernel-visible device node | Yes (CUSE, `gpio-sim`, PTY) | No (emulated per process) | Yes | Yes | No |
-| Stateful device behavior (registers, state machines, timed operations) | Yes, declarative packages | Replays recorded traffic; custom behavior needs code | Simple SMBus register file | GPIO lines only | Whatever the mock author codes |
-| Multiple buses | SPI, I2C, GPIO, UART | Many device classes via ioctl record/replay | I2C only | GPIO only | Per mock |
-| Needs root or kernel modules | Yes for CUSE and `gpio-sim`; UART PTY does not | No | Yes (module) | Yes (module) | No |
-| Fault injection and bus/transaction tracing | Built in | Via recording and custom handling | No | No | Custom |
-| Web UI and REST API | Yes | No | No | No | No |
-
-### Why VDS4E rather than umockdev?
-
-umockdev is a mature, lightweight choice and is often the better one. It needs
-no root access or kernel modules, it records real hardware ioctl traffic, and
-it replays it deterministically in unit tests. If you already have a recording
-from real hardware and want fast, unprivileged tests of one application,
-use it.
-
-Consider VDS4E when you need one or more of the following:
-
-- a device that responds to transactions it has never seen recorded (a modeled
-  register map, memory, state machine, timed write or erase), rather than a
-  fixed replay;
-- kernel-visible nodes that work for static binaries, other processes, and
-  stock tools such as `i2ctransfer`, `gpiomon`, and `spidev_test` at the same
-  time;
-- a shared, inspectable device state with fault injection, a transaction
-  trace, and headless scenarios with JUnit output.
-
-The cost is that VDS4E is heavier: the CUSE and `gpio-sim` adapters need root
-and kernel modules, and its device models cover only the ABI subset documented
-in each adapter README.
+SPI and I²C CUSE adapters and the GPIO `gpio-sim` integration require appropriate host-kernel support and privileges. UART PTY operation is unprivileged.
 
 ## Quick start
 
+### Install a release package
+
+Tagged releases publish an `amd64` Debian package and SHA-256 checksum.
+
+Download the package from [GitHub Releases](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/releases), then install it:
+
 ```shell
-./run.sh        # or ./dev.sh; see the getting-started guide
+sudo apt install ./vds4e_0.1.0_amd64.deb
 ```
 
-This starts the Web UI at `http://127.0.0.1:4174`, the control API at
-`http://127.0.0.1:8080/api/v1/health`, and the transaction data plane at
-`/tmp/vds4e.sock`. Prerequisites, the one-time-authorization launcher, and the
-staged `./configure`, `./build.sh`, `./install` pipeline are described in
-[docs/guides/getting-started.md](docs/guides/getting-started.md).
-
-## Debian package
-
-Tagged releases build an `amd64` Debian package and attach it to the GitHub
-Release together with a SHA-256 checksum. Install a downloaded release with:
+Validate the installed configuration:
 
 ```shell
-sudo apt install ./vds4e_<version>_amd64.deb
 vds-server --config /etc/vds4e/vds-server.yaml --check-config
 ```
 
-The package installs the server, CLI, four Linux host adapters, Web UI, schemas,
-bundled device models, example tools, and a default config under
-`/etc/vds4e/vds-server.yaml`. CUSE and `gpio-sim` still require the matching
-host kernel support and privileges; package installation does not load kernel
-modules automatically.
-
-Maintainers can build the same package locally after `./configure && ./build.sh`:
+Start the runtime:
 
 ```shell
-./packaging/debian/build-deb.sh 0.1.0
+vds-server --config /etc/vds4e/vds-server.yaml
 ```
 
-## Guides
+The package installs:
 
-| Guide | Contents |
-| --- | --- |
-| [Getting started](docs/guides/getting-started.md) | Prerequisites, development workspace, staged build and install |
-| [SPI](docs/guides/spi.md) | Creating `/dev/spidevX.Y`, a C spidev client, the Micron MT25QL256 example, device-node permissions |
-| [I2C](docs/guides/i2c.md) | `/dev/i2c-N`, `i2c-tools`, the AT24C EEPROM example, timing domain |
-| [GPIO](docs/guides/gpio.md) | `/dev/gpiochipX`, libgpiod tools, line direction mapping |
-| [UART](docs/guides/uart.md) | PTY endpoint and the `uart_ping` example |
-| [Topology](docs/guides/topology.md) | Connecting a sensor's DRDY signal to a GPIO line |
+- `vds-server` and `vds-cli`
+- SPI, I²C, GPIO and UART host adapters
+- the built Web UI assets
+- schemas and bundled example device models
+- example Embedded Linux tools
+- `/etc/vds4e/vds-server.yaml`
 
-Adapter details: [SPI CUSE](adapters/spi-cuse/README.md),
-[I2C CUSE](adapters/i2c-cuse/README.md),
-[GPIO gpio-sim](adapters/gpio-sim/README.md),
-[UART PTY](adapters/uart-pty/README.md).
+Package installation intentionally does not load privileged kernel modules automatically.
 
-## Linux host adapters
+### Run from source
 
-Host adapters expose standard Linux userspace ABIs and forward operations to
-the Unix-socket runtime. They contain no device opcodes or register behavior.
+For development:
 
-| Adapter | Host interface | Privilege |
-| --- | --- | --- |
-| SPI CUSE | `/dev/spidevX.Y` for supported spidev ioctls; works for dynamically and statically linked applications | Root to load `cuse` and run the helper |
-| I2C CUSE | `/dev/i2c-N` with `I2C_RDWR` and common SMBus operations | Root to load `cuse` and run the helper |
-| GPIO gpio-sim | Real `/dev/gpiochipX` from the kernel `gpio-sim` module | Root to configure `gpio-sim` |
-| UART PTY | `/dev/pts/N` | None |
+```shell
+git clone https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded.git
+cd VirtualDeviceSimulatorForEmbedded
+./run.sh
+```
 
-Client access to the nodes follows the host's device-node permissions; see
-[the permissions note](docs/guides/spi.md#device-node-permissions).
+The development launcher starts the Web UI, control API and transaction data plane. See [Getting started](docs/guides/getting-started.md) for prerequisites and privilege details.
+
+For the staged production-style build:
+
+```shell
+./configure
+./build.sh
+sudo ./install
+```
 
 ## Device packages
 
-Every device lives in a self-contained package:
+A device is a self-contained, versionable package:
 
 ```text
-device-package.yaml
-model/device.yaml
-flows/behavior.yaml
-scenarios/*.yaml
-fixtures/
-docs/
-assets/
+my-device/
+├── device-package.yaml
+├── model/
+│   └── device.yaml
+├── flows/
+│   └── behavior.yaml
+├── scenarios/
+├── fixtures/
+├── docs/
+└── assets/
 ```
-
-Only resources declared in the manifest are required. Package paths must stay
-inside the package root, and the package ID must match its runtime model.
-
 
 Create and validate a package:
 
 ```shell
-cargo run -p vds-cli -- device-package new ./my-sensor \
-  --id my-sensor --name "My Sensor" --bus i2c
+vds-cli device-package new ./my-sensor \
+  --id my-sensor \
+  --name "My Sensor" \
+  --bus i2c
 
-cargo run -p vds-cli -- device-package validate ./my-sensor
+vds-cli device-package validate ./my-sensor
 ```
 
-The scaffold creates the portable structure; the author must complete the
-bus-specific model before it can execute. The package schema accepts SPI, I2C,
-GPIO, Ethernet, UART, CAN, USB, and custom buses. The currently executable
-generic drivers are SPI command, I2C register (plus the AT24C EEPROM driver),
-GPIO bank, and UART responder; Ethernet, CAN, USB, and custom buses are
-schema-only.
+The bundled examples include generic SPI/I²C/GPIO/UART devices, AT24C EEPROM models and a Micron MT25QL256 flash model.
 
-See the [Device Package SDK](docs/development/device-package-sdk.md), the
-[behavior flow reference](docs/device-models/device-behavior-flow-reference.md),
-and the [package](schemas/device-package.schema.json) and
-[model](schemas/device-model.schema.json) schemas.
+See the [Device Package SDK](docs/development/device-package-sdk.md), [behavior-flow reference](docs/device-models/device-behavior-flow-reference.md), and package/model schemas under [schemas/](schemas/).
 
-## Scenarios
+## Cross-device signals
 
-Scenarios run headlessly against the same runtime registry used by native
-clients, using the virtual clock:
+Device models can expose public boolean output signals and connect them to device-driven GPIO lines through a board topology.
+
+A typical flow is:
+
+```text
+sensor schedules conversion completion
+        ↓
+sensor.drdy becomes high
+        ↓
+VDS4E topology routes the signal
+        ↓
+virtual GPIO line changes
+        ↓
+/dev/gpiochipN reports an edge
+        ↓
+application reads the sensor over SPI/I²C
+        ↓
+read-clear status deasserts DRDY
+```
+
+This allows application behavior based on interrupts/data-ready lines to be exercised without adding simulator-specific code to the application.
+
+See [Topology](docs/guides/topology.md).
+
+## Scenarios and deterministic device behavior
+
+Headless scenarios use a manual virtual clock. Device-model operations such as state transitions, delayed actions, faults and timed write/erase behavior can therefore be reproduced independently of host CPU speed.
+
+Example:
 
 ```shell
-cargo run -p vds-cli -- scenario run \
+vds-cli scenario run \
   device-models/examples/micron-mt25ql256aba8esf-0sit/scenarios/01-read-jedec-id.yaml \
   --config config/vds-server.yaml \
-  --json-output /tmp/mt25ql256-result.json \
-  --junit-output /tmp/mt25ql256-result.xml
+  --json-output /tmp/result.json \
+  --junit-output /tmp/result.xml
 ```
 
-Steps can reset a device, advance virtual time, send SPI requests, toggle
-faults, assert state/register/response/error values, and wait for typed events.
+The live server uses a real-time-backed simulator clock. Live runs therefore retain deterministic device-model semantics but are still subject to normal operating-system scheduling jitter. VDS4E does not claim whole-system or bit-for-bit determinism for live native processes.
 
-## Web control plane
+## Control and observability
 
-The Web UI provides:
+The server provides:
 
-- Dashboard
-- Devices
-- Adapters
-- Transactions
-- Device Library
-- Logs
+- REST control API
+- WebSocket event stream with bounded replay
+- optional SQLite event persistence
+- transaction and register inspection
+- device state and fault control
+- scenario execution
+- adapter management
+- React Web UI
 
-Behavior flows and scenarios are authored per device
-(`/devices/:deviceId/flows`, `/devices/:deviceId/scenarios`). The server also
-exposes REST resources under `/api/v1` and a WebSocket event stream at
-`GET /api/v1/events` with replay by `after_event_id`. REST and WebSocket are
-control and observability paths; native bus traffic uses the Unix-socket
-Protobuf data plane. For frontend development:
+High-frequency hardware transactions do **not** travel over REST. Native adapters use the framed Protobuf Unix-socket data plane.
 
-```shell
-npm --prefix apps/vds-web install
-npm --prefix apps/vds-web run dev
+Default development endpoints:
+
+```text
+Control API:  http://127.0.0.1:8080/api/v1
+Web UI:       http://127.0.0.1:4174
+Data plane:   /tmp/vds4e.sock
 ```
+
+## Hardware-description import
+
+The `vds-importer` crate can draft declarative models from:
+
+- CMSIS-SVD register descriptions
+- Device Tree source
+
+Importer output is intentionally a starting point rather than a finished behavioral model. Device-specific semantics still need to be reviewed and completed by the model author.
+
+## What VDS4E does not simulate
+
+VDS4E provides functional peripheral simulation. It does not currently model:
+
+- CPU instruction execution
+- a complete SoC or board boot
+- electrical characteristics or signal integrity
+- controller DMA/IRQ timing
+- analog behavior
+- Ethernet, CAN or USB runtime devices
+- full-system checkpoint/restore or record/replay
+
+Use QEMU, Renode or another full-system platform when CPU/SoC emulation is the requirement. Use hardware-in-the-loop and real-target testing for electrical, timing and hardware-integration validation.
+
+For recorded, unprivileged device replay, [umockdev](https://github.com/martinpitt/umockdev) may be a lighter fit. VDS4E is aimed at cases where stateful modeled behavior, kernel-visible interfaces, shared device state and cross-device interaction matter.
 
 ## Verification
+
+The regular CI validates the Rust workspace, Web UI, native adapters and example applications.
+
+Equivalent local checks include:
 
 ```shell
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
+
+npm --prefix apps/vds-web ci
 npm --prefix apps/vds-web run lint
 npm --prefix apps/vds-web run typecheck
 npm --prefix apps/vds-web run test:run
 npm --prefix apps/vds-web run build
 ```
 
-Native adapters and examples have their own CMake or Make definitions; the root
-`./configure` and `./build.sh` pipeline builds them together.
+A real Linux ABI E2E harness is available under `tests/e2e/` for privileged integration testing with standard Linux tools and kernel-backed interfaces.
 
-## Architecture boundaries
+## Documentation
 
-- The server is the only authoritative owner of runtime device state.
-- The Web UI never implements device semantics.
-- Linux adapters implement host ABI translation, not device behavior.
-- High-frequency hardware transactions do not use REST.
-- Models, behavior flows, and scenarios come only from device packages.
-- Packages are declarative and cannot load arbitrary executable extensions.
-- Privileged kernel integration is isolated from the default runtime.
-- Generated build outputs are not source artifacts.
+| Document | Purpose |
+| --- | --- |
+| [Getting started](docs/guides/getting-started.md) | prerequisites, development workspace, staged build and installation |
+| [Architecture](VDS4E_ARCHITECTURE.md) | authoritative system architecture and boundaries |
+| [Roadmap](docs/ROADMAP.md) | planned capabilities |
+| [SPI guide](docs/guides/spi.md) | spidev adapter and SPI examples |
+| [I²C guide](docs/guides/i2c.md) | i2c-dev adapter and EEPROM examples |
+| [GPIO guide](docs/guides/gpio.md) | gpio-sim integration and line semantics |
+| [UART guide](docs/guides/uart.md) | PTY adapter |
+| [Topology guide](docs/guides/topology.md) | cross-device signal routing |
+| [ADRs](docs/adr/README.md) | architecture decisions |
+| [Contributing](CONTRIBUTING.md) | development and contribution guidance |
+| [Security](SECURITY.md) | security policy |
 
+## Project boundaries
+
+The project intentionally keeps these responsibilities separate:
+
+- the server owns authoritative virtual-device state;
+- host adapters translate Linux ABIs and do not contain device semantics;
+- the Web UI is a control and observability client, not a device runtime;
+- high-frequency transactions use the native Unix-socket data plane;
+- behavior comes from declarative device packages;
+- privileged kernel integration is isolated from the core runtime.
+
+These boundaries are part of the product design, not just implementation details.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
 
 ## Maintainer
 
