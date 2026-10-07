@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-07
+
 ### Changed
 - Web UI redesigned as an engineering workstation: one navigation rail and a
   bottom status bar replace the double navigation, placeholder account chrome and
