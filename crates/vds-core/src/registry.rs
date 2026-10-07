@@ -24,6 +24,7 @@ pub struct DeviceFaultSnapshot {
 #[derive(Default)]
 pub struct DeviceRegistry {
     devices: RwLock<HashMap<String, Arc<dyn Device>>>,
+    router: RwLock<Option<Arc<crate::topology::SignalRouter>>>,
 }
 
 impl DeviceRegistry {
@@ -52,6 +53,56 @@ impl DeviceRegistry {
         Ok(())
     }
 
+    /// Validates a topology against the registered devices and activates
+    /// signal routing. Current signal levels are propagated immediately.
+    ///
+    /// # Errors
+    /// Returns an error when the topology references unknown devices, ports or
+    /// lines, has multiple drivers or a cycle, or the initial propagation fails.
+    pub fn attach_topology(
+        &self,
+        topology: &crate::topology::Topology,
+        clock: Arc<dyn crate::clock::SimulatorClock>,
+    ) -> Result<(), crate::topology::TopologyError> {
+        let router =
+            crate::topology::SignalRouter::new(topology, &|id| self.device(id).ok(), clock)?;
+        *self
+            .router
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(Arc::new(router));
+        self.settle()
+            .map_err(|error| crate::topology::TopologyError::Validation(error.to_string()))
+    }
+
+    /// Returns whether a topology with at least one connection is active.
+    #[must_use]
+    pub fn has_topology(&self) -> bool {
+        self.router().is_some()
+    }
+
+    fn router(&self) -> Option<Arc<crate::topology::SignalRouter>> {
+        self.router
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Propagates pending signal changes until stable.
+    fn settle(&self) -> Result<(), DeviceError> {
+        match self.router() {
+            Some(router) => router.settle(&|id| self.device(id)),
+            None => Ok(()),
+        }
+    }
+
+    /// Returns the transaction result unless signal propagation itself failed.
+    fn after_transaction<T>(&self, result: Result<T, DeviceError>) -> Result<T, DeviceError> {
+        let settled = self.settle();
+        let value = result?;
+        settled?;
+        Ok(value)
+    }
+
     /// Routes a configured SPI transaction to a registered device.
     ///
     /// # Errors
@@ -64,8 +115,10 @@ impl DeviceRegistry {
         wire: SpiWireConfig,
     ) -> Result<DeviceTransfer, DeviceError> {
         crate::device::validate_spi_transfer_size(request.len(), rx_length)?;
-        self.device(device_id)?
-            .transfer_spi(request, rx_length, wire)
+        let result = self
+            .device(device_id)?
+            .transfer_spi(request, rx_length, wire);
+        self.after_transaction(result)
     }
 
     /// Routes an atomic I2C message sequence to a registered device.
@@ -78,7 +131,8 @@ impl DeviceRegistry {
         messages: &[I2cMessage],
     ) -> Result<Vec<Vec<u8>>, DeviceError> {
         crate::device::validate_i2c_transfer_size(messages)?;
-        self.device(device_id)?.transfer_i2c(messages)
+        let result = self.device(device_id)?.transfer_i2c(messages);
+        self.after_transaction(result)
     }
 
     /// Exchanges GPIO line levels with a registered GPIO device.
@@ -121,7 +175,8 @@ impl DeviceRegistry {
     /// # Errors
     /// Returns an error when the device is unknown or rejects reset.
     pub fn reset(&self, device_id: &str) -> Result<Vec<crate::event::DeviceEvent>, DeviceError> {
-        self.device(device_id)?.reset()
+        let result = self.device(device_id)?.reset();
+        self.after_transaction(result)
     }
 
     /// Reads a register through a registered device's inspection API.
@@ -143,7 +198,8 @@ impl DeviceRegistry {
         address: u64,
         value: u64,
     ) -> Result<crate::device::RegisterTrace, DeviceError> {
-        self.device(device_id)?.write_register(address, value)
+        let result = self.device(device_id)?.write_register(address, value);
+        self.after_transaction(result)
     }
 
     /// Returns a registered device's current state.
@@ -185,6 +241,7 @@ impl DeviceRegistry {
                 events.push((id.clone(), event));
             }
         }
+        self.settle()?;
         Ok(events)
     }
 
@@ -193,13 +250,16 @@ impl DeviceRegistry {
     /// # Errors
     /// Returns an error when scheduler state cannot be inspected.
     pub fn next_event_deadline_ns(&self) -> Result<Option<u64>, DeviceError> {
-        self.device_values().iter().try_fold(None, |next, device| {
-            let deadline = device.next_event_deadline_ns()?;
-            Ok(match (next, deadline) {
-                (Some(left), Some(right)) => Some(left.min(right)),
-                (None, deadline) | (deadline, None) => deadline,
+        let router_deadline = self.router().and_then(|router| router.next_deadline_ns());
+        self.device_values()
+            .iter()
+            .try_fold(router_deadline, |next, device| {
+                let deadline = device.next_event_deadline_ns()?;
+                Ok(match (next, deadline) {
+                    (Some(left), Some(right)) => Some(left.min(right)),
+                    (None, deadline) | (deadline, None) => deadline,
+                })
             })
-        })
     }
 
     /// Lists devices in deterministic ID order.

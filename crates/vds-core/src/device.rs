@@ -67,6 +67,16 @@ pub struct I2cMessage {
 pub struct GpioLineSnapshot {
     pub offset: u16,
     pub name: String,
+    /// The simulated device drives this line toward the host (`output` in the
+    /// model). Only such lines can be the target of a signal connection.
+    pub device_driven: bool,
+}
+
+/// Current level of one public output signal port of a device.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignalLevel {
+    pub name: String,
+    pub value: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -308,6 +318,29 @@ pub trait Device: Send + Sync {
     /// Returns a device error when GPIO metadata cannot be inspected.
     fn gpio_lines(&self) -> Result<Vec<GpioLineSnapshot>, DeviceError> {
         Ok(Vec::new())
+    }
+
+    /// Lists every public output signal port with its current level, in
+    /// declaration order. Devices without signal ports return an empty list.
+    ///
+    /// # Errors
+    /// Returns a device error when the port levels cannot be evaluated.
+    fn signal_outputs(&self) -> Result<Vec<SignalLevel>, DeviceError> {
+        Ok(Vec::new())
+    }
+
+    /// Drives a device-driven GPIO line by name to a logical level.
+    ///
+    /// Returns whether the level changed.
+    ///
+    /// # Errors
+    /// Returns a device error when the device is not a GPIO bank, the line is
+    /// unknown, or the line is host-driven.
+    fn drive_gpio_line(&self, _name: &str, _level: bool) -> Result<bool, DeviceError> {
+        Err(DeviceError::InvalidRequest(format!(
+            "device '{}' does not support GPIO line driving",
+            self.id()
+        )))
     }
 
     /// Applies due simulator events without issuing a bus transaction.

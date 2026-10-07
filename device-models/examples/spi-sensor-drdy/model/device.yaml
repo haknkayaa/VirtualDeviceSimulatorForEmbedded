@@ -1,0 +1,56 @@
+schema_version: 1
+
+device:
+  id: spi-sensor-drdy
+  name: SPI Sensor with DRDY Output
+  bus: spi
+  model: generic-spi-command
+  spi:
+    mode: 0
+    transfer_bits: 8
+    max_frequency_hz: 10000000
+
+  commands:
+    - { name: START_CONVERSION, opcode: 0x10, response: [], event: start }
+    - { name: READ_SAMPLE, opcode: 0x20, operation: register_read, register: SAMPLE }
+
+  registers:
+    - name: SAMPLE
+      address: 0x20
+      width_bits: 32
+      reset_value: 0
+      access: ro
+      description: Latest conversion result. Bit 31 flags a sample that has not been read yet.
+      bitfields:
+        - { name: VALUE, lsb: 0, width: 16, access: ro, description: Conversion result. }
+        - { name: NEW, lsb: 31, width: 1, access: ro, read_clear: true, description: New sample flag; cleared when the sample is read. }
+
+  state_machine:
+    initial_state: idle
+    states:
+      idle:
+        transitions:
+          - { event: start, target: converting }
+      converting:
+        transitions:
+          - { event: start, target: converting }
+          - { event: conversion_done, target: data_ready }
+        delayed_events:
+          - { event: conversion_done, delay_us: 1000 }
+      data_ready:
+        entry_actions:
+          - { set_register: { name: SAMPLE, value: 0x80001234, mask: 0xFFFFFFFF } }
+        transitions:
+          - { event: start, target: converting }
+
+  # Public signal port. Board topology connects to `spi-sensor-drdy.drdy`; it
+  # never refers to the register bit below, so the binding can move to the
+  # state machine later without changing any topology.
+  signals:
+    outputs:
+      - { name: drdy, type: bool, description: Asserted while an unread sample is available. }
+  signal_bindings:
+    - signal: drdy
+      source: { register: SAMPLE, bit: 31 }
+
+  faults: []

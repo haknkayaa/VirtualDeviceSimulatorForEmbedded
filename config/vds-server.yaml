@@ -28,3 +28,7 @@ device_packages:
   - device-models/examples/generic-i2c-register
   - device-models/examples/atmel-at24c128
   - device-models/examples/atmel-at24c256
+
+# Optional board topology connecting device signal ports to GPIO lines.
+# See config/topology.example.yaml and docs/guides/topology.md.
+# topology: config/topology.yaml

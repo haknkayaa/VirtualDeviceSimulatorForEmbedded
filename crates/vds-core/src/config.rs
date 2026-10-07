@@ -22,6 +22,9 @@ pub struct ServerConfig {
     #[serde(default)]
     pub event_store: EventStoreSettings,
     pub device_packages: Vec<PathBuf>,
+    /// Optional board topology connecting public device signal ports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub topology: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

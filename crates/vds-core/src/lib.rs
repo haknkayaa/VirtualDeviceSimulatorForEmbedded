@@ -18,6 +18,8 @@ pub mod fault;
 pub mod registry;
 /// Declarative state-machine execution.
 pub mod state_machine;
+/// Board topology and deterministic signal routing.
+pub mod topology;
 /// Bus transaction records.
 pub mod transaction;
 

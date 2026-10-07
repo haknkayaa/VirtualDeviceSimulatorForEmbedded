@@ -71,6 +71,10 @@ pub fn load_registry_with_clock(
         };
         registry.register(device)?;
     }
+    if let Some(path) = &config.topology {
+        let topology = vds_core::topology::Topology::load(path)?;
+        registry.attach_topology(&topology, Arc::clone(&clock))?;
+    }
     drop(clock);
     Ok(registry)
 }
@@ -209,6 +213,9 @@ async fn serve(config: ServerConfig) -> Result<(), ServerError> {
         Arc::new(EventBus::new(vds_events::DEFAULT_RING_CAPACITY, 1_024))
     };
     spawn_event_logger(Arc::clone(&events));
+    if registry.has_topology() {
+        spawn_signal_pump(Arc::clone(&registry));
+    }
     let api_state = http::ApiState::new_persistent(
         config.clone(),
         Arc::clone(&registry),
@@ -279,6 +286,21 @@ async fn serve(config: ServerConfig) -> Result<(), ServerError> {
             }
         }
     }
+}
+
+/// Applies due device events on the live server so timer-driven signals reach
+/// their connections without waiting for another bus transaction.
+fn spawn_signal_pump(registry: Arc<DeviceRegistry>) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(2));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            interval.tick().await;
+            if let Err(error) = registry.run_due_events() {
+                warn!(component = "signals", %error, "signal pump failed");
+            }
+        }
+    });
 }
 
 fn spawn_event_logger(events: Arc<EventBus>) {
@@ -1219,6 +1241,9 @@ pub enum ServerError {
 
     #[error(transparent)]
     Io(#[from] std::io::Error),
+
+    #[error(transparent)]
+    Topology(#[from] vds_core::topology::TopologyError),
 
     #[error(transparent)]
     Model(#[from] ModelError),

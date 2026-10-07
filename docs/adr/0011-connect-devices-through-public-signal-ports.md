@@ -1,6 +1,6 @@
 # 0011: Connect devices through public signal ports
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-07
 
 ## Context
@@ -10,22 +10,23 @@ DRDY after a conversion, the application observes the edge on
 `/dev/gpiochipN` (for example with `gpiomon`), then reads the sample over
 `/dev/spidevX.Y` or `/dev/i2c-N`, and reading the sample clears DRDY.
 
-Today every runtime device is isolated. No model, schema field, or runtime
-path lets an I2C or SPI device drive a GPIO line. A GPIO bank line that the
-application reads is an `output` of the device side of the bank, so the
-sensor only needs a way to drive that line inside the runtime; the host
-adapters and the `gpio-sim` helper (ADR 0008) already carry the level out.
+Before this decision every runtime device was isolated. No model, schema field,
+or runtime path let an I2C or SPI device drive a GPIO line. A GPIO bank line
+that the application reads is an `output` of the simulated bank (the simulated
+side drives it, the host reads it), so a sensor only needs a way to drive that
+line inside the runtime; the GPIO adapter and kernel `gpio-sim` (ADR 0008)
+already carry the level out.
 
-Wiring must not leak a model's internals. If a topology refers to
+Wiring must not leak a model's internals. If a topology referred to
 `imu0.STATUS.bit3` or `imu0.state.READY`, moving DRDY from a register bit to a
-state machine silently breaks every topology that used the model.
+state machine would silently break every topology that used the model.
 
 ## Decision
 
 Devices expose **public signal ports**. A topology file connects ports, never
 registers or states.
 
-1. **Signal ports in the device model.** A model declares typed ports:
+1. **Output ports in the device model.** A model declares typed ports:
 
    ```yaml
    signals:
@@ -34,8 +35,9 @@ registers or states.
          type: bool
    ```
 
-   `bool` is the only type in the first version. Input ports are reserved for
-   later (RESET, chip-select-like lines).
+   Version 1 supports `bool` output ports only. Input ports, bidirectional or
+   open-drain lines, multiple drivers, and Device Tree integration are out of
+   scope.
 
 2. **Bindings are internal to the model.** A model drives a port from its own
    behavior:
@@ -43,25 +45,32 @@ registers or states.
    ```yaml
    signal_bindings:
      - signal: drdy
-       source:
-         register: { name: STATUS, bit: 3 }
+       source: { register: STATUS, bit: 3 }
      # or
      - signal: drdy
-       source:
-         state: { equals: data_ready }
-     # or a combination
+       source: { state: { equals: data_ready } }
+     # or a combination built from typed logical nodes
      - signal: drdy
        source:
-         expression: "STATUS.DRDY && state == READY"
+         and:
+           - { register: STATUS, bit: 3 }
+           - { state: { equals: ready } }
    ```
 
-   Moving the source later changes the model only. The editor may offer
-   "register bit", "state machine state", and "expression" as source kinds,
-   but all of them drive the same public port.
+   Combined sources use the logical vocabulary of the existing typed signal
+   graph (`and`, `or`, `not`, `nand`, `nor`, `xor`, `xnor`) and share its
+   evaluation function; no string or expression language is introduced. The
+   existing signal graph is state-activated and push-driven and cannot
+   re-evaluate levels after arbitrary register changes, so bindings are a small
+   typed tree that reuses its node semantics rather than a graph instance.
 
-3. **Wiring lives in a separate topology file.**
+   Moving a source later changes only the model. Version 1 supports ports on
+   `generic-spi-command` and `generic-i2c-register` devices.
+
+3. **Wiring is a separate `topology.yaml`.**
 
    ```yaml
+   schema_version: 1
    connections:
      - from: imu0.drdy
        to: gpio0.DRDY_IMU
@@ -70,44 +79,62 @@ registers or states.
        delay_ns: 500
    ```
 
-   The endpoint `to:` names a GPIO line by its model line name. The topology
-   is a new top-level resource referenced from server configuration; it does
-   not appear in device packages, so packages stay reusable. Validation
-   rejects unknown devices, unknown ports, type mismatches, and a target line
-   that is already driven by another connection.
+   The server configuration references it with an optional `topology:` key.
+   The file is a top-level resource, not part of a device package, so packages
+   stay reusable.
 
-4. **Propagation is a deterministic signal router in the runtime.**
-   Default propagation has zero delay and happens at the same virtual
-   timestamp. It is not recursive: a transaction or time advance that changes
-   a port queues a signal event; the router drains all zero-delay events from
-   a deterministic FIFO queue until the system is stable; only then does the
-   transaction or advance complete. A connection with `delay_ns` is scheduled
-   on the virtual-time scheduler instead.
+   - Endpoint device names resolve to the runtime `device.id` values. A
+     separate instance or composition system is out of scope.
+   - GPIO targets are addressed canonically by line **name**; offsets are not
+     part of the topology contract.
+   - The target must be a device-driven line (`direction: output` in the GPIO
+     model). Two connections may not drive the same line.
+   - Validation rejects unknown devices, ports, and lines, host-driven
+     targets, multiple drivers, and cycles between devices.
 
-5. **Loops are bounded.** Topology validation rejects cycles that can be
-   proven statically. The router also enforces a maximum propagation depth
-   per drain and fails the transaction with a typed error if it is exceeded.
+4. **Propagation is a deterministic router in the runtime.** The device
+   registry owns the router. After every transaction, reset, register write,
+   and due-event pass it samples source ports and propagates a value **only
+   when it changed** since the previous propagation. Zero-delay changes drain
+   through a FIFO queue at the same virtual timestamp until the system is
+   stable; propagation is never recursive. A connection with `delay_ns` is
+   queued on virtual time and takes part in the earliest-deadline
+   calculation, so scenarios and the live server advance it like any device
+   event.
 
-6. **Read side effects are model behavior.** "Reading the sample clears DRDY"
-   requires a register read-clear access attribute (or an equivalent behavior
-   action) that does not exist yet. It is part of the device model and
-   register engine, not of the router or any ABI adapter.
+5. **Loops are bounded twice.** Topology validation rejects device-level
+   cycles. The router also enforces a maximum number of stabilization passes
+   and fails with a typed error if it is exceeded.
 
-7. **Boundary.** The router, topology, and signal ports live in the runtime
-   (`vds-core` / `vds-device-model` / `vds-server`). The SPI, I2C, and GPIO
-   host adapters gain no device-specific or topology knowledge.
+6. **Adapter boundary.** The router drives the target GPIO bank's backing
+   register. The existing path from the bank through the GPIO adapter and
+   kernel `gpio-sim` carries the level out. The router and topology contain no adapter knowledge, and the
+   SPI, I2C, and GPIO adapters gain no device-specific or topology knowledge.
+
+7. **Read side effects are model behavior.** "Reading the sample clears DRDY"
+   is expressed with a register bitfield attribute `read_clear: true`: a bus
+   read returns the current value and then clears those bits. Control-plane
+   and scenario register inspection never clear them. The router is not
+   involved.
+
+8. **Live-server pump.** Device schedulers only advance during that device's
+   own transactions. When a topology is attached the live server therefore
+   applies due events on a short interval, so a timer-driven DRDY does not
+   wait for the next bus transaction.
 
 ## Alternatives
 
 - **Wire to registers or states directly** (`imu0.STATUS.bit3`): rejected; it
-  leaks model internals and makes topologies break when behavior moves.
+  leaks model internals and breaks topologies when behavior moves.
 - **Declare the target inside the sensor package**: rejected; it binds a
   reusable package to one board.
+- **A string expression language for combined sources**: rejected; typed
+  logical nodes already exist and are schema-validated.
 - **Delay every connection by default**: rejected; for functional simulation
   the propagation delay of DRDY, IRQ, RESET, and BUSY lines is usually
-  irrelevant and users expect the edge immediately after the transaction.
-- **Recursive propagation inside the transaction call**: rejected; it makes
-  ordering depend on call stacks and risks unbounded recursion.
+  irrelevant.
+- **Recursive propagation inside the transaction call**: rejected; ordering
+  would depend on call stacks and recursion would be unbounded.
 - **Let the GPIO helper or an adapter poll the sensor**: rejected; it moves
   device knowledge into an ABI adapter.
 
@@ -117,23 +144,16 @@ registers or states.
   topology.
 - Edge ordering is reproducible within the virtual-time domain.
 - `gpiomon` still observes the edge with the `gpio-sim` helper's polling
-  latency, which sits outside the virtual-time guarantee (see the timing note
-  in the README).
-- New schema surface: `signals`, `signal_bindings`, the topology file, and a
-  server-config reference to it. Scenarios gain the ability to assert port
-  values and connected line values.
-- Register read-clear and an expression evaluator are additional work.
+  latency, which sits outside the virtual-time guarantee.
+- A signal level is the line's logical value: an `active_low` target line
+  reaches the host inverted.
+- Topology is validated when the registry loads. Devices created later through
+  the control API are not part of an already attached topology.
+- Events produced by the live pump are not published to the domain event bus
+  in this version, and propagation itself emits no domain event.
 
 ## Migration impact
 
-Additive. Existing models without `signals` and configurations without a
-topology behave exactly as before. Accepted ADR 0008 is unchanged.
-`VDS4E_ARCHITECTURE.md` must be updated before implementation starts.
-
-## Open questions
-
-- Expression language for combined sources: reuse the behavior-flow logical
-  nodes or a small dedicated syntax.
-- Whether `gpio0.DRDY_IMU` should address lines by name only or also by
-  offset.
-- Topology file name and the server-config key that references it.
+Additive. Models without `signals`, bitfields without `read_clear`, and
+configurations without `topology` behave exactly as before. Accepted ADR 0008
+is unchanged. `VDS4E_ARCHITECTURE.md` section 8.8 records the architecture.

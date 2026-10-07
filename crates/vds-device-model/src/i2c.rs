@@ -8,7 +8,7 @@ use vds_core::device::{
 };
 use vds_registers::{RegisterDefinition, RegisterEngine, RegisterError};
 
-use crate::{I2cBusDefinition, ModelError, map_access, map_register_error};
+use crate::{I2cBusDefinition, ModelError, map_access, map_register_error, signals::SignalOutputs};
 
 struct I2cState {
     pointer: u64,
@@ -20,6 +20,7 @@ struct I2cState {
 pub struct GenericI2cDevice {
     id: String,
     definition: I2cBusDefinition,
+    signals: Option<SignalOutputs>,
     state: Mutex<I2cState>,
 }
 
@@ -28,10 +29,12 @@ impl GenericI2cDevice {
         id: String,
         definition: I2cBusDefinition,
         registers: Vec<RegisterDefinition>,
+        signals: Option<SignalOutputs>,
     ) -> Result<Self, ModelError> {
         Ok(Self {
             id,
             definition,
+            signals,
             state: Mutex::new(I2cState {
                 pointer: 0,
                 registers: RegisterEngine::new(registers)?,
@@ -108,7 +111,8 @@ impl Device for GenericI2cDevice {
                 }
                 let mut response = Vec::with_capacity(message.read_length);
                 for _ in 0..message.read_length {
-                    let value = match state.registers.read(state.pointer) {
+                    let pointer = state.pointer;
+                    let value = match state.registers.read_clearing(pointer) {
                         Ok(read) => u8::try_from(read.value).map_err(|_| {
                             DeviceError::InvalidRequest(format!(
                                 "I2C register 0x{:X} does not fit one byte",
@@ -163,6 +167,13 @@ impl Device for GenericI2cDevice {
             }
         }
         Ok(reads)
+    }
+
+    fn signal_outputs(&self) -> Result<Vec<vds_core::device::SignalLevel>, DeviceError> {
+        let Some(signals) = &self.signals else {
+            return Ok(Vec::new());
+        };
+        signals.evaluate(&self.lock()?.registers, None)
     }
 
     fn reset(&self) -> Result<Vec<vds_core::event::DeviceEvent>, DeviceError> {
@@ -267,6 +278,7 @@ mod tests {
                     bitfields: Vec::new(),
                 },
             ],
+            None,
         )
         .unwrap();
         let reads = device

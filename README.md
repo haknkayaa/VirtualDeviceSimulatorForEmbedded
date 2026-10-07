@@ -143,6 +143,7 @@ staged `./configure`, `./build.sh`, `./install` pipeline are described in
 | [I2C](docs/guides/i2c.md) | `/dev/i2c-N`, `i2c-tools`, the AT24C EEPROM example, timing domain |
 | [GPIO](docs/guides/gpio.md) | `/dev/gpiochipX`, libgpiod tools, line direction mapping |
 | [UART](docs/guides/uart.md) | PTY endpoint and the `uart_ping` example |
+| [Topology](docs/guides/topology.md) | Connecting a sensor's DRDY signal to a GPIO line |
 
 Adapter details: [SPI CUSE](adapters/spi-cuse/README.md),
 [I2C CUSE](adapters/i2c-cuse/README.md),

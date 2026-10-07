@@ -11,6 +11,7 @@ use super::{
     encode_unsigned, evaluate_guard, map_access, map_register_error, map_state_machine_error,
     ms_to_ns, schedule_state_events,
 };
+use crate::signals::SignalOutputs;
 
 /// Static generic SPI command implementation backed by declarative responses.
 pub struct GenericSpiDevice {
@@ -19,6 +20,7 @@ pub struct GenericSpiDevice {
     pub(super) spi: SpiBusDefinition,
     pub(super) clock: Arc<dyn SimulatorClock>,
     pub(super) busy_binding: Option<BusyDefinition>,
+    pub(super) signals: Option<SignalOutputs>,
     pub(super) state: Mutex<DeviceState>,
 }
 
@@ -154,7 +156,7 @@ impl Device for GenericSpiDevice {
                 address_bytes,
                 register,
             } => Self::read_register(
-                &state.registers,
+                &mut state.registers,
                 request,
                 *address_bytes,
                 register.as_deref(),
@@ -367,6 +369,20 @@ impl Device for GenericSpiDevice {
 
     fn current_state(&self) -> Result<Option<String>, DeviceError> {
         GenericSpiDevice::current_state(self)
+    }
+
+    fn signal_outputs(&self) -> Result<Vec<vds_core::device::SignalLevel>, DeviceError> {
+        let Some(signals) = &self.signals else {
+            return Ok(Vec::new());
+        };
+        let state = self.lock_state()?;
+        signals.evaluate(
+            &state.registers,
+            state
+                .state_machine
+                .as_ref()
+                .map(StateMachine::current_state),
+        )
     }
 
     fn set_fault_enabled(&self, fault_id: &str, enabled: bool) -> Result<bool, DeviceError> {
@@ -677,7 +693,7 @@ impl GenericSpiDevice {
     }
 
     fn read_register(
-        engine: &RegisterEngine,
+        engine: &mut RegisterEngine,
         request: &[u8],
         address_bytes: Option<u8>,
         register: Option<&str>,
@@ -706,7 +722,7 @@ impl GenericSpiDevice {
             decode_unsigned(&request[1..])
         };
         let read = engine
-            .read(address)
+            .read_clearing(address)
             .map_err(|error| map_register_error(&error, RegisterOperation::Read, None))?;
         let value_bytes = usize::from(read.register.width_bits).div_ceil(8);
         let response = encode_unsigned(read.value, value_bytes);

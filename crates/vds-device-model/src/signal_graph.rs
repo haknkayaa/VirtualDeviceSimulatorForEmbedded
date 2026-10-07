@@ -54,6 +54,26 @@ pub enum SignalNode {
     },
 }
 
+impl SignalNode {
+    /// Evaluates a logical node for boolean inputs, or `None` for non-logical nodes.
+    ///
+    /// `b` is ignored by `LogicalNot`. This is the single definition of logical
+    /// semantics shared by the signal graph and public signal bindings.
+    #[must_use]
+    pub const fn evaluate_logical(&self, a: bool, b: bool) -> Option<bool> {
+        match self {
+            Self::LogicalNot => Some(!a),
+            Self::LogicalAnd => Some(a && b),
+            Self::LogicalOr => Some(a || b),
+            Self::LogicalNand => Some(!(a && b)),
+            Self::LogicalNor => Some(!(a || b)),
+            Self::LogicalXor => Some(a ^ b),
+            Self::LogicalXnor => Some(a == b),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FileFormat {
@@ -188,15 +208,9 @@ impl SignalGraph {
                     return Ok(());
                 };
                 let (a, b) = (as_bool(a)?, as_bool(b)?);
-                let result = match node {
-                    SignalNode::LogicalAnd => a && b,
-                    SignalNode::LogicalOr => a || b,
-                    SignalNode::LogicalNand => !(a && b),
-                    SignalNode::LogicalNor => !(a || b),
-                    SignalNode::LogicalXor => a ^ b,
-                    SignalNode::LogicalXnor => a == b,
-                    _ => unreachable!(),
-                };
+                let result = node
+                    .evaluate_logical(a, b)
+                    .expect("binary logical node evaluates");
                 self.emit(node_id, SignalValue::Bool(result), execution)
             }
             SignalNode::Timer { duration_ns } | SignalNode::Timeout { duration_ns } => {

@@ -136,11 +136,51 @@ impl Device for GenericGpioDevice {
             .collect())
     }
 
+    fn drive_gpio_line(&self, name: &str, level: bool) -> Result<bool, DeviceError> {
+        let index = self
+            .lines
+            .iter()
+            .position(|line| line.name == name)
+            .ok_or_else(|| {
+                DeviceError::InvalidRequest(format!(
+                    "GPIO device '{}' has no line '{name}'",
+                    self.id
+                ))
+            })?;
+        if self.lines[index].direction != GpioLineDirection::Output {
+            return Err(DeviceError::InvalidRequest(format!(
+                "GPIO line '{}.{name}' is host-driven and cannot be driven by a signal",
+                self.id
+            )));
+        }
+        let mut state = self.state.lock().map_err(|_| {
+            DeviceError::InvalidRequest(format!("GPIO device '{}' state is unavailable", self.id))
+        })?;
+        let mut changed = state.values[index] != level;
+        state.values[index] = level;
+        if let Some(address) = self.register_addresses[index] {
+            changed = state
+                .registers
+                .read_internal(address)
+                .map_err(|error| map_register_error(&error, RegisterOperation::Read, None))?
+                .value
+                != u64::from(level);
+            state
+                .registers
+                .write_internal(address, u64::from(level))
+                .map_err(|error| {
+                    map_register_error(&error, RegisterOperation::Write, Some(u64::from(level)))
+                })?;
+        }
+        Ok(changed)
+    }
+
     fn gpio_lines(&self) -> Result<Vec<GpioLineSnapshot>, DeviceError> {
         Ok(self
             .lines
             .iter()
             .map(|line| GpioLineSnapshot {
+                device_driven: line.direction == GpioLineDirection::Output,
                 offset: line.offset,
                 name: line.name.clone(),
             })
