@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `GET /api/v1/topology` lists the attached board topology's signal connections
+  with their delay, last sampled source level and in-flight delayed deliveries.
+- The Web UI shows *Signal connections* on the Overview and, scoped to the
+  device, on the Devices Configuration tab.
+
 ### Changed
 - The Web UI Overview shows the live device path from the application under
   test through each adapter (Linux device node) to its virtual device, with

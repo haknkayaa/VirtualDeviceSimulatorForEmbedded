@@ -194,6 +194,32 @@ export interface BusTelemetryResponse {
   buses: BusTelemetry[]
 }
 
+export interface TopologyPendingDelivery {
+  due_ns: number
+  value: boolean
+}
+
+export interface TopologyConnection {
+  /** `<device>.<signal>` */
+  from: string
+  /** `<device>.<line>` */
+  to: string
+  source_device: string
+  source_signal: string
+  target_device: string
+  target_line: string
+  delay_ns: number
+  /** Last sampled source level; null until first sampled. */
+  level: boolean | null
+  pending: TopologyPendingDelivery[]
+}
+
+export interface Topology {
+  attached: boolean
+  path: string | null
+  connections: TopologyConnection[]
+}
+
 export interface Fault {
   id: string
   device_id: string

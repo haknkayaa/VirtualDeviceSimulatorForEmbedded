@@ -81,6 +81,33 @@ stream and shown in the Web UI event views. `phase: emitted` marks a source port
 change; `phase: delivered` marks the target GPIO line being driven (later than
 `emitted` when the connection has `delay_ns`).
 
+## Inspecting connections
+
+`GET /api/v1/topology` returns the attached topology file and each connection
+with its configured delay, the last source level the router sampled, and any
+delayed level change still travelling to the line:
+
+```json
+{
+  "attached": true,
+  "path": "/etc/vds4e/topology.yaml",
+  "connections": [
+    {
+      "from": "spi-sensor-drdy.drdy",
+      "to": "generic-gpio-bank-32.GPIO17",
+      "delay_ns": 500000,
+      "level": true,
+      "pending": [{ "due_ns": 2000000, "value": true }]
+    }
+  ]
+}
+```
+
+Without a topology the response is `{"attached": false, "path": null,
+"connections": []}`. The Web UI shows the same table as *Signal connections* on
+the Overview, and on a device's Configuration tab for connections that start or
+end at that device.
+
 ## Verified against the real ABI
 
 `tests/e2e/drdy` runs the chain with unmodified tools: `spidev_test` (SPI sensor) or

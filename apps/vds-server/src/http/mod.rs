@@ -25,6 +25,8 @@ mod faults;
 use faults::{disable_fault, enable_fault, faults};
 mod events;
 use events::events;
+mod topology;
+use topology::topology;
 
 use std::{
     collections::HashMap,
@@ -226,6 +228,7 @@ pub fn router(state: ApiState) -> Router {
         .route("/api/v1/runs/{run_id}/cancel", post(cancel_run))
         .route("/api/v1/runs/{run_id}/result", get(run_result))
         .route("/api/v1/runs/{run_id}/result/junit", get(run_result_junit))
+        .route("/api/v1/topology", get(topology))
         .route("/api/v1/faults", get(faults))
         .route("/api/v1/faults/{id}/enable", post(enable_fault))
         .route("/api/v1/faults/{id}/disable", post(disable_fault))

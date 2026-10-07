@@ -17,8 +17,8 @@ Out of scope for version 1 and candidates for follow-up ADRs:
 - input ports and bidirectional or open-drain lines;
 - multiple drivers on one line;
 - `generic-gpio-bank` and other models exposing signal ports;
-- domain events for signal changes and publishing events from the live pump;
-- control-plane and Web UI views of connections;
+- editing connections from the control plane or Web UI (a read-only view and
+  `GET /api/v1/topology` exist);
 - attaching a topology to devices created at runtime;
 - Device Tree driven topology generation.
 

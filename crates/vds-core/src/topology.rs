@@ -59,6 +59,28 @@ pub struct SignalTransition {
     pub time_ns: u64,
 }
 
+/// A delayed delivery still travelling along a connection.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PendingDelivery {
+    /// Virtual time at which the level reaches the target line.
+    pub due_ns: u64,
+    pub value: bool,
+}
+
+/// Read-only view of one connection for control-plane inspection.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConnectionSnapshot {
+    pub source_device: String,
+    pub source_signal: String,
+    pub target_device: String,
+    pub target_line: String,
+    pub delay_ns: u64,
+    /// Last source level the router sampled; `None` until first sampled.
+    pub level: Option<bool>,
+    /// Delayed deliveries not yet applied, in due order.
+    pub pending: Vec<PendingDelivery>,
+}
+
 /// Receives propagation steps. Called while the router holds its internal lock,
 /// so it must be cheap, must not block, and must not call back into the registry.
 pub type SignalObserver = Arc<dyn Fn(&SignalTransition) + Send + Sync>;
@@ -400,6 +422,37 @@ impl SignalRouter {
         Ok(())
     }
 
+    /// Connections in declaration order with their sampled level and any
+    /// delayed deliveries still in flight.
+    #[must_use]
+    pub fn snapshot(&self) -> Vec<ConnectionSnapshot> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        self.edges
+            .iter()
+            .enumerate()
+            .map(|(index, edge)| ConnectionSnapshot {
+                source_device: edge.source_device.clone(),
+                source_signal: edge.source_port.clone(),
+                target_device: edge.target_device.clone(),
+                target_line: edge.target_line.clone(),
+                delay_ns: edge.delay_ns,
+                level: state.last[index],
+                pending: state
+                    .pending
+                    .iter()
+                    .filter(|(_, (edge_index, _))| *edge_index == index)
+                    .map(|((due_ns, _), (_, value))| PendingDelivery {
+                        due_ns: *due_ns,
+                        value: *value,
+                    })
+                    .collect(),
+            })
+            .collect()
+    }
+
     /// Human-readable connection list for diagnostics.
     #[must_use]
     pub fn connections(&self) -> Vec<String> {
@@ -642,6 +695,58 @@ mod tests {
         fixture.registry.run_due_events().unwrap();
         assert!(fixture.bank.levels.lock().unwrap()["DRDY"]);
         assert_eq!(fixture.registry.next_event_deadline_ns().unwrap(), None);
+    }
+
+    #[test]
+    fn snapshot_reports_levels_and_in_flight_deliveries() {
+        let fixture = fixture();
+        assert_eq!(fixture.registry.topology_connections(), None);
+        attach(
+            &fixture,
+            "schema_version: 1\nconnections:\n  - { from: imu0.ready, to: gpio0.DRDY, delay_ns: 500 }\n",
+        )
+        .unwrap();
+        let connection = |fixture: &Fixture| {
+            fixture
+                .registry
+                .topology_connections()
+                .unwrap()
+                .pop()
+                .unwrap()
+        };
+        let initial = connection(&fixture);
+        assert_eq!(
+            (
+                initial.source_device.as_str(),
+                initial.source_signal.as_str(),
+                initial.target_device.as_str(),
+                initial.target_line.as_str(),
+                initial.delay_ns,
+                initial.level,
+            ),
+            ("imu0", "ready", "gpio0", "DRDY", 500, Some(false))
+        );
+
+        fixture.source.level.store(true, Ordering::SeqCst);
+        poke(&fixture);
+        assert_eq!(
+            connection(&fixture).pending,
+            [
+                PendingDelivery {
+                    due_ns: 500,
+                    value: false
+                },
+                PendingDelivery {
+                    due_ns: 500,
+                    value: true
+                }
+            ]
+        );
+        assert_eq!(connection(&fixture).level, Some(true));
+
+        fixture.clock.advance(Duration::from_nanos(500)).unwrap();
+        fixture.registry.run_due_events().unwrap();
+        assert!(connection(&fixture).pending.is_empty());
     }
 
     fn recorder(fixture: &Fixture) -> Arc<Mutex<Vec<SignalTransition>>> {
