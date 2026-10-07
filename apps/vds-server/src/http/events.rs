@@ -35,6 +35,15 @@ async fn event_socket(mut socket: WebSocket, events: Arc<EventBus>, after_event_
             }
             first = subscription.recv() => {
                 let Some(first) = first else { break };
+                if let Some(gap) = subscription.take_gap() {
+                    let notice = serde_json::json!({ "resync_required": {
+                        "after_event_id": gap.after_event_id,
+                        "resume_event_id": gap.resume_event_id,
+                    }});
+                    if socket.send(Message::Text(notice.to_string().into())).await.is_err() {
+                        break;
+                    }
+                }
                 let mut batch = vec![first];
                 let deadline = tokio::time::sleep(std::time::Duration::from_millis(20));
                 tokio::pin!(deadline);

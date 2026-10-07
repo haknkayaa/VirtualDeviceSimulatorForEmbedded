@@ -6,7 +6,9 @@ mod runs;
 mod telemetry;
 
 mod packages;
-use packages::{device_package_image, device_packages, import_device_package};
+use packages::{
+    IMPORT_BODY_LIMIT_BYTES, device_package_image, device_packages, import_device_package,
+};
 mod adapter_routes;
 use adapter_routes::{
     adapters, attach_adapter_device, create_adapter, detach_adapter_device, load_adapter,
@@ -18,7 +20,7 @@ use devices::{
     registers, reset_device, write_register,
 };
 mod scenarios;
-use scenarios::{run, run_result, run_result_junit, run_scenario, scenario, scenarios};
+use scenarios::{cancel_run, run, run_result, run_result_junit, run_scenario, scenario, scenarios};
 mod faults;
 use faults::{disable_fault, enable_fault, faults};
 mod events;
@@ -35,7 +37,7 @@ use std::{
 use axum::{
     Json, Router,
     extract::{
-        Path, Query, State,
+        DefaultBodyLimit, Path, Query, State,
         ws::{Message, WebSocket, WebSocketUpgrade},
     },
     http::{StatusCode, header},
@@ -191,7 +193,7 @@ pub fn router(state: ApiState) -> Router {
         )
         .route(
             "/api/v1/device-packages/import",
-            post(import_device_package),
+            post(import_device_package).layer(DefaultBodyLimit::max(IMPORT_BODY_LIMIT_BYTES)),
         )
         .route("/api/v1/adapters", get(adapters).post(create_adapter))
         .route("/api/v1/adapters/{id}/load", post(load_adapter))
@@ -218,6 +220,7 @@ pub fn router(state: ApiState) -> Router {
         .route("/api/v1/scenarios/{id}", get(scenario))
         .route("/api/v1/scenarios/{id}/run", post(run_scenario))
         .route("/api/v1/runs/{run_id}", get(run))
+        .route("/api/v1/runs/{run_id}/cancel", post(cancel_run))
         .route("/api/v1/runs/{run_id}/result", get(run_result))
         .route("/api/v1/runs/{run_id}/result/junit", get(run_result_junit))
         .route("/api/v1/faults", get(faults))

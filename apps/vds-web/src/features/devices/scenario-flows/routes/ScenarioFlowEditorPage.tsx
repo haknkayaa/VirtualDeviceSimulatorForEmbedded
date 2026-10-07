@@ -25,10 +25,11 @@ export function ScenarioFlowEditorPage() {
     if (localDocument?.flow.kind === 'scenario') useFlowStore.getState().loadDocument(localDocument, { readOnly: false })
     else if (packagedScenario.data) {
       useFlowStore.getState().loadDocument(scenarioDocumentToFlow(packagedScenario.data, { deviceId }), { readOnly: false })
-      setNotice({ message: 'Packaged test scenario opened. Saving creates a local draft.', error: false })
+      queueMicrotask(() => setNotice({ message: 'Packaged test scenario opened. Saving creates a local draft.', error: false }))
     } else {
       useFlowStore.getState().loadDocument(createScenarioFlowDocument({ id: flowId, name: 'Recovered Test Scenario', deviceId }), { readOnly: false })
-      setNotice({ message: packagedScenario.error?.message ?? 'Scenario definition was not found; opened a recovered draft.', error: true })
+      const message = packagedScenario.error?.message ?? 'Scenario definition was not found; opened a recovered draft.'
+      queueMicrotask(() => setNotice({ message, error: true }))
     }
   }, [deviceId, flowId, localDocument, packagedScenario.data, packagedScenario.error, packagedScenario.isPending])
   const save = useCallback(() => { const state = useFlowStore.getState(); if (state.readOnly) { setNotice({ message: 'Read-only documents cannot be saved.', error: true }); return }; const document = state.prepareLocalSave(); localFlowRepository.save(document); setNotice({ message: `Saved test scenario revision ${document.flow.revision} locally.`, error: false }); if (!flowId && deviceId) navigate(`/devices/${encodeURIComponent(deviceId)}/scenarios/${encodeURIComponent(document.flow.id)}`, { replace: true }) }, [deviceId, flowId, navigate])

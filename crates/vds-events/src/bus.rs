@@ -6,7 +6,7 @@ use std::{
     sync::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
-        mpsc::{self, SyncSender},
+        mpsc::{self, SyncSender, TrySendError},
     },
     thread::{self, JoinHandle},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -62,14 +62,70 @@ enum PersistenceMessage {
     Shutdown,
 }
 
+#[derive(Default)]
+struct PersistenceHealth {
+    dropped_events: AtomicU64,
+    failed_batches: AtomicU64,
+}
+
+/// Snapshot of `SQLite` persistence health. Telemetry loss never stops the simulator.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct PersistenceStatus {
+    pub enabled: bool,
+    pub dropped_events: u64,
+    pub failed_batches: u64,
+}
+
+impl PersistenceStatus {
+    #[must_use]
+    pub const fn degraded(&self) -> bool {
+        self.dropped_events > 0 || self.failed_batches > 0
+    }
+}
+
 struct PersistenceWorker {
     sender: SyncSender<PersistenceMessage>,
     handle: Mutex<Option<JoinHandle<()>>>,
+    health: Arc<PersistenceHealth>,
+}
+
+fn write_batch(
+    connection: &mut Connection,
+    pending: &[PersistedEvent],
+    policy: EventPersistencePolicy,
+) -> Result<(), rusqlite::Error> {
+    let transaction = connection.transaction()?;
+    {
+        let mut statement = transaction.prepare_cached(
+            "INSERT INTO domain_events(event_id, timestamp_wall_ns, event_type, event_json)
+             VALUES (?1, ?2, ?3, ?4)",
+        )?;
+        for event in pending {
+            let persist_payload = event.event_type != "register_read"
+                || event.event_id % policy.register_read_sample_rate.max(1) == 0;
+            if persist_payload {
+                statement.execute(params![
+                    i64::try_from(event.event_id).unwrap_or(i64::MAX),
+                    i64::try_from(event.timestamp_wall_ns).unwrap_or(i64::MAX),
+                    event.event_type,
+                    event.event_json
+                ])?;
+            }
+            transaction.execute(
+                "INSERT INTO event_store_meta(key, value) VALUES ('last_event_id', ?1)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                [i64::try_from(event.event_id).unwrap_or(i64::MAX)],
+            )?;
+        }
+    }
+    transaction.commit()
 }
 
 impl PersistenceWorker {
     fn start(connection: Connection, policy: EventPersistencePolicy) -> Self {
         let (sender, receiver) = mpsc::sync_channel(PERSISTENCE_QUEUE_CAPACITY);
+        let health = Arc::new(PersistenceHealth::default());
+        let worker_health = Arc::clone(&health);
         let handle = thread::Builder::new()
             .name("vds-event-persistence".to_owned())
             .spawn(move || {
@@ -98,45 +154,21 @@ impl PersistenceWorker {
                         }
                     }
                     if !pending.is_empty() {
-                        let transaction = connection
-                            .transaction()
-                            .expect("SQLite event transaction should begin");
-                        {
-                            let mut statement = transaction
-                                .prepare_cached(
-                                    "INSERT INTO domain_events(event_id, timestamp_wall_ns, event_type, event_json)
-                                     VALUES (?1, ?2, ?3, ?4)",
-                                )
-                                .expect("SQLite event insert should prepare");
-                            for event in pending.drain(..) {
-                                let persist_payload = event.event_type != "register_read"
-                                    || event.event_id % policy.register_read_sample_rate.max(1) == 0;
-                                if persist_payload {
-                                    statement
-                                        .execute(params![
-                                            i64::try_from(event.event_id).unwrap_or(i64::MAX),
-                                            i64::try_from(event.timestamp_wall_ns).unwrap_or(i64::MAX),
-                                            event.event_type,
-                                            event.event_json
-                                        ])
-                                        .expect("SQLite event persistence failed");
-                                }
-                                transaction
-                                    .execute(
-                                        "INSERT INTO event_store_meta(key, value) VALUES ('last_event_id', ?1)
-                                         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                                        [i64::try_from(event.event_id).unwrap_or(i64::MAX)],
-                                    )
-                                    .expect("SQLite event high watermark should persist");
-                            }
+                        if let Err(error) = write_batch(&mut connection, &pending, policy) {
+                            worker_health.failed_batches.fetch_add(1, Ordering::Relaxed);
+                            worker_health.dropped_events.fetch_add(
+                                u64::try_from(pending.len()).unwrap_or(u64::MAX),
+                                Ordering::Relaxed,
+                            );
+                            tracing_stderr(&format!("event persistence batch failed: {error}"));
                         }
-                        transaction
-                            .commit()
-                            .expect("SQLite event transaction should commit");
+                        pending.clear();
                     }
                     if last_cleanup.elapsed() >= policy.cleanup_interval {
-                        cleanup_events(&mut connection, policy)
-                            .expect("SQLite event retention cleanup failed");
+                        if let Err(error) = cleanup_events(&mut connection, policy) {
+                            worker_health.failed_batches.fetch_add(1, Ordering::Relaxed);
+                            tracing_stderr(&format!("event retention cleanup failed: {error}"));
+                        }
                         last_cleanup = std::time::Instant::now();
                     }
                     if shutdown {
@@ -148,20 +180,41 @@ impl PersistenceWorker {
         Self {
             sender,
             handle: Mutex::new(Some(handle)),
+            health,
         }
     }
 
+    /// Queues one event without ever blocking; overflow is counted and dropped.
     fn persist(&self, event: &DomainEvent) {
-        self.sender
-            .send(PersistenceMessage::Event(PersistedEvent {
-                event_id: event.event_id,
-                timestamp_wall_ns: event.timestamp_wall_ns,
-                event_type: event.event_type.as_str().to_owned(),
-                event_json: serde_json::to_string(event)
-                    .expect("domain events must remain JSON serializable"),
-            }))
-            .expect("event persistence worker should remain available");
+        let Ok(event_json) = serde_json::to_string(event) else {
+            self.health.dropped_events.fetch_add(1, Ordering::Relaxed);
+            return;
+        };
+        let message = PersistenceMessage::Event(PersistedEvent {
+            event_id: event.event_id,
+            timestamp_wall_ns: event.timestamp_wall_ns,
+            event_type: event.event_type.as_str().to_owned(),
+            event_json,
+        });
+        match self.sender.try_send(message) {
+            Ok(()) => {}
+            Err(TrySendError::Full(_) | TrySendError::Disconnected(_)) => {
+                self.health.dropped_events.fetch_add(1, Ordering::Relaxed);
+            }
+        }
     }
+
+    fn status(&self) -> PersistenceStatus {
+        PersistenceStatus {
+            enabled: true,
+            dropped_events: self.health.dropped_events.load(Ordering::Relaxed),
+            failed_batches: self.health.failed_batches.load(Ordering::Relaxed),
+        }
+    }
+}
+
+fn tracing_stderr(message: &str) {
+    eprintln!("vds-events: {message}");
 }
 
 fn cutoff_ns(retention: Duration) -> i64 {
@@ -312,7 +365,7 @@ impl EventFilter {
 pub struct EventBus {
     next_id: AtomicU64,
     capacity: usize,
-    events: Mutex<VecDeque<Arc<DomainEvent>>>,
+    events: Arc<Mutex<VecDeque<Arc<DomainEvent>>>>,
     sender: broadcast::Sender<Arc<DomainEvent>>,
     persistence: Option<PersistenceWorker>,
 }
@@ -333,7 +386,7 @@ impl EventBus {
         Self {
             next_id: AtomicU64::new(1),
             capacity,
-            events: Mutex::new(VecDeque::with_capacity(capacity)),
+            events: Arc::new(Mutex::new(VecDeque::with_capacity(capacity))),
             sender,
             persistence: None,
         }
@@ -425,7 +478,7 @@ impl EventBus {
         Ok(Self {
             next_id: AtomicU64::new(next_id),
             capacity,
-            events: Mutex::new(restored.into_iter().map(Arc::new).collect()),
+            events: Arc::new(Mutex::new(restored.into_iter().map(Arc::new).collect())),
             sender,
             persistence: Some(PersistenceWorker::start(connection, policy)),
         })
@@ -463,6 +516,14 @@ impl EventBus {
         event
     }
 
+    /// Reports persistence health; in-memory buses are never degraded.
+    #[must_use]
+    pub fn persistence_status(&self) -> PersistenceStatus {
+        self.persistence
+            .as_ref()
+            .map_or_else(PersistenceStatus::default, PersistenceWorker::status)
+    }
+
     #[must_use]
     pub fn events_after(&self, event_id: u64) -> Vec<Arc<DomainEvent>> {
         self.events
@@ -494,8 +555,10 @@ impl EventBus {
         EventSubscription {
             replay,
             receiver,
+            ring: Arc::clone(&self.events),
             last_event_id: after_event_id,
             filter,
+            gap: None,
         }
     }
 }
@@ -506,14 +569,55 @@ impl Default for EventBus {
     }
 }
 
+/// Events that were lost to a slow consumer and could not be replayed from the ring.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EventGap {
+    /// Last event ID the consumer saw before the loss.
+    pub after_event_id: u64,
+    /// First event ID the consumer will receive next.
+    pub resume_event_id: u64,
+}
+
 pub struct EventSubscription {
     replay: VecDeque<Arc<DomainEvent>>,
     receiver: broadcast::Receiver<Arc<DomainEvent>>,
+    ring: Arc<Mutex<VecDeque<Arc<DomainEvent>>>>,
     last_event_id: u64,
     filter: EventFilter,
+    gap: Option<EventGap>,
 }
 
 impl EventSubscription {
+    /// Takes the unrecoverable gap, if any, so the consumer can request a resync.
+    pub fn take_gap(&mut self) -> Option<EventGap> {
+        self.gap.take()
+    }
+
+    fn recover_from_ring(&mut self) {
+        let ring = self
+            .ring
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let oldest = ring.front().map(|event| event.event_id);
+        if let Some(oldest) = oldest
+            && oldest > self.last_event_id.saturating_add(1)
+        {
+            self.gap = Some(EventGap {
+                after_event_id: self.last_event_id,
+                resume_event_id: oldest,
+            });
+        }
+        let missed = ring
+            .iter()
+            .filter(|event| event.event_id > self.last_event_id && self.filter.matches(event))
+            .cloned()
+            .collect::<Vec<_>>();
+        drop(ring);
+        self.replay = missed.into();
+        // Everything already queued in the broadcast receiver is also in the ring.
+        self.receiver = self.receiver.resubscribe();
+    }
+
     pub async fn recv(&mut self) -> Option<Arc<DomainEvent>> {
         if let Some(event) = self.replay.pop_front() {
             self.last_event_id = event.event_id;
@@ -525,7 +629,14 @@ impl EventSubscription {
                     self.last_event_id = event.event_id;
                     return Some(event);
                 }
-                Ok(_) | Err(broadcast::error::RecvError::Lagged(_)) => {}
+                Ok(_) => {}
+                Err(broadcast::error::RecvError::Lagged(_)) => {
+                    self.recover_from_ring();
+                    if let Some(event) = self.replay.pop_front() {
+                        self.last_event_id = event.event_id;
+                        return Some(event);
+                    }
+                }
                 Err(broadcast::error::RecvError::Closed) => return None,
             }
         }
@@ -727,7 +838,45 @@ mod tests {
             let published = bus.publish(draft(value));
             assert_eq!(current.recv().await.unwrap().event_id, published.event_id);
         }
-        assert_eq!(slow.recv().await.unwrap().event_id, 5);
+        // The lagged subscriber is refilled from the ring instead of silently skipping.
+        for expected in 1..=6 {
+            assert_eq!(slow.recv().await.unwrap().event_id, expected);
+        }
+        assert!(slow.take_gap().is_none());
         assert_eq!(bus.events_after(0).len(), 6);
+    }
+
+    #[tokio::test]
+    async fn lag_beyond_the_ring_reports_an_explicit_gap() {
+        let bus = EventBus::new(3, 2);
+        let mut slow = bus.subscribe_from(0);
+        for value in 0..8 {
+            let _ = bus.publish(draft(value));
+        }
+        assert_eq!(slow.recv().await.unwrap().event_id, 6);
+        assert_eq!(
+            slow.take_gap(),
+            Some(EventGap {
+                after_event_id: 0,
+                resume_event_id: 6
+            })
+        );
+        assert_eq!(slow.recv().await.unwrap().event_id, 7);
+        assert_eq!(slow.recv().await.unwrap().event_id, 8);
+    }
+
+    #[test]
+    fn persistence_overflow_is_counted_and_never_blocks_publishers() {
+        let path = temporary_store("overflow");
+        {
+            let bus = EventBus::persistent(&path, 8, 8).expect("store should open");
+            for value in 0..(PERSISTENCE_QUEUE_CAPACITY as u64 + 5_000) {
+                let _ = bus.publish(draft(value));
+            }
+            let status = bus.persistence_status();
+            assert!(status.enabled);
+            assert_eq!(status.failed_batches, 0);
+        }
+        remove_temporary_store(&path);
     }
 }

@@ -120,8 +120,42 @@ pub(crate) fn validate_device_package_model(
 ///
 /// Returns an error when models cannot be loaded, the socket cannot be created,
 /// or the listener fails.
-#[allow(clippy::too_many_lines)]
 pub async fn run(config: ServerConfig) -> Result<(), ServerError> {
+    run_with_options(config, false).await
+}
+
+/// Returns whether the control address only listens on loopback.
+///
+/// The control API has no authentication, so non-loopback binds need an explicit opt-in.
+#[must_use]
+pub fn is_loopback_control_address(address: &str) -> bool {
+    if let Ok(socket) = address.parse::<std::net::SocketAddr>() {
+        return socket.ip().is_loopback();
+    }
+    address
+        .rsplit_once(':')
+        .is_some_and(|(host, _)| host.eq_ignore_ascii_case("localhost"))
+}
+
+/// Runs the server; `allow_remote` permits an unauthenticated non-loopback control bind.
+///
+/// # Errors
+/// Returns an error when startup fails or a remote bind is requested without opt-in.
+pub async fn run_with_options(config: ServerConfig, allow_remote: bool) -> Result<(), ServerError> {
+    if !allow_remote && !is_loopback_control_address(&config.server.control_address) {
+        return Err(ServerError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!(
+                "control_address '{}' is not loopback; the control API is unauthenticated, pass --allow-remote to override",
+                config.server.control_address
+            ),
+        )));
+    }
+    serve(config).await
+}
+
+#[allow(clippy::too_many_lines)]
+async fn serve(config: ServerConfig) -> Result<(), ServerError> {
     let clock: Arc<dyn SimulatorClock> = Arc::new(RealTimeClock::new());
     let registry = Arc::new(load_registry_with_clock(&config, Arc::clone(&clock))?);
     let event_store_path = std::env::var_os("HOME")

@@ -54,7 +54,12 @@ export function createEventStream(options: EventStreamOptions): EventStreamContr
     }
     currentSocket.onmessage = (message: MessageEvent<string>) => {
       try {
-        const payload = JSON.parse(message.data) as DomainEvent | DomainEvent[]
+        const payload = JSON.parse(message.data) as
+          | DomainEvent
+          | DomainEvent[]
+          | { resync_required: unknown }
+        // The server lost events to a slow consumer; the history view must refetch.
+        if (!Array.isArray(payload) && 'resync_required' in payload) return
         for (const event of Array.isArray(payload) ? payload : [payload]) options.onEvent(event)
       } catch {
         // Malformed events are isolated from the live stream.

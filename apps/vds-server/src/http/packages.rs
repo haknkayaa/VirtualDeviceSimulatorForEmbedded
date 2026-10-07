@@ -4,6 +4,8 @@ use super::*;
 
 const MAX_PACKAGE_FILES: usize = 1_024;
 const MAX_PACKAGE_BYTES: usize = 32 * 1024 * 1024;
+/// HTTP body ceiling: base64 inflates by 4/3, plus JSON framing for up to 1024 paths.
+pub(super) const IMPORT_BODY_LIMIT_BYTES: usize = MAX_PACKAGE_BYTES / 3 * 4 + 1024 * 1024;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -136,6 +138,7 @@ pub(super) async fn import_device_package(
         .map_err(|error| ApiError::internal("device_package_stage_failed", error.to_string()))?;
 
     let mut total_bytes = 0_usize;
+    let mut seen_paths = std::collections::HashSet::new();
     for file in request.files {
         if file.path.is_absolute()
             || file.path.as_os_str().is_empty()
@@ -147,6 +150,15 @@ pub(super) async fn import_device_package(
             return Err(ApiError::bad_request(
                 "device_package_path_invalid",
                 format!("package path '{}' is not safe", file.path.display()),
+            ));
+        }
+        if !seen_paths.insert(file.path.clone()) {
+            return Err(ApiError::bad_request(
+                "device_package_path_duplicate",
+                format!(
+                    "package path '{}' appears more than once",
+                    file.path.display()
+                ),
             ));
         }
         let content = BASE64.decode(file.content_base64).map_err(|_| {

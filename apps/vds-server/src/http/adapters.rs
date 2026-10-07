@@ -2036,12 +2036,11 @@ impl AdapterManager {
         } else {
             None
         };
-        if matches!(adapter.bus_type.as_str(), "gpio" | "uart") {
-            if let (Some(binding), Some(device_path)) =
+        if matches!(adapter.bus_type.as_str(), "gpio" | "uart")
+            && let (Some(binding), Some(device_path)) =
                 (adapter.bindings.first_mut(), adapter.device_path.as_ref())
-            {
-                binding.device_path.clone_from(device_path);
-            }
+        {
+            binding.device_path.clone_from(device_path);
         }
         Ok(adapter.clone())
     }

@@ -92,6 +92,14 @@ pub(super) async fn run(
         ApiError::not_found("run_not_found", format!("run '{run_id}' was not found"))
     })
 }
+pub(super) async fn cancel_run(
+    State(state): State<ApiState>,
+    Path(run_id): Path<String>,
+) -> ApiResult<Json<RunRecord>> {
+    state.runs.cancel(&run_id).map(Json).ok_or_else(|| {
+        ApiError::not_found("run_not_found", format!("run '{run_id}' was not found"))
+    })
+}
 pub(super) async fn run_result(
     State(state): State<ApiState>,
     Path(run_id): Path<String>,

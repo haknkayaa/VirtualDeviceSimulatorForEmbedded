@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Cable, Plus, Power, PowerOff, RotateCcw, Save } from 'lucide-react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 

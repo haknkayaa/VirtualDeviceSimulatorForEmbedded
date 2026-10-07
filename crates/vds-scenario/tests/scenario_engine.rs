@@ -137,10 +137,8 @@ steps:
     assert_eq!(result.status, ResultStatus::Failed);
     assert_eq!(result.duration_virtual_ns, 7_000_000);
     assert_eq!(result.steps_skipped, 1);
-    assert_eq!(
-        result.steps[0].failure_kind,
-        Some(StepFailureKind::Execution)
-    );
+    assert_eq!(result.steps[0].failure_kind, Some(StepFailureKind::Timeout));
+    assert!(result.timed_out());
 }
 
 #[test]
