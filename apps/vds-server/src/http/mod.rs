@@ -463,7 +463,6 @@ impl IntoResponse for ApiError {
     }
 }
 
-
 #[cfg(test)]
 mod web_asset_tests {
     use super::{safe_web_path, web_content_type};
@@ -479,9 +478,21 @@ mod web_asset_tests {
 
     #[test]
     fn web_content_types_cover_vite_assets() {
-        assert_eq!(web_content_type(Path::new("index.html")), "text/html; charset=utf-8");
-        assert_eq!(web_content_type(Path::new("assets/app.js")), "text/javascript; charset=utf-8");
-        assert_eq!(web_content_type(Path::new("assets/app.css")), "text/css; charset=utf-8");
-        assert_eq!(web_content_type(Path::new("assets/logo.svg")), "image/svg+xml");
+        assert_eq!(
+            web_content_type(Path::new("index.html")),
+            "text/html; charset=utf-8"
+        );
+        assert_eq!(
+            web_content_type(Path::new("assets/app.js")),
+            "text/javascript; charset=utf-8"
+        );
+        assert_eq!(
+            web_content_type(Path::new("assets/app.css")),
+            "text/css; charset=utf-8"
+        );
+        assert_eq!(
+            web_content_type(Path::new("assets/logo.svg")),
+            "image/svg+xml"
+        );
     }
 }
