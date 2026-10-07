@@ -74,7 +74,7 @@ Tagged releases publish an `amd64` Debian package and SHA-256 checksum.
 Download the package from [GitHub Releases](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/releases), then install it:
 
 ```shell
-sudo apt install ./vds4e_0.1.1_amd64.deb
+sudo apt install ./vds4e_0.1.2_amd64.deb
 ```
 
 Validate the installed configuration:
