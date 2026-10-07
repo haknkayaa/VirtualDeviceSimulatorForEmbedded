@@ -263,7 +263,7 @@ function SpiTimingDiagram({ request, response }: { request: number[]; response: 
   )
 }
 
-type DecodedBus = 'i2c' | 'uart' | 'gpio'
+type DecodedBus = 'i2c' | 'uart' | 'gpio' | 'can'
 type DirectedByte = { byte: number; direction: 'tx' | 'rx' }
 
 function directedBytes(request: number[], response: number[]): DirectedByte[] {
@@ -520,6 +520,66 @@ function ProtocolTimingDiagram({
     </>
   }
 
+  const renderCan = () => {
+    const txHigh = 63
+    const txLow = 87
+    const rxHigh = 151
+    const rxLow = 175
+    const lanePath = (direction: 'tx' | 'rx', highY: number, lowY: number) => {
+      let path = `M ${LABEL_WIDTH} ${highY} L ${activeStart} ${highY}`
+      let currentY = highY
+      visibleBytes.forEach((item, index) => {
+        const frameStart = uartFrameStart(index)
+        const values = item.direction === direction
+          ? [0, ...Array.from({ length: 8 }, (__, bit) => (item.byte >> (7 - bit)) & 1), 1]
+          : Array.from({ length: 10 }, () => 1)
+        const frame = levelPath(values, frameStart, unitWidth, highY, lowY)
+        path += frame.path.replace(/^M [^L]+L [^L]+/, '')
+        currentY = frame.currentY
+        const frameEnd = frameStart + 10 * unitWidth
+        const gapEnd = index === byteCount - 1 ? frameEnd : frameEnd + unitWidth
+        path += ` L ${frameEnd} ${currentY} L ${frameEnd} ${highY} L ${gapEnd} ${highY}`
+        currentY = highY
+      })
+      return `${path} L ${width} ${highY}`
+    }
+
+    return <>
+      <g className="protocol-grid can-grid">
+        {visibleBytes.map((_, frameIndex) => {
+          const frameStart = uartFrameStart(frameIndex)
+          return Array.from({ length: 11 }, (__, boundary) => {
+            const x = frameStart + boundary * unitWidth
+            return <line className={boundary === 0 || boundary === 10 ? 'frame-boundary' : ''} key={`${frameIndex}-${boundary}`} x1={x} x2={x} y1="21" y2="219" />
+          })
+        })}
+      </g>
+      <g className="protocol-axis">
+        <text className="axis-unit" x={LABEL_WIDTH - 7} y="14">CAN</text>
+        {visibleBytes.map(({ byte, direction }, index) => <text className={`axis-${direction}`} key={`${direction}-${index}`} x={uartFrameStart(index) + unitWidth * 5} y="14">{`${direction.toUpperCase()} ${hex(byte)}`}</text>)}
+      </g>
+      <g className="protocol-lane-labels">
+        <text className="lane-can-tx" x="9" y={txLow}>CAN_TX</text>
+        <text className="lane-can-rx" x="9" y={rxLow}>CAN_RX</text>
+      </g>
+      <path className="protocol-trace can-tx-trace" d={lanePath('tx', txHigh, txLow)} />
+      <path className="protocol-trace can-rx-trace" d={lanePath('rx', rxHigh, rxLow)} />
+      {visibleBytes.map(({ direction }, index) => {
+        const x = uartFrameStart(index)
+        const y = direction === 'tx' ? 111 : 199
+        return <g className={`uart-frame-label frame-${direction}`} key={`labels-${direction}-${index}`}>
+          <text x={x + unitWidth * .5} y={y}>SOF</text>
+          <text x={x + unitWidth * 5} y={y}>DATA</text>
+          <text x={x + unitWidth * 9.5} y={y}>EOF</text>
+        </g>
+      })}
+      <g className="protocol-summary">
+        <line x1={activeStart} x2={activeEnd} y1="226" y2="226" />
+        <text x={(activeStart + activeEnd) / 2} y="224">{`${bytes.length} frames · SOF + 8 data (MSB first) + EOF`}</text>
+      </g>
+    </>
+  }
+
   const renderGpio = () => {
     const outerPadding = 9
     const bankGap = 14
@@ -589,7 +649,9 @@ function ProtocolTimingDiagram({
     ? `I2C timing diagram with ${bytes.length} bytes and ${bytes.length * 9} clock pulses`
     : bus === 'uart'
       ? `UART 8N1 timing diagram with ${bytes.length} frames`
-      : `GPIO line-state table with ${gpioLineCount} lines`
+      : bus === 'can'
+        ? `CAN timing diagram with ${bytes.length} frames`
+        : `GPIO line-state table with ${gpioLineCount} lines`
 
   return <div className={`spi-timing-frame protocol-timing-frame protocol-${bus}`}>
     <div className="spi-timing-scroll" onWheel={handleWheel} ref={scrollRef}>
@@ -603,7 +665,7 @@ function ProtocolTimingDiagram({
         width={width}
       >
         <rect className="spi-timing-background" height={svgHeight} width={width} />
-        {bus === 'i2c' ? renderI2c() : bus === 'uart' ? renderUart() : renderGpio()}
+        {bus === 'i2c' ? renderI2c() : bus === 'uart' ? renderUart() : bus === 'can' ? renderCan() : renderGpio()}
       </svg>
     </div>
     <button
@@ -643,6 +705,11 @@ export function BusSignalScope({
       title: 'UART signal scope',
       detail: '8N1 · idle high · start low · 8 data bits LSB first · stop high',
       pins: ['TX', 'RX'],
+    },
+    can: {
+      title: 'CAN signal scope',
+      detail: 'Standard 2.0A · 11-bit ID · DLC · CRC · ACK',
+      pins: ['CAN_TX', 'CAN_RX'],
     },
     gpio: {
       title: 'GPIO line states',

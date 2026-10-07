@@ -5,6 +5,7 @@ import {
 } from 'react-circular-progressbar'
 import 'react-circular-progressbar/dist/styles.css'
 import {
+  AudioWaveform,
   Circle,
   Download,
   Gauge,
@@ -12,6 +13,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import { useAdapters, useBusTelemetry, useDevices } from '../../api/queries'
 import { AsyncState } from '../../components/AsyncState'
@@ -345,6 +347,26 @@ export function TransactionsPage() {
         </button>
         <button disabled={filteredTransactions.length === 0} onClick={exportTransactions} type="button"><Download size={13} /> Export</button>
         <button disabled={transactions.length === 0} onClick={clearCapture} type="button"><Trash2 size={13} /> Clear</button>
+        <Link
+          className="capture-analyzer-link"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 11px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: 600,
+            color: '#a7d2ff',
+            background: 'rgba(75, 159, 245, 0.14)',
+            border: '1px solid rgba(75, 159, 245, 0.3)',
+            textDecoration: 'none',
+          }}
+          title="Open full Logic Analyzer waveform viewer"
+          to="/waveform"
+        >
+          <AudioWaveform size={13} /> Logic Analyzer
+        </Link>
       </div>
     </section>
 
@@ -388,7 +410,30 @@ export function TransactionsPage() {
       <GlassPanel className="dashboard-scope-panel">
         <header className="console-panel-header">
           <div><span>{selectedTransaction ? `${selectedTransaction.busType.toUpperCase()} · ${selectedTransaction.deviceId}` : 'NO DEVICE'}</span><small>{selectedTransaction ? `${selectedTransaction.deviceId} · #${selectedTransaction.transactionId}` : 'Select a transaction'}</small></div>
-          <StatusBadge status={selectedTransaction?.status ?? connectionStatus} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {selectedTransaction && (
+              <Link
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#2acbd4',
+                  background: 'rgba(42, 203, 212, 0.12)',
+                  border: '1px solid rgba(42, 203, 212, 0.3)',
+                  textDecoration: 'none',
+                }}
+                title="Open in Logic Analyzer"
+                to={`/waveform?transaction=${selectedTransaction.id}&bus=${selectedTransaction.busType}&device=${selectedTransaction.deviceId}`}
+              >
+                <AudioWaveform size={12} /> Analyzer
+              </Link>
+            )}
+            <StatusBadge status={selectedTransaction?.status ?? connectionStatus} />
+          </div>
         </header>
         {!selectedTransaction && <AsyncState kind="empty" title="No signal captured yet" />}
         {selectedTransaction && supportsSignalScope(selectedTransaction.busType) && <BusSignalScope
