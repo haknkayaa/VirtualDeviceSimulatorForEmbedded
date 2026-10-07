@@ -134,6 +134,28 @@ This starts the Web UI at `http://127.0.0.1:4174`, the control API at
 staged `./configure`, `./build.sh`, `./install` pipeline are described in
 [docs/guides/getting-started.md](docs/guides/getting-started.md).
 
+## Debian package
+
+Tagged releases build an `amd64` Debian package and attach it to the GitHub
+Release together with a SHA-256 checksum. Install a downloaded release with:
+
+```shell
+sudo apt install ./vds4e_<version>_amd64.deb
+vds-server --config /etc/vds4e/vds-server.yaml --check-config
+```
+
+The package installs the server, CLI, four Linux host adapters, Web UI, schemas,
+bundled device models, example tools, and a default config under
+`/etc/vds4e/vds-server.yaml`. CUSE and `gpio-sim` still require the matching
+host kernel support and privileges; package installation does not load kernel
+modules automatically.
+
+Maintainers can build the same package locally after `./configure && ./build.sh`:
+
+```shell
+./packaging/debian/build-deb.sh 0.1.0
+```
+
 ## Guides
 
 | Guide | Contents |
