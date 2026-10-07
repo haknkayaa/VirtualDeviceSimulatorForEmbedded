@@ -74,4 +74,19 @@ describe('live transaction event pairing', () => {
       status: 'success',
     })
   })
+
+  it('pairs runtime-injected transactions without an adapter id sequentially per device', () => {
+    const result = buildLiveTransactions([
+      domainEvent(10, { kind: 'transaction_started', transaction_id: null, request: [0x9f] }),
+      domainEvent(11, { kind: 'transaction_completed', transaction_id: null, response: [0x20, 0xba, 0x19], result: 'success', error_code: null }),
+      domainEvent(12, { kind: 'transaction_started', transaction_id: null, request: [0x06] }),
+      domainEvent(13, { kind: 'transaction_completed', transaction_id: null, response: [], result: 'success', error_code: null }),
+      domainEvent(14, { kind: 'transaction_completed', transaction_id: null, response: [1], result: 'success', error_code: null }),
+    ], [{ id: 'flash-0', bus: 'spi', state: 'ready' }])
+
+    expect(result).toEqual([
+      expect.objectContaining({ id: 'flash-0:ev12', transactionId: 12, request: [0x06], response: [], status: 'success' }),
+      expect.objectContaining({ id: 'flash-0:ev10', transactionId: 10, request: [0x9f], response: [0x20, 0xba, 0x19], status: 'success' }),
+    ])
+  })
 })

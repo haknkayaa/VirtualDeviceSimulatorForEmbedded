@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -96,9 +96,9 @@ describe('devices page', () => {
     expect(screen.getAllByText('Flash memory').length).toBeGreaterThan(0)
     expect(screen.getAllByText('generic-spi-command').length).toBeGreaterThan(0)
     expect(screen.getAllByText('1.0').length).toBeGreaterThan(0)
-    expect(screen.getByRole('tab', { name: 'Device Behavior' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Behavior' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Register Map' })).toBeInTheDocument()
-    expect(screen.getByText('2 Registers')).toBeInTheDocument()
+    expect(screen.getByText(/^2 registers/)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Bitfield Inspector' })).toBeInTheDocument()
     expect(screen.queryByText('Loaded devices')).not.toBeInTheDocument()
     expect(screen.getByText('0x0010')).toBeInTheDocument()
@@ -111,11 +111,9 @@ describe('devices page', () => {
     expect(screen.getByRole('button', { name: 'Reset device' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Recent Transactions' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Value Controls' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Validation & State' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Device Information' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Write' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Write & Verify' })).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: 'Register value draft' })).toHaveValue('0x12')
+    expect(screen.queryByRole('heading', { name: 'Device Information' })).not.toBeInTheDocument()
+    expect(screen.getByText('/dev/spidev0.0', { selector: '.device-profile-card code' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Add Device' }))
     expect(await screen.findByRole('dialog', { name: 'Add Device' })).toBeInTheDocument()
     const busType = screen.getByRole('combobox', { name: 'Bus type' })
@@ -201,12 +199,35 @@ describe('devices page', () => {
     })
     renderRoute(<DevicesPage />, '/devices/spi-flash-0', '/devices/:deviceId')
 
-    await screen.findAllByText('CONTROL')
+    await screen.findByText('Device control register')
     expect(screen.getByText('2.000 ms')).toBeInTheDocument()
     expect(screen.getByText('Write', { selector: '.transaction-write' })).toBeInTheDocument()
     expect(screen.getAllByText('0x12').length).toBeGreaterThan(1)
-    expect(screen.getByText('Live snapshot')).toBeInTheDocument()
-    expect(screen.getByText('100%')).toBeInTheDocument()
+  })
+
+  it('opens the Add Device dialog from the ?add=1 deep link and clears it on cancel', async () => {
+    installDeviceApi()
+    renderRoute(<DevicesPage />, '/devices?add=1', '/devices')
+
+    expect(await screen.findByRole('dialog', { name: 'Add Device' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Add Device' })).not.toBeInTheDocument())
+  })
+
+  it('applies a typed hex draft value from the bitfield inspector', async () => {
+    const fetchMock = installDeviceApi()
+    renderRoute(<DevicesPage />, '/devices/spi-flash-0', '/devices/:deviceId')
+
+    const draft = await screen.findByRole('textbox', { name: 'Register value draft' })
+    await userEvent.clear(draft)
+    await userEvent.type(draft, '0x13')
+    expect(screen.getByText('Draft 0x13')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Bit 0 (BIT0)' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(screen.getByRole('button', { name: 'Apply value' }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/devices/spi-flash-0/registers/1',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ value: 19 }) }),
+    ))
   })
 
   it('filters the register map and applies a bitfield draft through the control API', async () => {
@@ -252,7 +273,7 @@ describe('devices page', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Configuration' }))
 
     expect(screen.getByRole('heading', { name: 'SPI configuration' })).toBeInTheDocument()
-    expect(screen.getByText('/dev/spidev0.0')).toBeInTheDocument()
+    expect(within(screen.getByRole('complementary', { name: 'Device detail inspector' })).getByText('/dev/spidev0.0')).toBeInTheDocument()
     expect(screen.getByText('sudo build/adapters/spi-cuse/vds4e-spi-cuse --name spidev0.0 --device-id spi-flash-0 --socket /tmp/vds4e.sock')).toBeInTheDocument()
     expect(screen.getAllByText('Chip select').length).toBeGreaterThan(0)
     expect(screen.getByRole('heading', { name: 'Configuration Inspector' })).toBeInTheDocument()
@@ -287,7 +308,7 @@ describe('devices page', () => {
     installDeviceApi()
     renderRoute(<DevicesPage />, '/devices/spi-flash-0/flows', '/devices/:deviceId/*')
 
-    expect(await screen.findByRole('tab', { name: 'Device Behavior' })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByRole('tab', { name: 'Behavior' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('heading', { name: 'Behavior Model' })).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('tab', { name: 'Test Scenarios' }))

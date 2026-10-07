@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { formatVirtualTime } from '../../utils/format'
 import type { ProtocolPacket } from './types'
 
@@ -11,96 +10,46 @@ interface ProtocolDecoderBannerProps {
   visibleEndNs: number
 }
 
-function packetColors(type: ProtocolPacket['type']): {
-  fill: string
-  stroke: string
-  text: string
-} {
-  switch (type) {
-    case 'start':
-    case 'ack':
-      return { fill: 'rgba(80, 216, 149, 0.22)', stroke: '#50d890', text: '#a7f3d0' }
-    case 'stop':
-    case 'nack':
-    case 'error':
-      return { fill: 'rgba(255, 118, 117, 0.22)', stroke: '#ff7675', text: '#fecaca' }
-    case 'address':
-      return { fill: 'rgba(162, 155, 254, 0.22)', stroke: '#a29bfe', text: '#e0e7ff' }
-    case 'data':
-      return { fill: 'rgba(75, 159, 245, 0.22)', stroke: '#4b9ff5', text: '#bfdbfe' }
-    case 'control':
-    case 'edge':
-    default:
-      return { fill: 'rgba(242, 169, 59, 0.22)', stroke: '#f2a93b', text: '#fde68a' }
-  }
-}
-
+/**
+ * Decoded protocol cells drawn under a channel trace. Colour encodes the frame
+ * kind through CSS (.wfa-pkt-<type>); framing is neutral, data takes the bus
+ * colour, ACK/NACK/error use state colours.
+ */
 export function ProtocolDecoderBanner({
   packets,
   timeToX,
   y,
-  height = 18,
+  height = 14,
   visibleStartNs,
   visibleEndNs,
 }: ProtocolDecoderBannerProps) {
-  const [hoveredPacket, setHoveredPacket] = useState<ProtocolPacket | null>(null)
-
-  // Filter packets visible in the viewport
-  const visiblePackets = packets.filter(
-    (p) => p.endTimeNs >= visibleStartNs && p.startTimeNs <= visibleEndNs,
-  )
-
+  const halfHeight = height / 2
   return (
-    <g className="protocol-decoder-banner" transform={`translate(0, ${y})`}>
-      {visiblePackets.map((pkt) => {
-        const x1 = Math.max(0, timeToX(pkt.startTimeNs))
-        const x2 = Math.max(x1 + 4, timeToX(pkt.endTimeNs))
-        const width = Math.max(12, x2 - x1)
-        const colors = packetColors(pkt.type)
+    <g className="wfa-decoder" transform={`translate(0, ${y})`}>
+      {packets.map((packet) => {
+        if (packet.endTimeNs < visibleStartNs || packet.startTimeNs > visibleEndNs) return null
+        const x1 = Math.max(0, timeToX(packet.startTimeNs))
+        const x2 = Math.max(x1 + 4, timeToX(packet.endTimeNs))
+        const width = Math.max(10, x2 - x1)
         const bevel = Math.min(4, width / 4)
-        const halfH = height / 2
-
-        // Hexagon / capsule polygon points
         const points = [
-          `${x1},${halfH}`,
+          `${x1},${halfHeight}`,
           `${x1 + bevel},0`,
           `${x1 + width - bevel},0`,
-          `${x1 + width},${halfH}`,
+          `${x1 + width},${halfHeight}`,
           `${x1 + width - bevel},${height}`,
           `${x1 + bevel},${height}`,
         ].join(' ')
-
-        const isHovered = hoveredPacket?.id === pkt.id
-
+        // ~5.6px per glyph at the 9px mono label size: fall back to the hex byte,
+        // then to nothing, rather than spilling text over neighbouring cells.
+        const fits = (text: string) => text.length * 5.6 <= width - 6
+        const label = fits(packet.label) ? packet.label : packet.hex && fits(packet.hex) ? packet.hex : null
         return (
-          <g
-            className="protocol-packet-cell"
-            key={pkt.id}
-            onPointerEnter={() => setHoveredPacket(pkt)}
-            onPointerLeave={() => setHoveredPacket(null)}
-            style={{ cursor: 'pointer' }}
-          >
-            <polygon
-              fill={colors.fill}
-              filter={isHovered ? 'brightness(1.4)' : undefined}
-              points={points}
-              stroke={colors.stroke}
-              strokeWidth={isHovered ? '1.5' : '1'}
-            />
-            {width > 22 && (
-              <text
-                fill={colors.text}
-                fontSize="9"
-                fontWeight="700"
-                textAnchor="middle"
-                x={x1 + width / 2}
-                y={halfH + 3.5}
-              >
-                {width < 45 && pkt.hex ? pkt.hex : pkt.label}
-              </text>
-            )}
+          <g className={`wfa-pkt wfa-pkt-${packet.type}`} key={packet.id}>
+            <polygon points={points} />
+            {label && <text textAnchor="middle" x={x1 + width / 2} y={halfHeight + 3}>{label}</text>}
             <title>
-              {`${pkt.label}\nType: ${pkt.type.toUpperCase()}\n${pkt.detail ? `${pkt.detail}\n` : ''}Time: ${formatVirtualTime(pkt.startTimeNs)} – ${formatVirtualTime(pkt.endTimeNs)} (Δ ${formatVirtualTime(pkt.endTimeNs - pkt.startTimeNs)})`}
+              {`${packet.label}\nType: ${packet.type.toUpperCase()}\n${packet.detail ? `${packet.detail}\n` : ''}Time: ${formatVirtualTime(packet.startTimeNs)} – ${formatVirtualTime(packet.endTimeNs)} (Δ ${formatVirtualTime(packet.endTimeNs - packet.startTimeNs)})`}
             </title>
           </g>
         )

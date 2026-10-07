@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { LiveEventStream } from './LiveEventStream'
-import { useEventStore } from '../../stores/eventStore'
-import type { DomainEvent } from '../../types/events'
+import { EventTail } from './EventTail'
+import { useEventStore } from '../stores/eventStore'
+import type { DomainEvent } from '../types/events'
 
 const events: DomainEvent[] = [
   {
@@ -53,11 +53,11 @@ const events: DomainEvent[] = [
   },
 ]
 
-describe('dashboard live event stream', () => {
+describe('event tail', () => {
   afterEach(() => useEventStore.getState().reset())
 
-  it('renders headerless event columns with severity, source, details, and timestamps', () => {
-    render(<LiveEventStream events={events} />)
+  it('renders compact event rows with severity, source, details, and timestamps', () => {
+    render(<EventTail events={events} />)
 
     expect(screen.queryByRole('columnheader')).not.toBeInTheDocument()
     expect(screen.getByText('warn')).toBeInTheDocument()
@@ -72,7 +72,7 @@ describe('dashboard live event stream', () => {
   })
 
   it('opens the existing event detail selection path', () => {
-    render(<LiveEventStream events={events} />)
+    render(<EventTail events={events} />)
     fireEvent.click(screen.getByRole('button', { name: 'warn fault triggered on spi-flash-0' }))
     expect(useEventStore.getState().selectedEventId).toBe(42)
   })

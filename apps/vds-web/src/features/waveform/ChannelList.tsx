@@ -1,4 +1,6 @@
-import { Eye, EyeOff, SlidersHorizontal } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
+
+import { BusTag } from '../../components/BusTag'
 import type { WaveformChannel } from './types'
 
 interface ChannelListProps {
@@ -8,95 +10,58 @@ interface ChannelListProps {
   onHideAll: () => void
 }
 
+/** Channel visibility manager, grouped by device like a probe/pod list. */
 export function ChannelList({
   channels,
   onToggleChannel,
   onShowAll,
   onHideAll,
 }: ChannelListProps) {
-  // Group channels by deviceId
   const deviceGroups = new Map<string, WaveformChannel[]>()
-  channels.forEach((c) => {
-    const list = deviceGroups.get(c.deviceId) ?? []
-    list.push(c)
-    deviceGroups.set(c.deviceId, list)
+  channels.forEach((channel) => {
+    const list = deviceGroups.get(channel.deviceId) ?? []
+    list.push(channel)
+    deviceGroups.set(channel.deviceId, list)
   })
+  const visibleCount = channels.filter((channel) => channel.visible).length
 
   return (
-    <aside className="waveform-channel-sidebar">
-      <header className="waveform-channel-header">
-        <div className="channel-header-title">
-          <SlidersHorizontal size={14} />
-          <strong>Signal Channels</strong>
-          <small>({channels.filter((c) => c.visible).length}/{channels.length})</small>
-        </div>
-        <div className="channel-quick-actions">
-          <button
-            className="channel-action-btn"
-            onClick={onShowAll}
-            title="Show all channels"
-            type="button"
-          >
-            All
-          </button>
-          <button
-            className="channel-action-btn"
-            onClick={onHideAll}
-            title="Hide all channels"
-            type="button"
-          >
-            None
-          </button>
+    <aside aria-label="Signal channels" className="wfa-channels-pane">
+      <header className="wfa-pane-head">
+        <h2 className="panel-title">Channels</h2>
+        <span className="panel-meta">{visibleCount}/{channels.length}</span>
+        <div className="segmented wfa-channel-bulk" role="group" aria-label="Channel visibility">
+          <button onClick={onShowAll} title="Show all channels" type="button">All</button>
+          <button onClick={onHideAll} title="Hide all channels" type="button">None</button>
         </div>
       </header>
 
-      <div className="waveform-channel-items">
-        {Array.from(deviceGroups.entries()).map(([deviceId, groupChannels]) => {
-          const bus = groupChannels[0]?.bus ?? 'unknown'
-          return (
-            <div className="channel-device-group" key={deviceId}>
-              <div className="channel-device-heading">
-                <span className={`channel-bus-pill bus-${bus.toLowerCase()}`}>
-                  {bus.toUpperCase()}
-                </span>
-                <strong title={deviceId}>{deviceId}</strong>
-              </div>
-
-              <div className="channel-group-list">
-                {groupChannels.map((channel) => (
-                  <div
-                    className={`channel-row ${channel.visible ? 'visible' : 'hidden'}`}
-                    key={channel.id}
-                  >
-                    <div className="channel-row-main">
-                      <span
-                        className="channel-color-dot"
-                        style={{ backgroundColor: channel.color }}
-                      />
-                      <span className="channel-name">{channel.name}</span>
-                      <small className="channel-pin-type">{channel.pinType}</small>
-                    </div>
-
-                    <button
-                      aria-label={`${channel.visible ? 'Hide' : 'Show'} channel ${channel.name}`}
-                      className="channel-toggle-visibility"
-                      onClick={() => onToggleChannel(channel.id)}
-                      type="button"
-                    >
-                      {channel.visible ? <Eye size={13} /> : <EyeOff size={13} />}
-                    </button>
-                  </div>
-                ))}
-              </div>
+      <div className="wfa-channel-scroll">
+        {Array.from(deviceGroups.entries()).map(([deviceId, groupChannels]) => (
+          <div className="wfa-channel-group" key={deviceId}>
+            <div className="wfa-channel-device">
+              <BusTag bus={groupChannels[0]?.bus} />
+              <strong title={deviceId}>{deviceId}</strong>
             </div>
-          )
-        })}
-
-        {channels.length === 0 && (
-          <div className="channel-empty-msg">
-            No active channels in capture.
+            {groupChannels.map((channel) => (
+              <div className={`wfa-channel bus-${channel.bus.toLowerCase()}${channel.visible ? '' : ' is-off'}`} key={channel.id}>
+                <span aria-hidden="true" className="wfa-channel-swatch" />
+                <span className="wfa-channel-name">{channel.name}</span>
+                <span className="wfa-channel-pin">{channel.pinType}</span>
+                <button
+                  aria-label={`${channel.visible ? 'Hide' : 'Show'} channel ${channel.name}`}
+                  className="icon-button sm"
+                  onClick={() => onToggleChannel(channel.id)}
+                  type="button"
+                >
+                  {channel.visible ? <Eye aria-hidden="true" size={12} /> : <EyeOff aria-hidden="true" size={12} />}
+                </button>
+              </div>
+            ))}
           </div>
-        )}
+        ))}
+
+        {channels.length === 0 && <p className="wfa-channel-empty">No channels in this capture.</p>}
       </div>
     </aside>
   )

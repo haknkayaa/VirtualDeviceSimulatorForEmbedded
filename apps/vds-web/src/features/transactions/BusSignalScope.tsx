@@ -3,6 +3,7 @@ import type { WheelEvent } from 'react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { LiveTransaction } from './transactionModel'
 import { supportsSignalScope } from './signalScopeSupport'
+import { downloadSvgRegionAsPng } from './svgSnapshot'
 
 interface BusSignalScopeProps {
   transaction: LiveTransaction
@@ -45,56 +46,8 @@ function downloadVisibleDiagram(
   fileName: string,
 ) {
   if (!scroll || !sourceSvg) return
-
   const captureWidth = Math.max(1, Math.min(scroll.clientWidth, width - scroll.scrollLeft))
-  const clone = sourceSvg.cloneNode(true) as SVGSVGElement
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  clone.setAttribute('viewBox', `${scroll.scrollLeft} 0 ${captureWidth} ${height}`)
-  clone.setAttribute('width', String(captureWidth))
-  clone.setAttribute('height', String(height))
-
-  const sourceNodes = [sourceSvg, ...sourceSvg.querySelectorAll('*')]
-  const cloneNodes = [clone, ...clone.querySelectorAll('*')]
-  const copiedProperties = [
-    'fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-linecap',
-    'stroke-linejoin', 'opacity', 'font-family', 'font-size', 'font-weight',
-    'text-anchor', 'vector-effect',
-  ]
-  sourceNodes.forEach((sourceNode, index) => {
-    const computed = window.getComputedStyle(sourceNode)
-    cloneNodes[index].setAttribute(
-      'style',
-      copiedProperties.map(property => `${property}:${computed.getPropertyValue(property)}`).join(';'),
-    )
-  })
-
-  const blob = new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const image = new Image()
-  image.onload = () => {
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.round(captureWidth * pixelRatio)
-    canvas.height = height * pixelRatio
-    const context = canvas.getContext('2d')
-    if (!context) {
-      URL.revokeObjectURL(url)
-      return
-    }
-    context.scale(pixelRatio, pixelRatio)
-    context.drawImage(image, 0, 0, captureWidth, height)
-    canvas.toBlob(pngBlob => {
-      if (!pngBlob) return
-      const link = document.createElement('a')
-      link.href = URL.createObjectURL(pngBlob)
-      link.download = fileName
-      link.click()
-      URL.revokeObjectURL(link.href)
-    }, 'image/png')
-    URL.revokeObjectURL(url)
-  }
-  image.onerror = () => URL.revokeObjectURL(url)
-  image.src = url
+  downloadSvgRegionAsPng(sourceSvg, { x: scroll.scrollLeft, width: captureWidth, height }, fileName)
 }
 
 function SpiTimingDiagram({ request, response }: { request: number[]; response: number[] }) {
@@ -256,7 +209,7 @@ function SpiTimingDiagram({ request, response }: { request: number[]; response: 
         title="Download visible timing diagram as PNG"
         type="button"
       >
-        <Download aria-hidden="true" size={15} />
+        <Download aria-hidden="true" size={12} />
         PNG
       </button>
     </div>
@@ -675,10 +628,20 @@ function ProtocolTimingDiagram({
       title={`Download visible ${bus.toUpperCase()} timing diagram as PNG`}
       type="button"
     >
-      <Download aria-hidden="true" size={15} />
+      <Download aria-hidden="true" size={12} />
       PNG
     </button>
   </div>
+}
+
+function ScopeHeader({ title, detail, pins }: { title: string; detail: string; pins: string[] }) {
+  return (
+    <header className="scope-head">
+      <strong>{title}</strong>
+      <small title={detail}>{detail}</small>
+      <div aria-label="Active pins" className="signal-pin-rail">{pins.map((pin) => <i key={pin}>{pin}</i>)}</div>
+    </header>
+  )
 }
 
 export function BusSignalScope({
@@ -688,9 +651,12 @@ export function BusSignalScope({
   const bus = transaction.busType.toLowerCase()
   const gpioLineCount = Math.max(transaction.request.length, transaction.response.length)
   if (bus === 'spi') {
-    return <section className="bus-signal-scope">
-      <header><div><span>Protocol-aware timing diagram</span><strong>SPI signal scope</strong></div><small>Mode 0 · CPOL=0 · CPHA=0 · /CS Active Low · 8 clocks / byte · 1-cycle gap</small></header>
-      <div className="signal-pin-rail"><span>Active pins</span>{['/CS', 'SCLK', 'MOSI', 'MISO'].map((pin) => <i key={pin}>{pin}</i>)}</div>
+    return <section className="bus-signal-scope bus-spi">
+      <ScopeHeader
+        detail="Mode 0 · CPOL=0 · CPHA=0 · /CS active low · 8 clocks/byte · 1-cycle gap"
+        pins={['/CS', 'SCLK', 'MOSI', 'MISO']}
+        title="SPI signal scope"
+      />
       <SpiTimingDiagram request={transaction.request} response={transaction.response} />
     </section>
   }
@@ -717,11 +683,12 @@ export function BusSignalScope({
       pins: gpioLineCount > 0 ? [`G0…G${gpioLineCount - 1}`] : ['No lines'],
     },
   }[bus as DecodedBus]
-  return <section className={`bus-signal-scope${bus === 'gpio' ? ' gpio-line-state-scope' : ''}`}>
-    {bus === 'gpio'
-      ? <header><strong>GPIO Line State View</strong><small>{scopeCopy.detail}</small></header>
-      : <header><div><span>Protocol-aware timing diagram</span><strong>{scopeCopy.title}</strong></div><small>{scopeCopy.detail}</small></header>}
-    <div className="signal-pin-rail"><span>Active pins</span>{scopeCopy.pins.map(pin => <i key={pin}>{pin}</i>)}</div>
+  return <section className={`bus-signal-scope bus-${bus}${bus === 'gpio' ? ' gpio-line-state-scope' : ''}`}>
+    <ScopeHeader
+      detail={scopeCopy.detail}
+      pins={scopeCopy.pins}
+      title={bus === 'gpio' ? 'GPIO Line State View' : scopeCopy.title}
+    />
     <ProtocolTimingDiagram
       bus={bus as DecodedBus}
       gpioControllerIndex={gpioControllerIndex}

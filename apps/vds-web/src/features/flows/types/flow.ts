@@ -125,6 +125,8 @@ export interface NodeRegistryEntry {
   compilerAdapter?: (node: FlowNodeDocument) => unknown
   runtimeStatusRenderer?: ComponentType<RuntimeStatusRendererProps>
   flowKinds?: string[]
+  /** Optional one-line technical summary (registers, hex, durations) rendered on the canvas node. */
+  summary?: (data: JsonObject) => string | undefined
 }
 
 export interface EdgeRegistryEntry {

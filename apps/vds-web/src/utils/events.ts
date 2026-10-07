@@ -1,12 +1,25 @@
-import { CircleAlert, CircleX, Info } from 'lucide-react'
+import type { DomainEvent } from '../types/events'
+import { formatHex, formatVirtualTime, humanize } from './format'
 
-import { useEventStore } from '../../stores/eventStore'
-import type { DomainEvent } from '../../types/events'
-import { formatHex, formatVirtualTime, humanize } from '../../utils/format'
-import { getEventSeverity } from './eventSeverity'
+export type EventSeverity = 'info' | 'warn' | 'error'
 
-interface LiveEventStreamProps {
-  events: DomainEvent[]
+function includesFailure(value: string | null | undefined) {
+  return value != null && /error|fail|reject|timeout|cancel/i.test(value)
+}
+
+export function getEventSeverity(event: DomainEvent): EventSeverity {
+  const payload = event.payload
+  if (payload.kind === 'transaction_completed' && (payload.error_code || includesFailure(payload.result))) return 'error'
+  if (payload.kind === 'scenario_step_completed' && includesFailure(payload.status)) return 'error'
+  if (payload.kind === 'scenario_completed' && includesFailure(payload.status)) return 'error'
+  if (payload.kind === 'operation_completed' && includesFailure(payload.result)) return 'error'
+  if (payload.kind === 'state_transition' && (payload.to_state === 'error' || includesFailure(payload.result))) return 'error'
+  if (payload.kind === 'fault_triggered') return 'warn'
+  return 'info'
+}
+
+export function eventSource(event: DomainEvent) {
+  return event.device_id ?? event.scenario_run_id ?? 'system'
 }
 
 const wallTimeFormatter = new Intl.DateTimeFormat(undefined, {
@@ -17,22 +30,22 @@ const wallTimeFormatter = new Intl.DateTimeFormat(undefined, {
   hour12: false,
 })
 
-const severityIcons = {
-  info: Info,
-  warn: CircleAlert,
-  error: CircleX,
-} as const
-
-function formatEventTimestamp(event: DomainEvent) {
-  if (event.timestamp_wall_ns > 0) return wallTimeFormatter.format(new Date(event.timestamp_wall_ns / 1_000_000))
+/** Wall-clock time of day (HH:MM:SS.mmm); falls back to virtual time when no wall stamp exists. */
+export function formatEventTime(event: Pick<DomainEvent, 'timestamp_wall_ns' | 'timestamp_virtual_ns'>) {
+  if (event.timestamp_wall_ns > 0) return formatWallTime(event.timestamp_wall_ns)
   return formatVirtualTime(event.timestamp_virtual_ns)
+}
+
+export function formatWallTime(wallNs: number) {
+  return wallTimeFormatter.format(new Date(wallNs / 1_000_000))
 }
 
 function registerName(name: string | null, address: number) {
   return name ?? formatHex(address, 16)
 }
 
-function eventDetail(event: DomainEvent) {
+/** One-line, human-readable payload summary used by event tails and logs. */
+export function eventSummary(event: DomainEvent) {
   const payload = event.payload
   switch (payload.kind) {
     case 'transaction_started':
@@ -64,36 +77,4 @@ function eventDetail(event: DomainEvent) {
     case 'signal_changed':
       return `${payload.source} → ${payload.target} = ${payload.value ? 'high' : 'low'} · ${payload.phase}${payload.delay_ns > 0 ? ` (+${formatVirtualTime(payload.delay_ns)})` : ''}`
   }
-}
-
-export function LiveEventStream({ events }: LiveEventStreamProps) {
-  const selectEvent = useEventStore((state) => state.selectEvent)
-
-  return (
-    <div aria-label="Live event stream" className="dashboard-live-events" role="log">
-      {events.map((event) => {
-        const severity = getEventSeverity(event)
-        const SeverityIcon = severityIcons[severity]
-        return (
-          <button
-            aria-label={`${severity} ${humanize(event.event_type)} on ${event.device_id ?? event.scenario_run_id ?? 'system'}`}
-            className="dashboard-live-event"
-            key={event.event_id}
-            onClick={() => selectEvent(event.event_id)}
-            type="button"
-          >
-            <time title={`Virtual time ${formatVirtualTime(event.timestamp_virtual_ns)}`}>{formatEventTimestamp(event)}</time>
-            <span className={`live-event-severity severity-${severity}`}>
-              <SeverityIcon aria-hidden="true" size={13} />
-              {severity}
-            </span>
-            <strong className="live-event-source">{event.device_id ?? event.scenario_run_id ?? 'system'}</strong>
-            <span className="live-event-type">{humanize(event.event_type)}</span>
-            <span className="live-event-detail">{eventDetail(event)}</span>
-            <span className="live-event-id">#{event.event_id}</span>
-          </button>
-        )
-      })}
-    </div>
-  )
 }

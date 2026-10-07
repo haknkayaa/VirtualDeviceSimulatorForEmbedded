@@ -1,0 +1,134 @@
+/*
+ * VDS4E design tokens.
+ *
+ * Colour carries meaning only: surface levels, selection/focus, state
+ * (ok/warn/error/info), live activity and bus identity. Never use these for
+ * decoration. No blur, glow or gradient tokens exist on purpose.
+ */
+:root {
+  color-scheme: dark;
+
+  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', ui-monospace, Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 18px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-lg: 6px;
+
+  --control-h: 26px;
+  --control-h-sm: 22px;
+  --row-h: 26px;
+  --bar-h: 36px;
+  --statusbar-h: 24px;
+  --sidebar-w: 196px;
+  --sidebar-w-collapsed: 48px;
+
+  /* Surfaces: 0 = app background, 1 = panel, 2 = raised/hover, 3 = input/pressed */
+  --bg-0: #0d0f12;
+  --bg-1: #14171b;
+  --bg-2: #1b1f24;
+  --bg-3: #22272e;
+  --bg-inset: #0f1215;
+  --border: #262b32;
+  --border-strong: #353c46;
+  --divider: #1f242a;
+
+  --text: #cfd6df;
+  --text-strong: #f0f3f6;
+  --text-muted: #8a94a1;
+  --text-faint: #5d6672;
+
+  --accent: #3d8ef0;
+  --accent-text: #79b2ff;
+  --accent-bg: rgba(61, 142, 240, .14);
+  --accent-border: rgba(61, 142, 240, .45);
+  --selection: rgba(61, 142, 240, .2);
+  --on-accent: #ffffff;
+
+  --ok: #3fb950;
+  --ok-bg: rgba(63, 185, 80, .13);
+  --warn: #d6a033;
+  --warn-bg: rgba(214, 160, 51, .14);
+  --err: #f0545c;
+  --err-bg: rgba(240, 84, 92, .14);
+  --info: #58a6ff;
+  --info-bg: rgba(88, 166, 255, .12);
+  --neutral-bg: rgba(138, 148, 161, .13);
+  --live: #2ec4b6;
+
+  /* Bus identity */
+  --bus-spi: #4ec9b0;
+  --bus-i2c: #dcb862;
+  --bus-gpio: #a3d36b;
+  --bus-uart: #c586c0;
+  --bus-ethernet: #8fa8ff;
+  --bus-unknown: #8a94a1;
+
+  /* Signal levels (logic analyzer, GPIO) */
+  --signal-high: #a3d36b;
+  --signal-low: #4d5662;
+
+  --shadow-pop: 0 6px 24px rgba(0, 0, 0, .45);
+  --scrim: rgba(0, 0, 0, .55);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg-0: #eceef1;
+  --bg-1: #ffffff;
+  --bg-2: #f4f5f7;
+  --bg-3: #e8ebef;
+  --bg-inset: #f7f8fa;
+  --border: #d6dae0;
+  --border-strong: #bfc5cd;
+  --divider: #e6e9ed;
+
+  --text: #262c33;
+  --text-strong: #0f1419;
+  --text-muted: #5a6470;
+  --text-faint: #8a939e;
+
+  --accent: #0b6bd3;
+  --accent-text: #0b5cb8;
+  --accent-bg: rgba(11, 107, 211, .1);
+  --accent-border: rgba(11, 107, 211, .45);
+  --selection: rgba(11, 107, 211, .12);
+
+  --ok: #1a7f37;
+  --ok-bg: rgba(26, 127, 55, .1);
+  --warn: #9a6700;
+  --warn-bg: rgba(191, 135, 0, .13);
+  --err: #cf222e;
+  --err-bg: rgba(207, 34, 46, .09);
+  --info: #0969da;
+  --info-bg: rgba(9, 105, 218, .09);
+  --neutral-bg: rgba(90, 100, 112, .1);
+  --live: #0f8a80;
+
+  --bus-spi: #0f8a74;
+  --bus-i2c: #9a6c00;
+  --bus-gpio: #4d8a12;
+  --bus-uart: #9c3f97;
+  --bus-ethernet: #4058c8;
+  --bus-unknown: #5a6470;
+
+  --signal-high: #4d8a12;
+  --signal-low: #b7bec7;
+
+  --shadow-pop: 0 6px 24px rgba(15, 20, 25, .16);
+  --scrim: rgba(15, 20, 25, .32);
+}

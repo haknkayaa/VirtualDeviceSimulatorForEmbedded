@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Clock3, FilePenLine, GitBranch, PackageCheck, Play, Plus, Trash2, Workflow, X } from 'lucide-react'
+import { FlaskConical, Play, Plus, Trash2, Workflow } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import {
@@ -11,8 +11,8 @@ import {
   useStartScenarioDefinition,
 } from '../../../api/queries'
 import { AsyncState } from '../../../components/AsyncState'
-import { GlassPanel } from '../../../components/GlassPanel'
 import { PageHeader } from '../../../components/PageHeader'
+import { Panel } from '../../../components/Panel'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { useRunStore } from '../../../stores/runStore'
 import { formatVirtualTime, humanize } from '../../../utils/format'
@@ -20,6 +20,7 @@ import { localFlowRepository } from '../../flows/serialization/localFlowReposito
 import type { FlowListItem } from '../../flows/types/flow'
 import { compileScenarioFlow } from '../scenario-flows/compiler/compileScenarioFlow'
 import { scenarioSettings } from '../scenario-flows/types/scenarioFlow'
+import '../devices.css'
 
 type ScenarioSelection = { id: string; source: 'draft' | 'package' }
 
@@ -51,10 +52,8 @@ export function ScenariosPage({ deviceId, embedded = false, localScenarios = [],
   const setActiveRunId = useRunStore((state) => state.setActiveRunId)
   const run = useRun(activeRunId)
   const editorBase = `/devices/${encodeURIComponent(deviceId)}/scenarios`
+  const starting = start.isPending || startDefinition.isPending
 
-  const selectScenario = (next: ScenarioSelection) => {
-    setSelection(next)
-  }
   const handleRun = (id = scenarioId) => {
     if (!id) return
     setSelection({ id, source: 'package' })
@@ -81,100 +80,185 @@ export function ScenariosPage({ deviceId, embedded = false, localScenarios = [],
   }
 
   const inspectorAction = selectedDraft
-    ? <Link className="button button-secondary" to={`${editorBase}/${encodeURIComponent(selectedDraft.id)}`}><Workflow size={15} /> Edit flow</Link>
-    : undefined
+    ? (
+      <>
+        <Link className="button button-sm" to={`${editorBase}/${encodeURIComponent(selectedDraft.id)}`}><Workflow aria-hidden="true" size={12} /> Edit flow</Link>
+        <button className="button button-primary button-sm" disabled={starting} onClick={() => handleRunDraft(selectedDraft.id)} type="button"><Play aria-hidden="true" size={12} /> Run</button>
+      </>
+    )
+    : selectedPackage
+      ? <button className="button button-primary button-sm" disabled={starting} onClick={() => handleRun(selectedPackage.id)} type="button"><Play aria-hidden="true" size={12} /> Run</button>
+      : undefined
   const inspectorTitle = selectedDraft?.name ?? scenario.data?.scenario.name ?? selectedPackage?.name ?? 'Test Scenario Inspector'
+  const runMatchesSelection = run.data && (
+    (selectedPackage && run.data.scenario_id === selectedPackage.id)
+    || (selectedDraftDocument && run.data.scenario_id === selectedDraftDocument.flow.id)
+  )
+
+  const list = (
+    <Panel
+      actions={<Link className="button button-sm" to={`${editorBase}/new`}><Plus aria-hidden="true" size={12} /> New scenario</Link>}
+      className="dv-tab-panel dv-scn-list"
+      flush
+      icon={FlaskConical}
+      meta={`${localScenarios.length + (deviceScenarios?.length ?? 0)} for ${deviceId}`}
+      title="Scenario Flows"
+    >
+      <div className="dv-table-scroll">
+        <table className="data-table dv-scn-table">
+          <colgroup><col /><col className="dv-scn-col-id" /><col className="dv-scn-col-steps" /><col className="dv-scn-col-timeout" /><col className="dv-scn-col-actions" /></colgroup>
+          <thead>
+            <tr><th>Scenario</th><th>ID</th><th className="num">Steps</th><th className="num">Timeout</th><th className="dv-cell-actions" /></tr>
+          </thead>
+          <tbody>
+            {localScenarios.length > 0 && <tr className="group-row"><td colSpan={5}>Drafts <span className="count">{localScenarios.length}</span></td></tr>}
+            {localScenarios.map((item) => {
+              const active = effectiveSelection?.source === 'draft' && effectiveSelection.id === item.id
+              const document = localFlowRepository.load(item.id)
+              return (
+                <tr aria-selected={active} className={`clickable${active ? ' selected' : ''}`} key={item.id} onClick={() => setSelection({ id: item.id, source: 'draft' })}>
+                  <td className="dv-trunc" title={item.name}><span className="chip dv-chip-draft">draft r{item.revision}</span> <strong>{item.name}</strong></td>
+                  <td className="mono dim dv-trunc" title={item.id}>{item.id}</td>
+                  <td className="num dim">{document ? document.nodes.filter((node) => !node.kind.endsWith('.start') && !node.kind.endsWith('.end')).length : '—'}</td>
+                  <td className="num dim">{document ? `${scenarioSettings(document).timeout_ms} ms` : '—'}</td>
+                  <td className="dv-cell-actions" onClick={(event) => event.stopPropagation()}>
+                    <Link aria-label={`Edit ${item.name} visual flow`} className="icon-button sm" title="Edit flow" to={`${editorBase}/${encodeURIComponent(item.id)}`}><Workflow aria-hidden="true" size={13} /></Link>
+                    <button aria-label={`Run ${item.name}`} className="icon-button sm" disabled={starting} onClick={() => handleRunDraft(item.id)} title="Run draft" type="button"><Play aria-hidden="true" size={13} /></button>
+                    {onDeleteDraft && <button aria-label={`Delete ${item.name}`} className="icon-button sm dv-danger" onClick={() => onDeleteDraft(item.id, item.name)} title="Delete draft" type="button"><Trash2 aria-hidden="true" size={13} /></button>}
+                  </td>
+                </tr>
+              )
+            })}
+            <tr className="group-row"><td colSpan={5}>Packaged <span className="count">{deviceScenarios?.length ?? 0}</span></td></tr>
+            {deviceScenarios?.map((item) => {
+              const active = effectiveSelection?.source === 'package' && item.id === scenarioId
+              return (
+                <tr aria-selected={active} className={`clickable${active ? ' selected' : ''}`} key={item.id} onClick={() => setSelection({ id: item.id, source: 'package' })}>
+                  <td className="dv-trunc" title={item.name}><strong>{item.name}</strong></td>
+                  <td className="mono dim dv-trunc" title={item.id}>{item.id}</td>
+                  <td className="num">{item.steps}</td>
+                  <td className="num dim">{item.timeout_ms} ms</td>
+                  <td className="dv-cell-actions" onClick={(event) => event.stopPropagation()}>
+                    <Link aria-label={`Open ${item.name} in visual editor`} className="icon-button sm" title="Open flow" to={`${editorBase}/${encodeURIComponent(item.id)}`}><Workflow aria-hidden="true" size={13} /></Link>
+                    <button aria-label={`Run ${item.name}`} className="icon-button sm" disabled={starting} onClick={() => handleRun(item.id)} title="Run scenario" type="button"><Play aria-hidden="true" size={13} /></button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        {scenarios.isPending && <AsyncState kind="loading" title="Loading packaged scenarios" />}
+        {scenarios.isError && <AsyncState detail={scenarios.error.message} kind="error" title="Scenarios unavailable" />}
+        {deviceScenarios?.length === 0 && localScenarios.length === 0 && (
+          <AsyncState
+            detail={<>Create a scenario flow to define repeatable device interactions. <Link className="inline-link" to={`${editorBase}/new`}>Create test scenario</Link></>}
+            kind="empty"
+            title="No scenarios for this device"
+          />
+        )}
+      </div>
+    </Panel>
+  )
+
+  const inspector = (
+    <Panel actions={inspectorAction} className="dv-scn-inspector" icon={FlaskConical} title={<span className="truncate" title={inspectorTitle}>{inspectorTitle}</span>}>
+      <section aria-label="Scenario definition" className="dv-scn-section">
+        <h3 className="panel-section-title dv-flush-title">Definition</h3>
+        {!effectiveSelection && <AsyncState detail="Select or create a scenario flow." kind="empty" title="No scenario selected" />}
+        {selectedDraft && !selectedDraftDocument && <AsyncState kind="error" title="Draft definition unavailable" />}
+        {selectedDraftDocument && (
+          <>
+            <dl className="kv-grid">
+              <div><dt>Source</dt><dd>Local draft</dd></div>
+              <div><dt>Revision</dt><dd className="mono">r{selectedDraftDocument.flow.revision}</dd></div>
+              <div><dt>Timeout</dt><dd className="mono">{scenarioSettings(selectedDraftDocument).timeout_ms} ms</dd></div>
+            </dl>
+            <ol className="dv-scn-steps">
+              {selectedDraftDocument.nodes.filter((node) => !node.kind.endsWith('.start') && !node.kind.endsWith('.end')).map((node, index) => (
+                <li key={node.id}><span className="count">{index + 1}</span><code>{String(node.data.step_id ?? node.id)}</code><span>{String(node.data.label ?? humanize(node.kind.split('.').slice(-1)[0] ?? node.kind))}</span></li>
+              ))}
+            </ol>
+          </>
+        )}
+        {scenario.isPending && scenarioId && <AsyncState kind="loading" title="Loading definition" />}
+        {scenario.isError && scenarioId && <AsyncState detail={scenario.error.message} kind="error" title="Definition unavailable" />}
+        {scenario.data && (
+          <>
+            <dl className="kv-grid">
+              <div><dt>ID</dt><dd className="mono">{scenario.data.scenario.id}</dd></div>
+              <div><dt>Schema</dt><dd className="mono">v{scenario.data.schema_version}</dd></div>
+              <div><dt>Timeout</dt><dd className="mono">{scenario.data.scenario.timeout_ms} ms</dd></div>
+            </dl>
+            <ol className="dv-scn-steps">
+              {scenario.data.steps.map((step, index) => (
+                <li key={step.id}><span className="count">{index + 1}</span><code>{step.id}</code><span>{humanize(step.action)}</span></li>
+              ))}
+            </ol>
+          </>
+        )}
+        {start.isError && <AsyncState detail={start.error.message} kind="error" title="Scenario start failed" />}
+        {draftRunError && <AsyncState detail={draftRunError} kind="error" title="Draft run failed" />}
+      </section>
+
+      <section aria-label="Scenario execution" className="dv-scn-section">
+        <h3 className="panel-section-title dv-flush-title">Execution</h3>
+        {!activeRunId && <AsyncState detail="Run a scenario to see its result here." kind="empty" title="No active run" />}
+        {run.isPending && activeRunId && <AsyncState kind="loading" title={`Tracking ${activeRunId}`} />}
+        {run.isError && <AsyncState detail={run.error.message} kind="error" title="Run status unavailable" />}
+        {run.data && (
+          <>
+            <div className={`dv-scn-run${runMatchesSelection ? '' : ' other'}`}>
+              <code>{run.data.run_id}</code>
+              <span className="truncate">{run.data.scenario_id}</span>
+              <StatusBadge status={run.data.status} />
+            </div>
+            {run.data.result && (
+              <dl className="dv-scn-metrics">
+                <div><dt>Passed</dt><dd className="text-ok">{run.data.result.steps_passed}</dd></div>
+                <div><dt>Failed</dt><dd className={run.data.result.steps_failed ? 'text-err' : ''}>{run.data.result.steps_failed}</dd></div>
+                <div><dt>Skipped</dt><dd>{run.data.result.steps_skipped}</dd></div>
+                <div><dt>Duration</dt><dd>{formatVirtualTime(run.data.result.duration_virtual_ns)}</dd></div>
+              </dl>
+            )}
+            {run.data.error && <AsyncState detail={run.data.error} kind="error" title="Run execution failed" />}
+            {run.data.result && (
+              <table className="data-table dv-scn-results">
+                <colgroup><col className="dv-scn-col-result" /><col /><col className="dv-scn-col-time" /></colgroup>
+                <thead><tr><th>Result</th><th>Step</th><th className="num">Δt</th></tr></thead>
+                <tbody>
+                  {run.data.result.steps.map((step) => (
+                    <tr key={step.step_id} title={step.error ?? undefined}>
+                      <td><StatusBadge status={step.status} /></td>
+                      <td className="mono dv-scn-step" title={`${step.step_id} · ${humanize(step.action)}`}>{step.step_id}{step.error && <small className="dv-scn-error">{step.error}</small>}</td>
+                      <td className="num dim">{formatVirtualTime(step.completed_virtual_ns - step.started_virtual_ns)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+      </section>
+    </Panel>
+  )
+
+  if (embedded) {
+    return (
+      <div className={`dv-scn${inspectorTarget ? ' inspector-external' : ''}`}>
+        {list}
+        {inspectorTarget ? createPortal(inspector, inspectorTarget) : inspector}
+      </div>
+    )
+  }
 
   return (
-    <div className={embedded ? 'device-scenario-runtime' : 'page-stack'}>
-      {!embedded && <PageHeader
-        eyebrow="Deterministic verification"
-        title="Test Scenarios"
-        description="Author scenario flows, run packaged tests, and inspect their authoritative results."
-      />}
-      <div className={`scenario-workspace-layout${inspectorTarget ? ' inspector-external' : ''}`}>
-        <GlassPanel className="scenario-flow-list-panel" eyebrow="Test authoring" title="Scenario Flows">
-          <div className="scenario-flow-list">
-            <Link className="flow-list-new" to={`${editorBase}/new`}>
-              <Plus size={21} />
-              <div><strong>Create test scenario</strong><span>Build a deterministic test for {deviceId}.</span></div>
-            </Link>
-
-            {localScenarios.length > 0 && <section className="scenario-flow-group">
-              <header><FilePenLine size={14} /><strong>Drafts</strong><span>{localScenarios.length}</span></header>
-              {localScenarios.map((item) => (
-                <article className={`scenario-flow-runtime-card ${effectiveSelection?.source === 'draft' && effectiveSelection.id === item.id ? 'active' : ''}`} key={item.id}>
-                  <button className="scenario-flow-select" onClick={() => selectScenario({ id: item.id, source: 'draft' })} type="button">
-                    <span>draft · r{item.revision}</span><strong>{item.name}</strong><small>{item.id}</small><div><GitBranch size={13} /> Local flow</div>
-                  </button>
-                  <div className={`scenario-flow-runtime-actions draft-actions${onDeleteDraft ? '' : ' without-delete'}`}>
-                    <Link aria-label={`Edit ${item.name} visual flow`} to={`${editorBase}/${encodeURIComponent(item.id)}`}><Workflow size={14} /> Edit flow</Link>
-                    <button aria-label={`Run ${item.name}`} disabled={startDefinition.isPending || start.isPending} onClick={() => handleRunDraft(item.id)} type="button"><Play size={14} /> {startDefinition.isPending && selectedDraft?.id === item.id ? 'Starting' : 'Run scenario'}</button>
-                    {onDeleteDraft && <button aria-label={`Delete ${item.name}`} className="danger" onClick={() => onDeleteDraft(item.id, item.name)} type="button"><Trash2 size={14} /> Delete</button>}
-                  </div>
-                </article>
-              ))}
-            </section>}
-
-            <section className="scenario-flow-group">
-              <header><PackageCheck size={14} /><strong>Packaged &amp; runnable</strong><span>{deviceScenarios?.length ?? 0}</span></header>
-              {scenarios.isPending && <AsyncState kind="loading" title="Loading packaged scenarios" />}
-              {scenarios.isError && <AsyncState detail={scenarios.error.message} kind="error" title="Scenarios unavailable" />}
-              {deviceScenarios?.length === 0 && <AsyncState kind="empty" title="No packaged scenarios for this device" />}
-              {deviceScenarios?.map((item) => (
-                <article className={`scenario-flow-runtime-card ${effectiveSelection?.source === 'package' && item.id === scenarioId ? 'active' : ''}`} key={item.id}>
-                  <button className="scenario-flow-select" onClick={() => selectScenario({ id: item.id, source: 'package' })} type="button">
-                    <span>{item.steps} steps</span><strong>{item.name}</strong><small>{item.id}</small><div><Clock3 size={13} /> {item.timeout_ms} ms</div>
-                  </button>
-                  <div className="scenario-flow-runtime-actions">
-                    <Link aria-label={`Open ${item.name} in visual editor`} to={`${editorBase}/${encodeURIComponent(item.id)}`}><Workflow size={14} /> Open flow</Link>
-                    <button aria-label={`Run ${item.name}`} disabled={start.isPending || startDefinition.isPending} onClick={() => handleRun(item.id)} type="button"><Play size={14} /> {start.isPending && item.id === scenarioId ? 'Starting' : 'Run scenario'}</button>
-                  </div>
-                </article>
-              ))}
-            </section>
-          </div>
-        </GlassPanel>
-
-        {(() => { const panel = <GlassPanel action={inspectorAction} className="scenario-inspector-panel" eyebrow="Selected test scenario" title={inspectorTitle}>
-          <div className="scenario-inspector-content">
-            <section aria-label="Scenario definition" className="scenario-inspector-section">
-              <header><span>01</span><div><strong>Definition</strong><small>Authored steps and runtime settings</small></div></header>
-              <div className="scenario-inspector-section-body">
-              {!effectiveSelection && <AsyncState detail="Create a scenario flow on the left to define repeatable device interactions." kind="empty" title="No scenario flows yet" />}
-              {selectedDraft && !selectedDraftDocument && <AsyncState kind="error" title="Draft definition unavailable" />}
-              {selectedDraftDocument && <div className="scenario-definition">
-                <div className="scenario-meta"><span>Source <strong>Draft</strong></span><span>Revision <strong>r{selectedDraftDocument.flow.revision}</strong></span><span>Timeout <strong>{scenarioSettings(selectedDraftDocument).timeout_ms} ms</strong></span></div>
-                <ol>{selectedDraftDocument.nodes.filter((node) => !node.kind.endsWith('.start') && !node.kind.endsWith('.end')).map((node) => <li key={node.id}><span>{String(node.data.step_id ?? node.id)}</span><strong>{String(node.data.label ?? humanize(node.kind.split('.').slice(-1)[0] ?? node.kind))}</strong></li>)}</ol>
-              </div>}
-              {scenario.isPending && scenarioId && <AsyncState kind="loading" title="Loading definition" />}
-              {scenario.isError && scenarioId && <AsyncState detail={scenario.error.message} kind="error" title="Definition unavailable" />}
-              {scenario.data && <div className="scenario-definition">
-                <div className="scenario-meta"><span>ID <strong>{scenario.data.scenario.id}</strong></span><span>Schema <strong>v{scenario.data.schema_version}</strong></span><span>Timeout <strong>{scenario.data.scenario.timeout_ms} ms</strong></span></div>
-                <ol>{scenario.data.steps.map((step) => <li key={step.id}><span>{step.id}</span><strong>{humanize(step.action)}</strong></li>)}</ol>
-              </div>}
-              {start.isError && <AsyncState detail={start.error.message} kind="error" title="Scenario start failed" />}
-              {draftRunError && <AsyncState detail={draftRunError} kind="error" title="Draft run failed" />}
-              </div>
-            </section>
-
-            <section aria-label="Scenario execution" className="scenario-inspector-section">
-              <header><span>02</span><div><strong>Execution</strong><small>Current run status and step progress</small></div></header>
-              <div className="scenario-inspector-section-body">
-              {!activeRunId && <AsyncState detail="Select a packaged scenario and start a run." kind="empty" title="No active run" />}
-              {run.isPending && activeRunId && <AsyncState kind="loading" title={`Tracking ${activeRunId}`} />}
-              {run.isError && <AsyncState detail={run.error.message} kind="error" title="Run status unavailable" />}
-              {run.data && <div className="run-detail">
-                <div className="run-meta"><span>{run.data.run_id}</span><strong>{run.data.scenario_id}</strong><StatusBadge status={run.data.status} /></div>
-                {run.data.result && <div className="result-metrics"><span><Check size={15} />{run.data.result.steps_passed} passed</span><span><X size={15} />{run.data.result.steps_failed} failed</span><span><Clock3 size={15} />{formatVirtualTime(run.data.result.duration_virtual_ns)}</span></div>}
-                {run.data.error && <AsyncState detail={run.data.error} kind="error" title="Run execution failed" />}
-                {run.data.result && <div className="step-results">{run.data.result.steps.map((step) => <article key={step.step_id}><StatusBadge status={step.status} /><div><strong>{step.step_id}</strong><span>{humanize(step.action)}</span>{step.error && <small>{step.error}</small>}</div><time>{formatVirtualTime(step.completed_virtual_ns - step.started_virtual_ns)}</time></article>)}</div>}
-              </div>}
-              </div>
-            </section>
-
-          </div>
-        </GlassPanel>; return inspectorTarget ? createPortal(panel, inspectorTarget) : panel })()}
+    <div className="page dv-scn-page">
+      <PageHeader context={<code>{deviceId}</code>} title="Test Scenarios" />
+      <div className="page-body fill flush">
+        <div className="dv-scn">
+          {list}
+          {inspectorTarget ? createPortal(inspector, inspectorTarget) : inspector}
+        </div>
       </div>
     </div>
   )

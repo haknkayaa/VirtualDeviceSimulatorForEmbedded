@@ -7,8 +7,8 @@ function value(value: unknown) {
   return typeof value === 'string' || typeof value === 'number' ? String(value) : ''
 }
 
-function BlurField({ label, value: current, disabled, type = 'text', onCommit }: { label: string; value: string; disabled: boolean; type?: string; onCommit: (value: string) => void }) {
-  return <label className="flow-field"><span>{label}</span><input defaultValue={current} disabled={disabled} key={`${label}-${current}`} onBlur={(event) => { if (event.target.value !== current) onCommit(event.target.value) }} type={type} /></label>
+function BlurField({ label, value: current, disabled, type = 'text', mono = false, placeholder, onCommit }: { label: string; value: string; disabled: boolean; type?: string; mono?: boolean; placeholder?: string; onCommit: (value: string) => void }) {
+  return <label className="flow-field"><span>{label}</span><input className={mono ? 'mono' : undefined} defaultValue={current} disabled={disabled} key={`${label}-${current}`} onBlur={(event) => { if (event.target.value !== current) onCommit(event.target.value) }} placeholder={placeholder} spellCheck={mono ? false : undefined} type={type} /></label>
 }
 
 export function TransitionInspector({ edge, readOnly, updateData }: EdgeInspectorProps) {
@@ -25,8 +25,8 @@ export function TransitionInspector({ edge, readOnly, updateData }: EdgeInspecto
         <option value="event">Runtime event</option>
         <option value="command">Command-dispatched event</option>
       </select></label>
-      <BlurField disabled={readOnly} label="Event identifier" onCommit={(trigger) => updateData({ trigger })} value={value(edge.data.trigger)} />
-      <BlurField disabled={readOnly} label="Priority" onCommit={(priority) => updateData({ priority: Number(priority) })} type="number" value={value(edge.data.priority)} />
+      <BlurField disabled={readOnly} label="Event identifier" mono onCommit={(trigger) => updateData({ trigger })} value={value(edge.data.trigger)} />
+      <BlurField disabled={readOnly} label="Priority" mono onCommit={(priority) => updateData({ priority: Number(priority) })} type="number" value={value(edge.data.priority)} />
       <label className="flow-field"><span>Register guard</span><select disabled={readOnly} onChange={(event) => updateData({ guard_enabled: event.target.value === 'true' })} value={guardEnabled ? 'true' : 'false'}>
         <option value="false">Disabled</option>
         <option value="true">Enabled</option>
@@ -37,20 +37,20 @@ export function TransitionInspector({ edge, readOnly, updateData }: EdgeInspecto
           {selectedRegister && !knownRegister && <option value={selectedRegister}>Missing: {selectedRegister}</option>}
           {(registers.data ?? []).map((register) => <option key={register.name} value={register.name}>{register.name} · {register.width_bits} bit</option>)}
         </select></label>
-        <BlurField disabled={readOnly} label="Equals" onCommit={(guard_equals) => updateData({ guard_equals })} value={value(edge.data.guard_equals)} />
-        <BlurField disabled={readOnly} label="Mask (optional)" onCommit={(guard_mask) => updateData({ guard_mask })} value={value(edge.data.guard_mask)} />
+        <BlurField disabled={readOnly} label="Equals" mono onCommit={(guard_equals) => updateData({ guard_equals })} value={value(edge.data.guard_equals)} />
+        <BlurField disabled={readOnly} label="Mask" mono onCommit={(guard_mask) => updateData({ guard_mask })} placeholder="optional" value={value(edge.data.guard_mask)} />
       </>}
       <label className="flow-field"><span>Scheduled event</span><select disabled={readOnly || edge.data.trigger_type === 'command'} onChange={(event) => updateData({ delay_value: event.target.value === 'true' ? 1 : null, delay_unit: 'ms' })} value={delayEnabled ? 'true' : 'false'}>
         <option value="false">Disabled</option>
         <option value="true">Enabled</option>
       </select></label>
-      {delayEnabled && <div className="behavior-duration-fields">
-        <BlurField disabled={readOnly} label="Delay" onCommit={(delay_value) => updateData({ delay_value: Number(delay_value) })} type="number" value={value(edge.data.delay_value)} />
+      {delayEnabled && <div className="flow-field-pair">
+        <BlurField disabled={readOnly} label="Delay" mono onCommit={(delay_value) => updateData({ delay_value: Number(delay_value) })} type="number" value={value(edge.data.delay_value)} />
         <label className="flow-field"><span>Unit</span><select disabled={readOnly} onChange={(event) => updateData({ delay_unit: event.target.value })} value={value(edge.data.delay_unit)}>
           {TIME_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
         </select></label>
       </div>}
-      {registers.isError && <small className="scenario-resource-status">Register snapshot unavailable; authored values are preserved.</small>}
+      {registers.isError && <p className="flow-note">Register snapshot unavailable; authored values are preserved.</p>}
     </div>
   )
 }

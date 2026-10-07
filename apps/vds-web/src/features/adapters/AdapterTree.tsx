@@ -1,9 +1,15 @@
-import { Cable, ChevronDown, Cpu, LoaderCircle, Power, PowerOff } from 'lucide-react'
+import { CircleAlert, LoaderCircle, Power, PowerOff } from 'lucide-react'
+import type { KeyboardEvent } from 'react'
 
+import { AsyncState } from '../../components/AsyncState'
+import { BusTag } from '../../components/BusTag'
 import type { Adapter } from '../../types/api'
+import { adapterNodePath, adapterStateTone, bindingEndpointLabel, bindingNodePath } from './adapterModel'
 
 export interface AdapterTreeSelection {
   adapterId: string
+  /** Optional binding highlighted in the inspector. */
+  deviceId?: string
 }
 
 interface AdapterTreeProps {
@@ -17,6 +23,17 @@ interface AdapterTreeProps {
   selection?: AdapterTreeSelection
 }
 
+/** Arrow-key navigation between the focusable rows of the tree. */
+function moveFocus(event: KeyboardEvent<HTMLDivElement>) {
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+  const rows = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('.adp-tree-focus')]
+  const index = rows.indexOf(document.activeElement as HTMLButtonElement)
+  if (index === -1) return
+  event.preventDefault()
+  rows[Math.max(0, Math.min(rows.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))]?.focus()
+}
+
+/** Host adapter topology: adapter rows with their bound Linux nodes nested below. */
 export function AdapterTree({
   adapters,
   busy,
@@ -30,101 +47,100 @@ export function AdapterTree({
   const deviceCount = adapters.reduce((count, adapter) => count + adapter.bindings.length, 0)
 
   return (
-    <aside aria-label="Adapter topology" className="glass-panel adapter-tree-panel">
-      <header className="adapter-tree-header">
-        <div>
-          <span>Host topology</span>
-          <strong>Adapters</strong>
-        </div>
-        <span className="adapter-tree-count">{adapters.length}</span>
-      </header>
+    <div
+      aria-label={`${adapters.length} adapters and ${deviceCount} attached devices`}
+      className="adp-tree"
+      onKeyDown={moveFocus}
+      role="tree"
+    >
+      {isLoading && <AsyncState kind="loading" title="Reading adapter topology" />}
+      {errorMessage && <AsyncState detail={errorMessage} kind="error" title="Adapters unavailable" />}
+      {!isLoading && !errorMessage && adapters.length === 0 && (
+        <AsyncState detail="Create an adapter to expose a Linux device node." kind="empty" title="No adapters configured" />
+      )}
+      {adapters.map((adapter) => {
+        const adapterSelected = selection?.adapterId === adapter.id
+        const loaded = adapter.state === 'loaded'
+        const transitioning = adapter.state === 'loading' || adapter.state === 'unloading'
+        const unloadable = loaded || adapter.state === 'error'
+        const select = () => onSelect({ adapterId: adapter.id })
 
-      <div aria-label={`${adapters.length} adapters and ${deviceCount} attached devices`} className="adapter-tree" role="tree">
-        {isLoading && <span className="adapter-tree-message">Loading adapter topology…</span>}
-        {errorMessage && <span className="adapter-tree-message error">{errorMessage}</span>}
-        {!isLoading && !errorMessage && adapters.length === 0 && (
-          <span className="adapter-tree-message">No adapters are configured.</span>
-        )}
-        {adapters.map((adapter) => {
-          const adapterSelected = selection?.adapterId === adapter.id
-          const devicePaths = adapter.bindings.map((binding) => binding.device_path)
-          const pathLabel = devicePaths.length > 0
-            ? devicePaths.join(', ')
-            : adapter.bus_type === 'gpio'
-              ? adapter.device_path ?? `/dev/gpiochipX · ${adapter.line_count ?? 0} lines`
-              : adapter.bus_type === 'i2c'
-                ? `/dev/i2c-${adapter.bus_number}`
-                : adapter.bus_type === 'uart'
-                  ? adapter.device_path ?? '/dev/pts/X'
-                  : `/dev/spidev${adapter.bus_number}.*`
-          const loaded = adapter.state === 'loaded'
-          const transitioning = adapter.state === 'loading' || adapter.state === 'unloading'
-          const unloadable = loaded || adapter.state === 'error'
-
-          return (
-            <div
-              aria-expanded="true"
-              aria-selected={adapterSelected}
-              className={`adapter-tree-branch${adapterSelected ? ' active' : ''}`}
-              key={adapter.id}
-              role="treeitem"
-            >
+        return (
+          <div
+            aria-expanded="true"
+            aria-level={1}
+            aria-selected={adapterSelected}
+            className={`adp-tree-item${adapterSelected ? ' selected' : ''}`}
+            key={adapter.id}
+            onClick={select}
+            role="treeitem"
+          >
+            <div className="adp-tree-adapter">
               <button
                 aria-label={`Select ${adapter.name}`}
-                className="adapter-tree-select"
-                onClick={() => onSelect({ adapterId: adapter.id })}
+                className="adp-tree-row adp-tree-focus"
+                onClick={(event) => { event.stopPropagation(); select() }}
                 type="button"
               >
-                <span className="adapter-tree-adapter">
-                  <ChevronDown aria-hidden="true" className="adapter-tree-chevron" size={14} />
-                  <span className="adapter-tree-icon"><Cable aria-hidden="true" size={16} /></span>
-                  <span className="adapter-tree-copy">
-                    <span className="adapter-tree-name">
-                      <strong>{adapter.name}</strong>
-                      <code>{pathLabel}</code>
-                    </span>
-                  </span>
-                </span>
-
-                <span className="adapter-tree-devices">
-                  {adapter.bindings.length === 0 && <span className="adapter-tree-empty">No attached devices</span>}
-                  {adapter.bindings.map((binding) => (
-                    <span className="adapter-tree-device" key={binding.device_id}>
-                      <span className="adapter-tree-device-line" />
-                      <span className="adapter-tree-device-icon"><Cpu aria-hidden="true" size={14} /></span>
-                      <span className="adapter-tree-copy">
-                        <strong>{binding.device_id}</strong>
-                        <small>CS{binding.endpoint} · {binding.device_path}</small>
-                      </span>
-                    </span>
-                  ))}
-                </span>
+                <i aria-hidden="true" className={`status-dot ${adapterStateTone(adapter.state)}`} />
+                <BusTag bus={adapter.bus_type} />
+                <strong className="adp-tree-name truncate">{adapter.name}</strong>
+                <code className="adp-tree-id truncate">{adapter.id}</code>
+                {adapter.readiness !== 'ready' && (
+                  <CircleAlert
+                    aria-label={adapter.readiness === 'authorization_required' ? 'Needs authorization' : 'Driver unavailable'}
+                    className={adapter.readiness === 'unavailable' ? 'text-err' : 'text-warn'}
+                    size={12}
+                  />
+                )}
+                <span className={`adp-tree-state adp-state-${adapter.state}`}>{adapter.state}</span>
               </button>
-
-              <div className="adapter-tree-status-actions">
-                <span className={`adapter-tree-status ${loaded ? 'online' : 'offline'}`}>
-                  <i aria-hidden="true" className={`adapter-tree-state ${adapter.state}`} />
-                  <span>{loaded ? 'Online' : 'Offline'}</span>
-                </span>
-                <button
-                  aria-label={unloadable ? `Unload ${adapter.name}` : `Load ${adapter.name}`}
-                  className={`adapter-tree-power${unloadable ? ' adapter-tree-power-unload' : ''}`}
-                  disabled={busy || transitioning || (!unloadable && (adapter.bindings.length === 0 || adapter.readiness === 'unavailable'))}
-                  onClick={() => unloadable ? onUnload(adapter.id) : onLoad(adapter.id)}
-                  title={unloadable ? 'Unload adapter' : 'Load adapter'}
-                  type="button"
-                >
-                  {transitioning
-                    ? <LoaderCircle aria-hidden="true" className="spin" size={14} />
-                    : unloadable
-                      ? <PowerOff aria-hidden="true" size={14} />
-                      : <Power aria-hidden="true" size={14} />}
-                </button>
-              </div>
+              <button
+                aria-label={unloadable ? `Unload ${adapter.name}` : `Load ${adapter.name}`}
+                className="icon-button sm adp-tree-power"
+                disabled={busy || transitioning || (!unloadable && (adapter.bindings.length === 0 || adapter.readiness === 'unavailable'))}
+                onClick={(event) => { event.stopPropagation(); if (unloadable) onUnload(adapter.id); else onLoad(adapter.id) }}
+                title={unloadable ? 'Unload adapter' : 'Load adapter'}
+                type="button"
+              >
+                {transitioning
+                  ? <LoaderCircle aria-hidden="true" className="spin" size={13} />
+                  : unloadable
+                    ? <PowerOff aria-hidden="true" size={13} />
+                    : <Power aria-hidden="true" size={13} />}
+              </button>
             </div>
-          )
-        })}
-      </div>
-    </aside>
+
+            <div className="adp-tree-bindings" role="group">
+              {adapter.bindings.length === 0 && (
+                <div className="adp-tree-binding adp-tree-binding-empty">
+                  <code className={loaded ? '' : 'adp-node-down'}>{adapterNodePath(adapter)}</code>
+                  <span className="dim">no device attached</span>
+                </div>
+              )}
+              {adapter.bindings.map((binding) => {
+                const bindingSelected = adapterSelected && selection?.deviceId === binding.device_id
+                return (
+                  <button
+                    aria-level={2}
+                    aria-selected={bindingSelected}
+                    className={`adp-tree-binding adp-tree-focus${bindingSelected ? ' selected' : ''}`}
+                    key={binding.device_id}
+                    onClick={(event) => { event.stopPropagation(); onSelect({ adapterId: adapter.id, deviceId: binding.device_id }) }}
+                    role="treeitem"
+                    title={loaded ? 'Exposed to applications' : 'Not exposed: adapter is not loaded'}
+                    type="button"
+                  >
+                    <code className={`adp-tree-node truncate${loaded ? '' : ' adp-node-down'}`}>{bindingNodePath(adapter, binding)}</code>
+                    <span className="adp-tree-endpoint">{bindingEndpointLabel(adapter, binding)}</span>
+                    <span className="adp-tree-device truncate">{binding.device_id}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }

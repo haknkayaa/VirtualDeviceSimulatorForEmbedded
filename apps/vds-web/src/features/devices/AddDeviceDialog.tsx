@@ -1,5 +1,5 @@
-import { Cpu, Info, Plus, X } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
+import { Plus, X } from 'lucide-react'
+import { type FormEvent, useEffect, useState } from 'react'
 
 import type { CreateDeviceInput, DeviceTemplate } from '../../types/api'
 
@@ -39,6 +39,14 @@ export function AddDeviceDialog({
     : undefined
   const canSubmit = Boolean(effectiveTemplateId && deviceId && !idError && !isCreating)
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isCreating) onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isCreating, onClose])
+
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!canSubmit) return
@@ -46,22 +54,24 @@ export function AddDeviceDialog({
   }
 
   return (
-    <div aria-labelledby="add-device-title" aria-modal="true" className="dialog-backdrop" role="dialog">
-      <form className="glass-panel add-device-dialog" onSubmit={submit}>
+    <div
+      aria-labelledby="add-device-title"
+      aria-modal="true"
+      className="dialog-backdrop"
+      onMouseDown={(event) => { if (event.target === event.currentTarget && !isCreating) onClose() }}
+      role="dialog"
+    >
+      <form className="dialog dv-add-dialog" onSubmit={submit}>
         <header>
-          <span className="add-device-dialog-icon"><Cpu aria-hidden="true" size={20} /></span>
-          <div>
-            <p>Runtime instance</p>
-            <h2 id="add-device-title">Add Device</h2>
-            <span>Create an independent device from one configured model.</span>
-          </div>
-          <button aria-label="Close Add Device" className="icon-button" disabled={isCreating} onClick={onClose} type="button">
-            <X aria-hidden="true" size={16} />
+          <h2 id="add-device-title">Add Device</h2>
+          <span className="faint dv-add-sub">new runtime instance from a configured model</span>
+          <button aria-label="Close Add Device" className="icon-button sm dv-add-close" disabled={isCreating} onClick={onClose} type="button">
+            <X aria-hidden="true" size={14} />
           </button>
         </header>
 
-        <div className="add-device-fields">
-          <label>
+        <div className="dialog-body dv-add-fields">
+          <label className="field">
             <span>Bus type</span>
             <select
               aria-label="Bus type"
@@ -80,7 +90,7 @@ export function AddDeviceDialog({
             </select>
           </label>
 
-          <label>
+          <label className="field">
             <span>Device model</span>
             <select
               aria-label="Device model"
@@ -100,33 +110,31 @@ export function AddDeviceDialog({
             </select>
           </label>
 
-          <div className="add-device-field">
-            <label htmlFor="new-device-id"><span>Device instance ID</span></label>
+          <div className="field dv-add-wide">
+            <label className="field-label" htmlFor="new-device-id">Device instance ID</label>
             <input
               aria-describedby={idError ? 'device-id-error' : 'device-id-help'}
               aria-invalid={Boolean(idError)}
               autoFocus
+              className="mono"
               id="new-device-id"
               maxLength={64}
               onChange={(event) => setDeviceId(event.target.value)}
               placeholder="spi-flash-1"
+              spellCheck={false}
               value={deviceId}
             />
             {idError
-              ? <small className="field-error" id="device-id-error">{idError}</small>
+              ? <small className="text-err" id="device-id-error">{idError}</small>
               : <small id="device-id-help">Must be unique in the current environment.</small>}
           </div>
 
-          <label>
-            <span>Environment</span>
-            <input disabled value="Local simulator" />
-          </label>
-
           {effectiveBusType === 'spi' && (
-            <div className="add-device-field">
-              <label htmlFor="new-device-path"><span>Suggested device path</span></label>
+            <div className="field dv-add-wide">
+              <label className="field-label" htmlFor="new-device-path">Suggested device path</label>
               <input
                 aria-describedby="device-path-help"
+                className="mono"
                 disabled
                 id="new-device-path"
                 value="/dev/spidev0.0"
@@ -136,19 +144,18 @@ export function AddDeviceDialog({
               </small>
             </div>
           )}
+
+          <p className="inline-alert info dv-add-wide">
+            Creates an in-memory runtime instance. Attach it to an adapter in Configuration to expose a Linux device node.
+          </p>
+
+          {errorMessage && <p className="inline-alert error dv-add-wide" role="alert">{errorMessage}</p>}
         </div>
 
-        <aside className="add-device-runtime-note">
-          <Info aria-hidden="true" size={15} />
-          <span>This creates an in-memory runtime instance. Start the bus-specific adapter from Configuration to create its kernel device node.</span>
-        </aside>
-
-        {errorMessage && <p className="add-device-error" role="alert">{errorMessage}</p>}
-
         <footer>
-          <button className="button button-secondary" disabled={isCreating} onClick={onClose} type="button">Cancel</button>
+          <button className="button" disabled={isCreating} onClick={onClose} type="button">Cancel</button>
           <button className="button button-primary" disabled={!canSubmit} type="submit">
-            <Plus aria-hidden="true" size={15} /> {isCreating ? 'Creating…' : 'Create Instance'}
+            <Plus aria-hidden="true" size={13} /> {isCreating ? 'Creating…' : 'Create Instance'}
           </button>
         </footer>
       </form>

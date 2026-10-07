@@ -1,96 +1,78 @@
-import { Boxes, CheckCircle2, Search, SlidersHorizontal } from 'lucide-react'
+import { Cpu } from 'lucide-react'
+import { memo } from 'react'
 
+import { AsyncState } from '../../components/AsyncState'
+import { BusTag } from '../../components/BusTag'
 import type { LibraryPackage } from './deviceLibraryCatalog'
-import { libraryKindLabel } from './deviceLibraryCatalog'
+import type { PackageInstance } from './packageInstances'
 
 interface DevicePackageListProps {
-  bus: string
-  onBusChange: (bus: string) => void
-  onQueryChange: (query: string) => void
+  instances: Map<string, PackageInstance>
   onSelect: (id: string) => void
   packages: LibraryPackage[]
-  query: string
   selectedId: string
 }
 
-export function DevicePackageList({
-  bus,
-  onBusChange,
-  onQueryChange,
-  onSelect,
-  packages,
-  query,
-  selectedId,
-}: DevicePackageListProps) {
+export function PackageThumb({ item, size = 'sm' }: { item: LibraryPackage; size?: 'sm' | 'lg' }) {
+  return item.image
+    ? <img alt={item.image.alt} className={`dl-thumb dl-thumb-${size}`} loading="lazy" src={item.image.src} />
+    : <span aria-hidden="true" className={`dl-thumb dl-thumb-${size} dl-monogram bus-${item.bus}`}><Cpu size={size === 'lg' ? 22 : 14} /></span>
+}
+
+const PackageRow = memo(function PackageRow({ item, instance, selected, onSelect }: {
+  item: LibraryPackage
+  instance?: PackageInstance
+  selected: boolean
+  onSelect: (id: string) => void
+}) {
   return (
-    <section aria-label="Local package catalog" className="library-browser-panel">
-      <div className="library-search-row">
-        <label className="library-search">
-          <Search aria-hidden="true" size={15} />
-          <input
-            aria-label="Search device packages"
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search packages, capabilities, sources…"
-            type="search"
-            value={query}
-          />
-        </label>
-        <select aria-label="Filter packages by bus" onChange={(event) => onBusChange(event.target.value)} value={bus}>
-          <option value="all">All buses</option>
-          <option value="SPI">SPI</option>
-          <option value="I2C">I2C</option>
-          <option value="GPIO">GPIO</option>
-        </select>
-        <button className="button button-secondary" disabled title="Additional registry filters require a package service." type="button">
-          <SlidersHorizontal aria-hidden="true" size={14} /> More filters
-        </button>
+    <button
+      aria-pressed={selected}
+      className={`list-row dl-row${selected ? ' selected' : ''}`}
+      onClick={() => onSelect(item.id)}
+      type="button"
+    >
+      <PackageThumb item={item} />
+      <span className="dl-row-name">
+        <strong className="truncate">{item.name}</strong>
+        <code className="truncate">{item.id}</code>
+      </span>
+      <BusTag bus={item.bus} />
+      <code className="dl-row-version">{item.version}</code>
+      <span className="dl-row-node truncate">
+        {instance?.nodePath
+          ? <code className={instance.exposed ? '' : 'dl-node-down'}>{instance.nodePath}</code>
+          : <span className="faint">{instance?.device ? 'unbound' : '—'}</span>}
+      </span>
+    </button>
+  )
+})
+
+/** Dense package catalog: one row per installed package with its runtime node, if any. */
+export function DevicePackageList({ instances, onSelect, packages, selectedId }: DevicePackageListProps) {
+  return (
+    <section aria-label="Local package catalog" className="panel flush dl-list">
+      <div aria-hidden="true" className="dl-row dl-list-head">
+        <span />
+        <span>Package</span>
+        <span>Bus</span>
+        <span>Version</span>
+        <span>Linux node</span>
       </div>
-      <header className="library-list-header">
-        <div><Boxes aria-hidden="true" size={14} /><strong>List</strong></div>
-        <span>{packages.length} local packages</span>
-      </header>
-      <div className="library-package-list">
+      <div className="dl-list-body">
         {packages.map((item) => (
-          <button
-            aria-pressed={selectedId === item.id}
-            className={`library-package-row${selectedId === item.id ? ' selected' : ''}`}
+          <PackageRow
+            instance={instances.get(item.id)}
+            item={item}
             key={item.id}
-            onClick={() => onSelect(item.id)}
-            type="button"
-          >
-            {item.image ? (
-              <img alt={item.image.alt} className="package-row-image" src={item.image.src} />
-            ) : (
-              <span className={`package-acronym package-kind-${item.kind}`}>{item.acronym}</span>
-            )}
-            <span className="package-row-copy">
-              <strong>{item.name}</strong>
-              <small>{item.source}</small>
-              <span>{item.description}</span>
-            </span>
-            <span className="package-row-meta">
-              <i>{item.bus}</i>
-              <i>v{item.version}</i>
-              <b>
-                <CheckCircle2 aria-hidden="true" size={11} />
-                Installed
-              </b>
-            </span>
-            <span className="package-row-kind">{libraryKindLabel()}</span>
-          </button>
+            onSelect={onSelect}
+            selected={selectedId === item.id}
+          />
         ))}
         {packages.length === 0 && (
-          <div className="library-empty">
-            <Search aria-hidden="true" size={20} />
-            <strong>No matching local packages</strong>
-            <span>Try a different search or bus filter.</span>
-          </div>
+          <AsyncState detail="Try a different search or bus filter." kind="empty" title="No matching local packages" />
         )}
       </div>
-      <footer className="library-list-footer">
-        <span>Showing {packages.length} bundled assets</span>
-        <span>Local catalog · read-only</span>
-      </footer>
     </section>
   )
 }

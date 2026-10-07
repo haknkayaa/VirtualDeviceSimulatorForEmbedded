@@ -1,6 +1,8 @@
 import { type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode, useCallback, useRef, useState } from 'react'
 import { ReactFlowProvider, useReactFlow } from '@xyflow/react'
 
+import { PageHeader } from '../../../components/PageHeader'
+
 import { defaultLayoutEngine } from '../layout/dagreLayout'
 import { runFlowLayout } from '../layout/layoutEngine'
 import { useFlowValidation } from '../hooks/useFlowValidation'
@@ -8,12 +10,21 @@ import { useFlowStore } from '../store/flowStore'
 import type { FlowCanvasEdge, FlowCanvasNode, FlowLayoutDirection } from '../types/flow'
 import { FlowCanvas } from './FlowCanvas'
 import { FlowStatusBar } from './FlowStatusBar'
-import { FlowToolbar } from './FlowToolbar'
+import { flowDocumentName } from './flowLabels'
+import { FlowDocumentState, FlowToolbar } from './FlowToolbar'
 import { NodePalette } from './NodePalette'
 import { PropertiesInspector } from './PropertiesInspector'
 import { ValidationPanel } from './ValidationPanel'
+import '@xyflow/react/dist/style.css'
+import '../flows.css'
 
 interface FlowWorkspaceProps {
+  /** Breadcrumb context rendered before the editable document name. */
+  context?: ReactNode
+  /** Transient editor notice rendered under the page bar. */
+  notice?: ReactNode
+  /** Document-level properties shown in the inspector when nothing is selected. */
+  documentInspector?: ReactNode
   onSave: () => void
   onExport: () => void
   onImport: (file: File) => void
@@ -21,34 +32,33 @@ interface FlowWorkspaceProps {
   validationTabs?: {
     activeTab: string
     onTabChange: (tab: string) => void
-    tabs: { id: string; label: string; content: ReactNode }[]
+    tabs: { id: string; label: string; meta?: ReactNode; content: ReactNode }[]
   }
 }
 
 type WorkspaceSize = 'palette' | 'inspector' | 'validation'
 
 const limits = {
-  palette: { min: 150, max: 760 },
+  palette: { min: 150, max: 420 },
   inspector: { min: 260, max: 620 },
-  validation: { min: 72, max: 360 },
+  validation: { min: 72, max: 480 },
 } satisfies Record<WorkspaceSize, { min: number; max: number }>
 
 function clamp(value: number, size: WorkspaceSize) {
   return Math.min(limits[size].max, Math.max(limits[size].min, value))
 }
 
-function WorkspaceBody({ onSave, onExport, onImport, toolbarActions, validationTabs }: FlowWorkspaceProps) {
+function WorkspaceBody({ context, notice, documentInspector, onSave, onExport, onImport, toolbarActions, validationTabs }: FlowWorkspaceProps) {
   const document = useFlowStore((state) => state.document)
   const density = useFlowStore((state) => state.density)
   const replaceNodePositions = useFlowStore((state) => state.replaceNodePositions)
   const inspectorVisible = useFlowStore((state) => state.inspectorVisible)
   const validationVisible = useFlowStore((state) => state.validationVisible)
-  const panelsResizable = document.flow.kind === 'device_behavior'
   const issues = useFlowValidation(document)
   const instance = useReactFlow<FlowCanvasNode, FlowCanvasEdge>()
   const workspaceRef = useRef<HTMLElement>(null)
   const [canvasFocused, setCanvasFocused] = useState(false)
-  const [panelSizes, setPanelSizes] = useState({ palette: 205, inspector: 405, validation: 150 })
+  const [panelSizes, setPanelSizes] = useState({ palette: 200, inspector: 320, validation: 190 })
   const resizePanel = useCallback((size: WorkspaceSize, value: number) => {
     setPanelSizes((current) => ({ ...current, [size]: clamp(value, size) }))
   }, [])
@@ -66,7 +76,7 @@ function WorkspaceBody({ onSave, onExport, onImport, toolbarActions, validationT
       let next = initial + delta
       if (size !== 'validation' && workspaceRef.current) {
         const otherPanel = size === 'palette' ? panelSizes.inspector : panelSizes.palette
-        next = Math.min(next, workspaceRef.current.clientWidth - otherPanel - 340)
+        next = Math.min(next, workspaceRef.current.clientWidth - otherPanel - 320)
       }
       resizePanel(size, next)
     }
@@ -99,17 +109,33 @@ function WorkspaceBody({ onSave, onExport, onImport, toolbarActions, validationT
     '--flow-validation-height': `${panelSizes.validation}px`,
   } as CSSProperties
   return (
-    <section className={`flow-workspace density-${density}${inspectorVisible ? '' : ' inspector-collapsed'}${validationVisible ? '' : ' validation-collapsed'}`} ref={workspaceRef} style={workspaceStyle}>
-      <FlowToolbar autoLayout={autoLayout} fitView={fitView} onExport={onExport} onImport={onImport} onSave={onSave} toolbarActions={toolbarActions} />
-      <NodePalette />
-      <ValidationPanel issues={issues} tabConfig={validationTabs} />
-      <FlowCanvas canvasFocused={canvasFocused} issues={issues} onSave={onSave} setCanvasFocused={setCanvasFocused} />
-      <PropertiesInspector issues={issues} />
-      {panelsResizable && <div aria-label="Resize node palette" aria-orientation="vertical" className="flow-resize-handle flow-resize-palette" onKeyDown={(event) => resizeWithKeyboard('palette', event)} onPointerDown={(event) => startResize('palette', event)} role="separator" tabIndex={0} />}
-      {panelsResizable && inspectorVisible && <div aria-label="Resize properties panel" aria-orientation="vertical" className="flow-resize-handle flow-resize-inspector" onKeyDown={(event) => resizeWithKeyboard('inspector', event)} onPointerDown={(event) => startResize('inspector', event)} role="separator" tabIndex={0} />}
-      {panelsResizable && validationVisible && <div aria-label="Resize validation panel" aria-orientation="horizontal" className="flow-resize-handle flow-resize-validation" onKeyDown={(event) => resizeWithKeyboard('validation', event)} onPointerDown={(event) => startResize('validation', event)} role="separator" tabIndex={0} />}
-      <FlowStatusBar issues={issues} />
-    </section>
+    <>
+      <PageHeader
+        actions={<FlowToolbar autoLayout={autoLayout} fitView={fitView} onExport={onExport} onImport={onImport} onSave={onSave} toolbarActions={toolbarActions} />}
+        context={context}
+        title={document.flow.name.trim() || `Untitled ${flowDocumentName(document.flow.kind).toLowerCase()}`}
+      >
+        <FlowDocumentState />
+      </PageHeader>
+      {notice}
+      <div className="page-body fill flush flow-body">
+        <section
+          aria-label={`${flowDocumentName(document.flow.kind)} editor`}
+          className={`flow-workspace density-${density}${inspectorVisible ? '' : ' inspector-collapsed'}${validationVisible ? '' : ' validation-collapsed'}`}
+          ref={workspaceRef}
+          style={workspaceStyle}
+        >
+          <NodePalette />
+          <FlowCanvas canvasFocused={canvasFocused} issues={issues} onSave={onSave} setCanvasFocused={setCanvasFocused} />
+          <FlowStatusBar issues={issues} />
+          <ValidationPanel issues={issues} tabConfig={validationTabs} />
+          <PropertiesInspector documentInspector={documentInspector} issues={issues} />
+          <div aria-label="Resize node palette" aria-orientation="vertical" className="flow-resize-handle flow-resize-palette" onKeyDown={(event) => resizeWithKeyboard('palette', event)} onPointerDown={(event) => startResize('palette', event)} role="separator" tabIndex={0} />
+          {inspectorVisible && <div aria-label="Resize properties panel" aria-orientation="vertical" className="flow-resize-handle flow-resize-inspector" onKeyDown={(event) => resizeWithKeyboard('inspector', event)} onPointerDown={(event) => startResize('inspector', event)} role="separator" tabIndex={0} />}
+          {validationVisible && <div aria-label="Resize validation panel" aria-orientation="horizontal" className="flow-resize-handle flow-resize-validation" onKeyDown={(event) => resizeWithKeyboard('validation', event)} onPointerDown={(event) => startResize('validation', event)} role="separator" tabIndex={0} />}
+        </section>
+      </div>
+    </>
   )
 }
 

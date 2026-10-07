@@ -16,8 +16,8 @@ const registers: DeviceRegister[] = Array.from({ length: 12 }, (_, address) => (
 }))
 
 describe('RegisterMap', () => {
-  it('paginates after eight registers and supports expanded mode', async () => {
-    render(<RegisterMap onSelect={vi.fn()} registers={registers} selectedAddress={0} />)
+  it('paginates after the page size and supports expanded mode', async () => {
+    render(<RegisterMap onSelect={vi.fn()} pageSize={8} registers={registers} selectedAddress={0} />)
 
     expect(screen.getByText('REGISTER_0')).toBeInTheDocument()
     expect(screen.getByText('REGISTER_7')).toBeInTheDocument()

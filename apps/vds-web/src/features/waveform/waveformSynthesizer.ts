@@ -13,16 +13,10 @@ function asciiChar(byte: number): string {
   return byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'
 }
 
-const GPIO_COLORS = [
-  '#50d890',
-  '#48cfe7',
-  '#f2a93b',
-  '#b184f3',
-  '#ff7675',
-  '#74b9ff',
-  '#ffeaa7',
-  '#55efc4',
-]
+/** Channel colour is the bus identity token so traces follow the active theme. */
+function busColorToken(bus: string): string {
+  return ['spi', 'i2c', 'gpio', 'uart', 'ethernet'].includes(bus) ? `var(--bus-${bus})` : 'var(--bus-unknown)'
+}
 
 function inferBusFromDeviceId(busType: string, deviceId: string): string {
   const b = busType.toLowerCase()
@@ -51,7 +45,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
     bus: string,
     deviceId: string,
     pinType: string,
-    color: string,
     initialLevel: DigitalLogicLevel = 0,
   ): WaveformChannel {
     let channel = channelMap.get(id)
@@ -62,7 +55,7 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         bus,
         deviceId,
         pinType,
-        color,
+        color: busColorToken(bus),
         visible: true,
         samples: initialLevel !== -1 ? [{ timeNs: 0, value: initialLevel }] : [],
         packets: [],
@@ -95,6 +88,7 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
 
   // Ensure deterministic continuous timing if mock or 0 timestamps are present
   let currentBaseTimeNs = 0
+  let firstActivityNs = 0
 
   sorted.forEach((txn, txnIdx) => {
     let t0 = txn.startedVirtualNs ?? txn.completedVirtualNs ?? 0
@@ -103,6 +97,8 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
     } else if (t0 < currentBaseTimeNs) {
       t0 = currentBaseTimeNs
     }
+
+    if (txnIdx === 0) firstActivityNs = t0
 
     const bus = inferBusFromDeviceId(txn.busType, txn.deviceId)
     let txnEndTimeNs = t0
@@ -114,7 +110,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'spi',
         txn.deviceId,
         'CS',
-        '#f2a93b',
         1,
       )
       const sclkChan = getOrCreateChannel(
@@ -123,7 +118,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'spi',
         txn.deviceId,
         'CLK',
-        '#2acbd4',
         0,
       )
       const mosiChan = getOrCreateChannel(
@@ -132,7 +126,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'spi',
         txn.deviceId,
         'MOSI',
-        '#4b9ff5',
         0,
       )
       const misoChan = getOrCreateChannel(
@@ -141,7 +134,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'spi',
         txn.deviceId,
         'MISO',
-        '#b184f3',
         0,
       )
 
@@ -254,7 +246,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'i2c',
         txn.deviceId,
         'CLK',
-        '#2acbd4',
         1,
       )
       const sdaChan = getOrCreateChannel(
@@ -263,7 +254,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'i2c',
         txn.deviceId,
         'SDA',
-        '#f2a93b',
         1,
       )
 
@@ -437,7 +427,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'uart',
         txn.deviceId,
         'TX',
-        '#4b9ff5',
         1,
       )
       const rxChan = getOrCreateChannel(
@@ -446,7 +435,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'uart',
         txn.deviceId,
         'RX',
-        '#50d890',
         1,
       )
 
@@ -534,7 +522,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'can',
         txn.deviceId,
         'CAN_TX',
-        '#e17055',
         1,
       )
       const canRx = getOrCreateChannel(
@@ -543,7 +530,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'can',
         txn.deviceId,
         'CAN_RX',
-        '#a29bfe',
         1,
       )
       const canH = getOrCreateChannel(
@@ -552,7 +538,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'can',
         txn.deviceId,
         'CAN_H',
-        '#fdcb6e',
         0,
       )
       const canL = getOrCreateChannel(
@@ -561,7 +546,6 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
         'can',
         txn.deviceId,
         'CAN_L',
-        '#00cec9',
         1,
       )
 
@@ -737,14 +721,12 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
       const curT = t0
 
       Array.from(activeLines).sort((a, b) => a - b).forEach((line) => {
-        const color = GPIO_COLORS[line % GPIO_COLORS.length]
         const chan = getOrCreateChannel(
           `${txn.deviceId}:io_${line}`,
           `IO_${line}`,
           'gpio',
           txn.deviceId,
           'PIN',
-          color,
           0,
         )
 
@@ -792,8 +774,11 @@ export function synthesizeWaveforms(transactions: LiveTransaction[]): {
 
   // Ensure all channels have samples ending at max time
   const channels = Array.from(channelMap.values())
-  const minTimeNs = 0
   const maxTimeNs = Math.max(currentBaseTimeNs, 5_000)
+  // Start the capture window shortly before the first activity (not at t=0)
+  // so a capture taken late in a session is not a sliver at the right edge.
+  const leadInNs = Math.max(2_000, (maxTimeNs - firstActivityNs) * 0.05)
+  const minTimeNs = Math.max(0, Math.min(firstActivityNs - leadInNs, maxTimeNs - 5_000))
 
   channels.forEach((channel) => {
     const lastSample = channel.samples.at(-1)

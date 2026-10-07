@@ -4,7 +4,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AsyncState } from './components/AsyncState'
 import { AppShell } from './layouts/AppShell'
 
-const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
+const OverviewPage = lazy(() => import('./features/overview/OverviewPage').then((module) => ({ default: module.OverviewPage })))
 const DevicesPage = lazy(() => import('./features/devices/DevicesPage').then((module) => ({ default: module.DevicesPage })))
 const AdaptersPage = lazy(() => import('./features/adapters/AdaptersPage').then((module) => ({ default: module.AdaptersPage })))
 const TransactionsPage = lazy(() => import('./features/transactions/TransactionsPage').then((module) => ({ default: module.TransactionsPage })))
@@ -16,10 +16,10 @@ const DeviceBehaviorEditorPage = lazy(() => import('./features/devices/behavior/
 
 export function App() {
   return (
-    <Suspense fallback={<div className="route-loading"><AsyncState kind="loading" title="Loading workspace" /></div>}>
+    <Suspense fallback={<AsyncState centered kind="loading" title="Loading workspace" />}>
       <Routes>
         <Route element={<AppShell />}>
-          <Route element={<DashboardPage />} index />
+          <Route element={<OverviewPage />} index />
           <Route element={<DevicesPage />} path="devices" />
           <Route element={<DevicesPage />} path="devices/:deviceId" />
           <Route element={<DevicesPage />} path="devices/:deviceId/flows" />
