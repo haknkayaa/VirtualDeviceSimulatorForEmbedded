@@ -94,25 +94,24 @@ traversal are rejected.
 
 ## Bus profiles
 
-The manifest contract supports these bus families without changing the folder
-layout:
+The package contract can describe these bus families without changing the
+folder layout:
 
-| Bus | Typical package content | Suggested runtime driver |
+| Bus | Current executable runtime | Host exposure |
 | --- | --- | --- |
-| SPI | commands, mode, word size, memory/register maps | `generic-spi-command` |
-| I²C | address rules, register map, repeated-start behavior | `generic-i2c-register` |
-| GPIO | pins, direction, pull, edge/level events | `generic-gpio-bank` |
-| Ethernet | MAC/link settings, frame or socket behavior | `generic-ethernet-endpoint` |
-| UART | baud/frame settings, byte streams | `generic-uart-stream` |
-| CAN | node IDs, frames, filters, arbitration data | `generic-can-node` |
-| USB | descriptors, endpoints, transfer behavior | `generic-usb-function` |
-| Custom | vendor or experimental transport contract | `custom-runtime` |
+| SPI | `generic-spi-command` | CUSE `/dev/spidevX.Y` |
+| I²C | `generic-i2c-register`, `at24c-eeprom` | CUSE `/dev/i2c-N` |
+| GPIO | `generic-gpio-bank` | kernel `gpio-sim` / `/dev/gpiochipX` |
+| UART | `generic-uart-responder` | PTY `/dev/pts/N` |
+| Ethernet | not implemented | not implemented |
+| CAN | not implemented | not implemented |
+| USB | not implemented | not implemented |
+| Custom | no generic runtime | depends on a future implementation |
 
-The package layer, schema, validator, and scaffold support every row today.
-The authoritative execution engine currently implements
-`spi` + `generic-spi-command`, `i2c` + `generic-i2c-register`, and `gpio` +
-`generic-gpio-bank`. Adding another bus requires a runtime driver and adapter
-implementation, but does not require another package format.
+The schema and package layer intentionally cover more bus families than the
+runtime currently executes. A package can be structurally valid while still
+requiring a runtime driver that has not been implemented. Server startup is the
+authoritative check that a configured runtime driver is executable.
 
 ## Author workflow
 
