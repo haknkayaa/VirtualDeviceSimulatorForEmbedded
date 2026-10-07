@@ -146,7 +146,7 @@ impl ScenarioDocument {
             .map_err(|error| ScenarioError::InvalidSchema(error.to_string()))?;
         let errors = validator
             .iter_errors(&instance)
-            .map(|error| format!("- {}: {error}", error.instance_path))
+            .map(|error| format!("- {}: {error}", error.instance_path()))
             .collect::<Vec<_>>();
         if !errors.is_empty() {
             return Err(ScenarioError::Validation(errors.join("\n")));

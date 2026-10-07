@@ -213,6 +213,12 @@ impl PersistenceWorker {
     }
 }
 
+/// Reads a non-negative `SQLite` integer as `u64` (`rusqlite` no longer maps `u64`).
+fn read_u64(row: &rusqlite::Row<'_>) -> rusqlite::Result<u64> {
+    let value: i64 = row.get(0)?;
+    u64::try_from(value).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(0, value))
+}
+
 fn tracing_stderr(message: &str) {
     eprintln!("vds-events: {message}");
 }
@@ -281,7 +287,7 @@ fn cleanup_events(
         cutoff_ns(policy.critical_retention),
     )?;
     let count = transaction.query_row("SELECT COUNT(*) FROM domain_events", [], |row| {
-        row.get::<_, u64>(0)
+        read_u64(row)
     })?;
     let mut overflow = count.saturating_sub(policy.max_events);
     for _ in 0..MAX_CLEANUP_CHUNKS {
@@ -300,10 +306,9 @@ fn cleanup_events(
             break;
         }
     }
-    let page_count = transaction.query_row("PRAGMA page_count", [], |row| row.get::<_, u64>(0))?;
-    let freelist_count =
-        transaction.query_row("PRAGMA freelist_count", [], |row| row.get::<_, u64>(0))?;
-    let page_size = transaction.query_row("PRAGMA page_size", [], |row| row.get::<_, u64>(0))?;
+    let page_count = transaction.query_row("PRAGMA page_count", [], read_u64)?;
+    let freelist_count = transaction.query_row("PRAGMA freelist_count", [], read_u64)?;
+    let page_size = transaction.query_row("PRAGMA page_size", [], read_u64)?;
     let logical_size = page_count
         .saturating_sub(freelist_count)
         .saturating_mul(page_size);
@@ -470,7 +475,7 @@ impl EventBus {
                COALESCE((SELECT value FROM event_store_meta WHERE key = 'last_event_id'), 0)
              )",
             [],
-            |row| row.get::<_, u64>(0),
+            read_u64,
         )?;
         let next_id = maximum_id.saturating_add(1);
         let (sender, _) = broadcast::channel(subscriber_capacity);
