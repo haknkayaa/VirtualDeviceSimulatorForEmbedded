@@ -14,6 +14,9 @@ SPI device drives a line of a GPIO device. The only way to change a GPIO line
 today is to write the GPIO bank's `GPIOn_STATE` registers directly through the
 control API, the Web UI, or a scenario step; a sensor model cannot do so.
 
+Design: [ADR 0011](adr/0011-connect-devices-through-public-signal-ports.md)
+(proposed).
+
 Planned work:
 
 - Add a declarative topology link, for example a data-ready output of an
