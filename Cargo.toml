@@ -24,7 +24,7 @@ axum = { version = "0.8.9", features = ["ws"] }
 base64 = "0.22.1"
 futures-util = "0.3.31"
 jsonschema = { version = "0.33.0", default-features = false }
-prost = "0.13.5"
+prost = "0.14.4"
 prost-build = "0.13.5"
 protoc-bin-vendored = "3.2.0"
 rusqlite = { version = "0.37.0", features = ["bundled"] }
