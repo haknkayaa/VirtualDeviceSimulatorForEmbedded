@@ -249,7 +249,7 @@ fn discover_web_root() -> Option<PathBuf> {
 }
 
 async fn serve_web(State(state): State<ApiState>, uri: Uri) -> Response {
-    if uri.path().starts_with("/api/") {
+    if uri.path() == "/api" || uri.path().starts_with("/api/") {
         return StatusCode::NOT_FOUND.into_response();
     }
     let Some(root) = state.web_root.as_ref() else {
