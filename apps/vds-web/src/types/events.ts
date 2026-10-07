@@ -12,6 +12,7 @@ export const eventTypes = [
   'scenario_step_completed',
   'scenario_completed',
   'device_reset',
+  'signal_changed',
 ] as const
 
 export type EventType = (typeof eventTypes)[number]
@@ -74,6 +75,14 @@ export type EventPayload =
       steps_skipped: number
     }
   | { kind: 'device_reset'; result: string }
+  | {
+      kind: 'signal_changed'
+      phase: 'emitted' | 'delivered'
+      source: string
+      target: string
+      value: boolean
+      delay_ns: number
+    }
 
 export interface DomainEvent {
   event_id: number
