@@ -156,6 +156,30 @@ impl RegisterEngine {
         Ok(metadata(&state.definition))
     }
 
+    /// Performs a bus read and then clears every bit field marked `read_clear`.
+    ///
+    /// The returned value is the value observed before clearing. Internal
+    /// inspection through [`Self::read_internal`] never clears bits.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same structured errors as [`Self::read`].
+    pub fn read_clearing(&mut self, address: u64) -> Result<RegisterRead, RegisterError> {
+        let read = self.read(address)?;
+        if let Some(state) = self.registers.get_mut(&address) {
+            let mask = state
+                .definition
+                .bitfields
+                .iter()
+                .filter(|field| field.read_clear)
+                .fold(0_u64, |mask, field| {
+                    mask | field_mask(field.lsb, field.width)
+                });
+            state.current_value &= !mask;
+        }
+        Ok(read)
+    }
+
     /// Applies a device-internal value change while retaining address and width
     /// validation. This is used for hardware-owned status bits such as BUSY and
     /// intentionally bypasses client access permissions.
@@ -268,7 +292,27 @@ fn validate_definition(definition: &RegisterDefinition) -> Result<(), RegisterEr
             reset_value: definition.reset_value,
         });
     }
+    for field in &definition.bitfields {
+        let end = u16::from(field.lsb) + u16::from(field.width);
+        if field.read_clear && (field.width == 0 || end > u16::from(definition.width_bits)) {
+            return Err(RegisterError::InvalidBitField {
+                name: definition.name.clone(),
+                address: definition.address,
+                field: field.name.clone(),
+                reason: "read_clear field must lie within the register width",
+            });
+        }
+    }
     Ok(())
+}
+
+fn field_mask(lsb: u8, width: u8) -> u64 {
+    let ones = if width >= 64 {
+        u64::MAX
+    } else {
+        (1_u64 << width) - 1
+    };
+    ones.checked_shl(u32::from(lsb)).unwrap_or(0)
 }
 
 fn fits_width(value: u64, width_bits: u8) -> bool {
@@ -320,6 +364,42 @@ mod tests {
         let engine = RegisterEngine::new(document.registers).expect("definitions should validate");
 
         assert_eq!(engine.read(0x01).expect("register should read").value, 0x12);
+    }
+
+    #[test]
+    fn read_clearing_returns_the_old_value_then_clears_marked_bits() {
+        let mut definition = register("status", 0x01, AccessType::Ro);
+        definition.bitfields = vec![crate::BitFieldDefinition {
+            name: "drdy".to_owned(),
+            lsb: 3,
+            width: 1,
+            access: AccessType::Ro,
+            description: String::new(),
+            read_clear: true,
+        }];
+        let mut engine = RegisterEngine::new(vec![definition]).expect("valid register");
+        engine.write_internal(0x01, 0b1001).expect("internal write");
+        assert_eq!(engine.read_internal(0x01).unwrap().value, 0b1001);
+        assert_eq!(engine.read_clearing(0x01).unwrap().value, 0b1001);
+        assert_eq!(engine.read_internal(0x01).unwrap().value, 0b0001);
+    }
+
+    #[test]
+    fn rejects_read_clear_fields_outside_the_register_width() {
+        let mut definition = register("status", 0x01, AccessType::Ro);
+        definition.width_bits = 8;
+        definition.bitfields = vec![crate::BitFieldDefinition {
+            name: "bad".to_owned(),
+            lsb: 7,
+            width: 2,
+            access: AccessType::Ro,
+            description: String::new(),
+            read_clear: true,
+        }];
+        assert!(matches!(
+            RegisterEngine::new(vec![definition]),
+            Err(RegisterError::InvalidBitField { .. })
+        ));
     }
 
     #[test]
