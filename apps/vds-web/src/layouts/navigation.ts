@@ -1,4 +1,4 @@
-import { Activity, AudioWaveform, Boxes, Cable, LayoutDashboard, LibraryBig, ScrollText, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, AudioWaveform, BookCopy, Cpu, FileText, ListTree, SlidersHorizontal, type LucideIcon } from 'lucide-react'
 
 export interface NavigationItem {
   to: string
@@ -7,35 +7,17 @@ export interface NavigationItem {
   end?: boolean
 }
 
-export interface NavigationGroup {
-  label?: string
-  items: NavigationItem[]
-}
-
 /**
  * The single source of workspace navigation. Ordered along the data path an
- * embedded application exercises: Linux device node -> adapter -> device
- * runtime -> observed bus traffic.
+ * embedded application exercises: adapter (Linux device node) -> device
+ * runtime -> observed bus traffic -> history -> package library.
  */
-export const navigationGroups: NavigationGroup[] = [
-  { items: [{ to: '/', label: 'Overview', icon: LayoutDashboard, end: true }] },
-  {
-    label: 'Topology',
-    items: [
-      { to: '/adapters', label: 'Adapters', icon: Cable },
-      { to: '/devices', label: 'Devices', icon: Boxes },
-    ],
-  },
-  {
-    label: 'Analyze',
-    items: [
-      { to: '/transactions', label: 'Transactions', icon: Activity },
-      { to: '/waveform', label: 'Logic Analyzer', icon: AudioWaveform },
-      { to: '/logs', label: 'Event Log', icon: ScrollText },
-    ],
-  },
-  {
-    label: 'Library',
-    items: [{ to: '/device-library', label: 'Device Library', icon: LibraryBig }],
-  },
+export const navigationItems: NavigationItem[] = [
+  { to: '/', label: 'Overview', icon: ArrowLeftRight, end: true },
+  { to: '/adapters', label: 'Adapters', icon: SlidersHorizontal },
+  { to: '/devices', label: 'Devices', icon: Cpu },
+  { to: '/transactions', label: 'Transactions', icon: ListTree },
+  { to: '/waveform', label: 'Logic Analyzer', icon: AudioWaveform },
+  { to: '/logs', label: 'Event Log', icon: FileText },
+  { to: '/device-library', label: 'Device Library', icon: BookCopy },
 ]
