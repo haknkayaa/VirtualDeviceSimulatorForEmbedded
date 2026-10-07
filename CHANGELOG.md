@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Debian `amd64` package builder and tag-driven GitHub Release workflow that
+  publishes the `.deb` and SHA-256 checksum.
 - `tests/e2e/drdy`: real-ABI end-to-end test (spidev_test, gpio-sim, gpiomon) for
   the signal topology flow, with a QEMU runner.
 - Public device signal ports, `signal_bindings`, and a `topology.yaml` that

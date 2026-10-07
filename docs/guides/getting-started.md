@@ -63,6 +63,27 @@ VDS_WEB_PORT=4200 ./dev.sh
 `dev.sh` installs missing Web dependencies and prepares the development SPI and
 I²C CUSE helpers. It is not the staged production build.
 
+## Install a release package
+
+GitHub Releases provide an `amd64` Debian package. After downloading the release
+asset, install it with:
+
+```shell
+sudo apt install ./vds4e_<version>_amd64.deb
+vds-server --config /etc/vds4e/vds-server.yaml --check-config
+```
+
+The package includes the server, CLI, host adapters, Web UI, schemas, bundled
+device models, and example tools. It does not automatically load `cuse` or
+`gpio-sim`; kernel-backed adapters still need the host modules and the same
+privileges described above.
+
+Each release also publishes a matching `.deb.sha256` file. Verify it with:
+
+```shell
+sha256sum --check vds4e_<version>_amd64.deb.sha256
+```
+
 ## Staged build and installation
 
 The root pipeline is deliberately ordered:

@@ -1,0 +1,101 @@
+name: Release Debian package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  debian-amd64:
+    name: Debian amd64
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/vds-web/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.91.1
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake pkg-config libfuse3-dev dpkg-dev
+
+      - name: Validate release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          workspace_version="$(awk -F'"' '/^\[workspace.package\]/{in_workspace=1; next} in_workspace && /^version = / {print $2; exit}' Cargo.toml)"
+          if [[ -z "$version" || "$version" == "$GITHUB_REF_NAME" ]]; then
+            echo "Release tag must have the form vX.Y.Z" >&2
+            exit 1
+          fi
+          if [[ "$version" != "$workspace_version" ]]; then
+            echo "Tag version $version does not match workspace version $workspace_version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Configure
+        run: ./configure
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Build Debian package
+        run: ./packaging/debian/build-deb.sh "${{ steps.version.outputs.version }}"
+
+      - name: Inspect package
+        run: |
+          set -euo pipefail
+          package="dist/vds4e_${{ steps.version.outputs.version }}_amd64.deb"
+          dpkg-deb --info "$package"
+          dpkg-deb --contents "$package"
+          sha256sum --check "$package.sha256"
+
+      - name: Smoke install package
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y "./dist/vds4e_${{ steps.version.outputs.version }}_amd64.deb"
+          command -v vds-server
+          command -v vds-cli
+          test -x /usr/bin/vds4e-spi-cuse
+          test -x /usr/bin/vds4e-i2c-cuse
+          test -x /usr/bin/vds4e-gpio-sim
+          test -x /usr/bin/vds4e-uart-pty
+          test -f /etc/vds4e/vds-server.yaml
+          test -f /usr/share/vds4e/web/index.html
+          vds-server --help >/dev/null
+          vds-cli --help >/dev/null
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          package="dist/vds4e_${{ steps.version.outputs.version }}_amd64.deb"
+          checksum="$package.sha256"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$package" "$checksum" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$package" "$checksum" \
+              --title "VDS4E $GITHUB_REF_NAME" \
+              --generate-notes \
+              --verify-tag
+          fi
