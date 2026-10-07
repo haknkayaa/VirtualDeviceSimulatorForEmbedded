@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ArrowLeft, CheckCircle2 } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import { useDeviceFlow } from '../../../../api/queries'
 import { FlowEditorBoundary } from '../../../flows/components/FlowEditorBoundary'
+import { FlowBreadcrumb, FlowNotice, type FlowNoticeState } from '../../../flows/components/FlowPageChrome'
 import { serializeFlowDocument } from '../../../flows/serialization/flowDocument'
 import { localFlowRepository } from '../../../flows/serialization/localFlowRepository'
 import { useFlowStore } from '../../../flows/store/flowStore'
@@ -22,7 +22,7 @@ export function DeviceBehaviorEditorPage() {
   const navigate = useNavigate()
   const packagedFlow = useDeviceFlow(deviceId)
   const loaded = useRef<string | null>(null)
-  const [notice, setNotice] = useState<{ message: string; error: boolean } | null>(null)
+  const [notice, setNotice] = useState<FlowNoticeState | null>(null)
   useEffect(() => {
     const key = `${deviceId ?? 'unbound'}:${flowId ?? 'new'}`; if (loaded.current === key) return; loaded.current = key
     if (!flowId) { useFlowStore.getState().newDocument(createDeviceBehaviorFlowDocument({ deviceId })); useFlowStore.getState().setReadOnly(false); return }
@@ -60,5 +60,18 @@ export function DeviceBehaviorEditorPage() {
     }
     setNotice({ message: result.ok ? 'Device behavior imported.' : result.error, error: !result.ok })
   }, [])
-  return <div className="flow-editor-page device-behavior-page"><div className="flow-editor-nav"><Link to={`/devices/${encodeURIComponent(deviceId ?? '')}/flows`}><ArrowLeft size={15} /> Behavior model</Link><span>Runtime device · {deviceId}</span></div>{notice && <div className={`flow-notice flow-notice-${notice.error ? 'error' : 'success'}`} role="status">{notice.error ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />}<span>{notice.message}</span><button aria-label="Dismiss message" onClick={() => setNotice(null)} type="button">×</button></div>}<FlowEditorBoundary><DeviceBehaviorEditor onExport={exportFlow} onImport={importFlow} onNotice={(message, error = false) => setNotice({ message, error })} onSave={save} /></FlowEditorBoundary></div>
+  return (
+    <div className="page flow-page device-behavior-page">
+      <FlowEditorBoundary>
+        <DeviceBehaviorEditor
+          context={<FlowBreadcrumb deviceId={deviceId} section="Device behavior" sectionPath="flows" />}
+          notice={<FlowNotice notice={notice} onDismiss={() => setNotice(null)} />}
+          onExport={exportFlow}
+          onImport={importFlow}
+          onNotice={(message, error = false) => setNotice({ message, error })}
+          onSave={save}
+        />
+      </FlowEditorBoundary>
+    </div>
+  )
 }

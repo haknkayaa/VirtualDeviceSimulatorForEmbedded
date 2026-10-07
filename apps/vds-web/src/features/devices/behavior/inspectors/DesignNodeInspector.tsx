@@ -39,16 +39,16 @@ export function DesignNodeInspector({ node, readOnly, updateData }: NodeInspecto
         <input disabled={readOnly} onChange={(event) => updateData({ label: event.target.value })} value={text(node.data.label)} />
       </label>
 
-      {logicalKinds.has(node.kind) && <div className="design-node-summary">
+      {logicalKinds.has(node.kind) && <div className="flow-field">
         <span>Operation</span>
-        <strong>{node.kind.split('logical_')[1]?.toUpperCase()}</strong>
-        <small>Input count is defined by the node handles.</small>
+        <code className="flow-field-value">{node.kind.split('logical_')[1]?.toUpperCase()}</code>
+        <p className="flow-note flow-field-full">Input count is defined by the node handles.</p>
       </div>}
 
       {timeKinds.has(node.kind) && <>
         <label className="flow-field">
           <span>Duration</span>
-          <input disabled={readOnly} min={1} onChange={(event) => updateNumber('duration', event.target.value)} type="number" value={numberValue(node.data.duration)} />
+          <input className="mono" disabled={readOnly} min={1} onChange={(event) => updateNumber('duration', event.target.value)} type="number" value={numberValue(node.data.duration)} />
         </label>
         <label className="flow-field">
           <span>Time unit</span>
@@ -61,7 +61,7 @@ export function DesignNodeInspector({ node, readOnly, updateData }: NodeInspecto
       {(node.kind === BEHAVIOR_NODE_KINDS.fileRead || node.kind === BEHAVIOR_NODE_KINDS.fileWrite) && <>
         <label className="flow-field">
           <span>File path</span>
-          <input disabled={readOnly} onChange={(event) => updateData({ path: event.target.value })} placeholder="/tmp/device-data.bin" value={text(node.data.path)} />
+          <input className="mono" disabled={readOnly} onChange={(event) => updateData({ path: event.target.value })} placeholder="/tmp/device-data.bin" value={text(node.data.path)} />
         </label>
         <label className="flow-field">
           <span>Format</span>
@@ -76,11 +76,11 @@ export function DesignNodeInspector({ node, readOnly, updateData }: NodeInspecto
       {node.kind === BEHAVIOR_NODE_KINDS.fileRead && <>
         <label className="flow-field">
           <span>Offset</span>
-          <input disabled={readOnly} min={0} onChange={(event) => updateNumber('offset', event.target.value)} type="number" value={numberValue(node.data.offset)} />
+          <input className="mono" disabled={readOnly} min={0} onChange={(event) => updateNumber('offset', event.target.value)} type="number" value={numberValue(node.data.offset)} />
         </label>
         <label className="flow-field">
-          <span>Length (empty = all)</span>
-          <input disabled={readOnly} min={1} onChange={(event) => updateNumber('length', event.target.value, null)} type="number" value={numberValue(node.data.length)} />
+          <span>Length</span>
+          <input className="mono" placeholder="all" disabled={readOnly} min={1} onChange={(event) => updateNumber('length', event.target.value, null)} type="number" value={numberValue(node.data.length)} />
         </label>
       </>}
 
@@ -93,7 +93,7 @@ export function DesignNodeInspector({ node, readOnly, updateData }: NodeInspecto
           </select>
         </label>
         <label className="flow-field">
-          <span>Create file when missing</span>
+          <span>Create if missing</span>
           <select disabled={readOnly} onChange={(event) => updateData({ create: event.target.value === 'true' })} value={node.data.create !== false ? 'true' : 'false'}>
             <option value="false">False</option>
             <option value="true">True</option>

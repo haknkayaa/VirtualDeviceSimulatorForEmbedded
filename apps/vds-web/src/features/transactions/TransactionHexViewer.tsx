@@ -3,16 +3,17 @@ interface TransactionHexViewerProps {
   response: number[]
 }
 
+const BYTES_PER_ROW = 16
+
 function rows(bytes: number[]) {
-  const bytesPerRow = 16
-  return Array.from({ length: Math.max(1, Math.ceil(bytes.length / bytesPerRow)) }, (_, row) => {
-    const chunk = bytes.slice(row * bytesPerRow, row * bytesPerRow + bytesPerRow)
+  return Array.from({ length: Math.max(1, Math.ceil(bytes.length / BYTES_PER_ROW)) }, (_, row) => {
+    const chunk = bytes.slice(row * BYTES_PER_ROW, row * BYTES_PER_ROW + BYTES_PER_ROW)
     const hex = (group: number[]) => group
       .map((byte) => byte.toString(16).padStart(2, '0'))
       .join(' ')
 
     return {
-      offset: (row * bytesPerRow).toString(16).padStart(8, '0'),
+      offset: (row * BYTES_PER_ROW).toString(16).padStart(8, '0'),
       leftHex: hex(chunk.slice(0, 8)),
       rightHex: hex(chunk.slice(8, 16)),
       ascii: chunk.map((byte) => (byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.')).join(''),
@@ -20,34 +21,38 @@ function rows(bytes: number[]) {
   })
 }
 
-function HexBlock({ label, bytes }: { label: string; bytes: number[] }) {
+function HexBlock({ label, bytes, direction }: { label: string; bytes: number[]; direction: 'tx' | 'rx' }) {
   return (
-    <section className="transaction-hex-block">
-      <header><strong>{label}</strong><span>{bytes.length} bytes</span></header>
-      <div className="hex-viewer">
-        {rows(bytes).map((row) => (
-          <div key={row.offset}>
-            <code className="hexdump-line">
-              <span className="hexdump-offset">{row.offset}</span>
+    <section className={`txa-hex-block ${direction}`}>
+      <header>
+        <strong>{label}</strong>
+        <span>{bytes.length} {bytes.length === 1 ? 'byte' : 'bytes'}</span>
+      </header>
+      <div className="txa-hexdump">
+        {bytes.length === 0
+          ? <span className="txa-hex-empty">empty</span>
+          : rows(bytes).map((row) => (
+            <code className="txa-hex-line" key={row.offset}>
+              <span className="txa-hex-offset">{row.offset}</span>
               {'  '}
-              <span>{(row.leftHex || '—').padEnd(23, ' ')}</span>
+              <span>{row.leftHex.padEnd(23, ' ')}</span>
               {'  '}
               <span>{row.rightHex.padEnd(23, ' ')}</span>
               {'  '}
-              <span className="hexdump-ascii">|{row.ascii}|</span>
+              <span className="txa-hex-ascii">|{row.ascii}|</span>
             </code>
-          </div>
-        ))}
+          ))}
       </div>
     </section>
   )
 }
 
+/** Classic offset / 16-byte hex / ASCII dump of both directions of a transfer. */
 export function TransactionHexViewer({ request, response }: TransactionHexViewerProps) {
   return (
-    <div className="transaction-hex-grid">
-      <HexBlock bytes={response} label="RX Buffer" />
-      <HexBlock bytes={request} label="TX Buffer" />
+    <div className="txa-hex">
+      <HexBlock bytes={request} direction="tx" label="TX Buffer" />
+      <HexBlock bytes={response} direction="rx" label="RX Buffer" />
     </div>
   )
 }

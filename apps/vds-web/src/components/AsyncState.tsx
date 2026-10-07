@@ -5,6 +5,7 @@ interface AsyncStateProps {
   kind: 'loading' | 'empty' | 'error' | 'disconnected'
   title: string
   detail?: ReactNode
+  centered?: boolean
 }
 
 const icons = {
@@ -14,11 +15,11 @@ const icons = {
   disconnected: WifiOff,
 }
 
-export function AsyncState({ kind, title, detail }: AsyncStateProps) {
+export function AsyncState({ kind, title, detail, centered = false }: AsyncStateProps) {
   const Icon = icons[kind]
   return (
-    <div className={`async-state async-${kind}`} role={kind === 'error' ? 'alert' : 'status'}>
-      <Icon aria-hidden="true" className={kind === 'loading' ? 'spin' : ''} size={22} />
+    <div className={`async-state async-${kind}${centered ? ' centered' : ''}`} role={kind === 'error' ? 'alert' : 'status'}>
+      <Icon aria-hidden="true" className={kind === 'loading' ? 'spin' : ''} size={15} />
       <div>
         <strong>{title}</strong>
         {detail && <p>{detail}</p>}

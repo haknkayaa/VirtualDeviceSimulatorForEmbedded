@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
+
 import { formatVirtualTime } from '../../utils/format'
 
 interface TimingCursorsProps {
@@ -10,6 +12,38 @@ interface TimingCursorsProps {
   xToTime: (x: number) => number
   height: number
   width: number
+  /** Left edge of the trace area; cursors are not drawn over the label dock. */
+  minX?: number
+}
+
+function Cursor({
+  id,
+  timeNs,
+  x,
+  height,
+  onBeginDrag,
+}: {
+  id: 'A' | 'B'
+  timeNs: number
+  x: number
+  height: number
+  onBeginDrag: (cursor: 'A' | 'B', event: ReactPointerEvent<SVGGElement>) => void
+}) {
+  return (
+    <g className={`wfa-cursor wfa-cursor-${id.toLowerCase()}`}>
+      <line x1={x} x2={x} y1={0} y2={height} />
+      <g
+        className="wfa-cursor-flag"
+        onPointerDown={(event) => onBeginDrag(id, event)}
+        transform={`translate(${x}, 2)`}
+      >
+        <title>{`Cursor ${id} · drag to move`}</title>
+        <path d="M 0 0 L 16 0 L 16 13 L 5 13 L 0 18 Z" />
+        <text x="5" y="10">{id}</text>
+      </g>
+      <text className="wfa-cursor-time" textAnchor="middle" x={x} y={height - 4}>{formatVirtualTime(timeNs)}</text>
+    </g>
+  )
 }
 
 export function TimingCursors({
@@ -21,30 +55,27 @@ export function TimingCursors({
   xToTime,
   height,
   width,
+  minX = 0,
 }: TimingCursorsProps) {
   const draggingRef = useRef<'A' | 'B' | null>(null)
 
-  const beginDrag = (cursor: 'A' | 'B', e: React.PointerEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
+  const beginDrag = (cursor: 'A' | 'B', event: ReactPointerEvent<SVGGElement>) => {
+    event.stopPropagation()
+    event.preventDefault()
     draggingRef.current = cursor
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    event.currentTarget.setPointerCapture(event.pointerId)
   }
 
-  const handlePointerMove = useCallback((e: PointerEvent) => {
+  const handlePointerMove = useCallback((event: PointerEvent) => {
     if (!draggingRef.current) return
     const container = document.getElementById('waveform-timeline-canvas-container')
     if (!container) return
     const rect = container.getBoundingClientRect()
-    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left))
+    const x = Math.max(minX, Math.min(rect.width, event.clientX - rect.left))
     const time = Math.max(0, Math.round(xToTime(x)))
-
-    if (draggingRef.current === 'A') {
-      onUpdateCursorA(time)
-    } else if (draggingRef.current === 'B') {
-      onUpdateCursorB(time)
-    }
-  }, [xToTime, onUpdateCursorA, onUpdateCursorB])
+    if (draggingRef.current === 'A') onUpdateCursorA(time)
+    else onUpdateCursorB(time)
+  }, [minX, xToTime, onUpdateCursorA, onUpdateCursorB])
 
   const handlePointerUp = useCallback(() => {
     draggingRef.current = null
@@ -61,116 +92,21 @@ export function TimingCursors({
 
   const xA = cursorANs !== null ? timeToX(cursorANs) : null
   const xB = cursorBNs !== null ? timeToX(cursorBNs) : null
+  const inView = (x: number | null): x is number => x !== null && x >= minX && x <= width
 
   return (
-    <g className="waveform-timing-cursors">
-      {/* Delta measurement region highlight if both cursors placed */}
+    <g className="wfa-cursors">
       {xA !== null && xB !== null && (
         <rect
-          className="waveform-cursor-delta-fill"
-          fill="rgba(42, 203, 212, 0.08)"
+          className="wfa-cursor-span"
           height={height}
-          stroke="rgba(42, 203, 212, 0.2)"
-          strokeDasharray="3 3"
-          width={Math.abs(xB - xA)}
-          x={Math.min(xA, xB)}
+          width={Math.max(0, Math.min(width, Math.max(xA, xB)) - Math.max(minX, Math.min(xA, xB)))}
+          x={Math.max(minX, Math.min(xA, xB))}
           y={0}
         />
       )}
-
-      {/* Cursor A (Cyan) */}
-      {xA !== null && xA >= 0 && xA <= width && (
-        <g className="waveform-cursor waveform-cursor-a">
-          <line
-            stroke="#2acbd4"
-            strokeWidth="1.5"
-            x1={xA}
-            x2={xA}
-            y1={0}
-            y2={height}
-          />
-          {/* Flag handle at top */}
-          <g
-            className="cursor-flag cursor-flag-a"
-            onPointerDown={(event) => beginDrag('A', event)}
-            style={{ cursor: 'ew-resize' }}
-            transform={`translate(${xA}, 4)`}
-          >
-            <path
-              d="M 0 0 L 28 0 L 28 14 L 6 14 L 0 20 Z"
-              fill="#2acbd4"
-            />
-            <text
-              fill="#06131e"
-              fontSize="9"
-              fontWeight="800"
-              x="8"
-              y="11"
-            >
-              A
-            </text>
-          </g>
-          {/* Virtual time label */}
-          <text
-            className="cursor-time-label"
-            fill="#2acbd4"
-            fontSize="9"
-            fontWeight="700"
-            textAnchor="middle"
-            x={xA}
-            y={height - 6}
-          >
-            {formatVirtualTime(cursorANs!)}
-          </text>
-        </g>
-      )}
-
-      {/* Cursor B (Amber) */}
-      {xB !== null && xB >= 0 && xB <= width && (
-        <g className="waveform-cursor waveform-cursor-b">
-          <line
-            stroke="#f2a93b"
-            strokeWidth="1.5"
-            x1={xB}
-            x2={xB}
-            y1={0}
-            y2={height}
-          />
-          {/* Flag handle at top */}
-          <g
-            className="cursor-flag cursor-flag-b"
-            onPointerDown={(event) => beginDrag('B', event)}
-            style={{ cursor: 'ew-resize' }}
-            transform={`translate(${xB}, 4)`}
-          >
-            <path
-              d="M 0 0 L 28 0 L 28 14 L 6 14 L 0 20 Z"
-              fill="#f2a93b"
-            />
-            <text
-              fill="#06131e"
-              fontSize="9"
-              fontWeight="800"
-              x="8"
-              y="11"
-            >
-              B
-            </text>
-          </g>
-          {/* Virtual time label */}
-          <text
-            className="cursor-time-label"
-            fill="#f2a93b"
-            fontSize="9"
-            fontWeight="700"
-            textAnchor="middle"
-            x={xB}
-            y={height - 6}
-          >
-            {formatVirtualTime(cursorBNs!)}
-          </text>
-        </g>
-      )}
+      {inView(xA) && cursorANs !== null && <Cursor height={height} id="A" onBeginDrag={beginDrag} timeNs={cursorANs} x={xA} />}
+      {inView(xB) && cursorBNs !== null && <Cursor height={height} id="B" onBeginDrag={beginDrag} timeNs={cursorBNs} x={xB} />}
     </g>
   )
 }

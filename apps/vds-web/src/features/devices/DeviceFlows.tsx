@@ -1,9 +1,9 @@
-import { Orbit, Plus } from 'lucide-react'
+import { Orbit, Plus, Workflow } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { useDeviceFlow } from '../../api/queries'
 import { AsyncState } from '../../components/AsyncState'
-import { GlassPanel } from '../../components/GlassPanel'
+import { Panel } from '../../components/Panel'
 import { localFlowRepository } from '../flows/serialization/localFlowRepository'
 import { behaviorSettings } from './behavior/types/deviceBehaviorFlow'
 import './behavior/registry/deviceBehaviorRegistry'
@@ -27,33 +27,39 @@ export function DeviceFlows({ deviceId }: { deviceId: string }) {
       source: 'package' as const,
     }
     : null)
+  const flowDocument = localFlow ? localFlowRepository.load(localFlow.id) : packagedFlow.data
+
+  const editorLink = item ? `${editorBase}/${encodeURIComponent(item.id)}` : `${editorBase}/new`
 
   return (
-    <GlassPanel className="flows-catalog" eyebrow="Always-on device logic" title="Behavior Model">
-      <div className="flow-list">
-        {packagedFlow.isPending && !localFlow && <AsyncState kind="loading" title="Loading packaged behavior model" />}
-        {!packagedFlow.isPending && !item && <Link className="flow-list-new" to={`${editorBase}/new`}>
-          <Plus size={21} />
-          <div>
-            <strong>Define device behavior</strong>
-            <span>Create the runtime logic for {deviceId}.</span>
-          </div>
-        </Link>}
-        {item && (
-          <Link
-            className="flow-list-card"
-            to={`${editorBase}/${encodeURIComponent(item.id)}`}
-          >
-            <span className="flow-list-icon"><Orbit size={18} /></span>
-            <div className="flow-list-copy">
-              <span>{item.source === 'local' ? 'draft' : 'package'} · behavior model</span>
-              <strong>{item.name}</strong>
-              <small>{item.id}</small>
-            </div>
-            <div className="flow-list-meta"><span>r{item.revision}</span></div>
-          </Link>
-        )}
-      </div>
-    </GlassPanel>
+    <Panel
+      actions={!packagedFlow.isPending && (
+        item
+          ? <Link className="button button-primary button-sm" to={editorLink}><Workflow aria-hidden="true" size={12} /> Open editor</Link>
+          : <Link className="button button-primary button-sm" to={editorLink}><Plus aria-hidden="true" size={12} /> Define behavior</Link>
+      )}
+      className="dv-tab-panel dv-flows"
+      icon={Orbit}
+      meta="always-on device logic"
+      title="Behavior Model"
+    >
+      {packagedFlow.isPending && !localFlow && <AsyncState kind="loading" title="Loading packaged behavior model" />}
+      {!packagedFlow.isPending && !item && (
+        <AsyncState
+          detail={<>No behavior model is defined for <code>{deviceId}</code>. <Link className="inline-link" to={editorLink}>Create the runtime logic</Link> in the visual editor.</>}
+          kind="empty"
+          title="No behavior model"
+        />
+      )}
+      {item && (
+        <dl className="kv-grid dv-flows-grid">
+          <div><dt>Model</dt><dd><strong>{item.name}</strong></dd></div>
+          <div><dt>Source</dt><dd><span className={`chip${item.source === 'local' ? ' dv-chip-draft' : ''}`}>{item.source === 'local' ? 'local draft' : 'device package'}</span></dd></div>
+          <div><dt>Flow ID</dt><dd className="mono">{item.id}</dd></div>
+          <div><dt>Revision</dt><dd className="mono">r{item.revision}</dd></div>
+          <div><dt>Graph</dt><dd className="mono">{flowDocument ? `${flowDocument.nodes.length} nodes · ${flowDocument.edges.length} edges` : '—'}</dd></div>
+        </dl>
+      )}
+    </Panel>
   )
 }

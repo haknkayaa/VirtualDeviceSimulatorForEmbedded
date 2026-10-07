@@ -27,6 +27,44 @@ import {
 } from '../types/deviceBehaviorFlow'
 import { behaviorFlowRules } from '../validation/behaviorRules'
 
+/** Canvas icon and visual node class per reserved/active behavior kind. */
+const appearance: Record<string, { icon: string; accent: string }> = {
+  [BEHAVIOR_NODE_KINDS.initialState]: { icon: 'initial', accent: 'trigger' },
+  [BEHAVIOR_NODE_KINDS.state]: { icon: 'state', accent: 'state' },
+  [BEHAVIOR_NODE_KINDS.commandTrigger]: { icon: 'send', accent: 'trigger' },
+  [BEHAVIOR_NODE_KINDS.eventTrigger]: { icon: 'event', accent: 'trigger' },
+  [BEHAVIOR_NODE_KINDS.guard]: { icon: 'guard', accent: 'guard' },
+  [BEHAVIOR_NODE_KINDS.setRegister]: { icon: 'action', accent: 'action' },
+  [BEHAVIOR_NODE_KINDS.resetRegister]: { icon: 'reset', accent: 'action' },
+  [BEHAVIOR_NODE_KINDS.emitEvent]: { icon: 'event', accent: 'action' },
+  [BEHAVIOR_NODE_KINDS.startOperation]: { icon: 'play', accent: 'action' },
+  [BEHAVIOR_NODE_KINDS.completeOperation]: { icon: 'flag', accent: 'action' },
+  [BEHAVIOR_NODE_KINDS.end]: { icon: 'end', accent: 'end' },
+  [BEHAVIOR_NODE_KINDS.timer]: { icon: 'timer', accent: 'timing' },
+  [BEHAVIOR_NODE_KINDS.delay]: { icon: 'wait', accent: 'timing' },
+  [BEHAVIOR_NODE_KINDS.timeout]: { icon: 'timeout', accent: 'timing' },
+  [BEHAVIOR_NODE_KINDS.interval]: { icon: 'interval', accent: 'timing' },
+  [BEHAVIOR_NODE_KINDS.fileRead]: { icon: 'file-read', accent: 'action' },
+  [BEHAVIOR_NODE_KINDS.fileWrite]: { icon: 'file-write', accent: 'action' },
+}
+
+function count(value: unknown) {
+  return Array.isArray(value) ? value.length : 0
+}
+
+function stateSummary(data: JsonObject) {
+  const name = typeof data.state_name === 'string' && data.state_name.trim() ? data.state_name.trim() : '—'
+  const label = typeof data.label === 'string' ? data.label.trim() : ''
+  const actions = count(data.entry_actions) + count(data.exit_actions)
+  return [name === label ? '' : name, data.terminal === true ? 'terminal' : '', actions ? `${actions} action${actions === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ') || undefined
+}
+
+function designSummary(data: JsonObject) {
+  if (typeof data.duration === 'number') return `${data.duration} ${typeof data.unit === 'string' ? data.unit : 'ms'}`
+  if (typeof data.path === 'string') return data.path.trim() || 'no path'
+  return undefined
+}
+
 const stateInput = [{ id: 'in', label: 'Incoming transition' }]
 const stateOutput = [{ id: 'out', label: 'Outgoing transition' }]
 
@@ -42,8 +80,8 @@ function entry(
     displayName,
     description: active ? `${displayName} in the compiled device state machine.` : `${displayName} metadata is represented by state or transition inspectors in edge-centric v1.`,
     category: active ? 'Device states' : 'Reserved metadata',
-    iconIdentifier: kind === BEHAVIOR_NODE_KINDS.initialState ? 'play' : 'workflow',
-    accentToken: kind === BEHAVIOR_NODE_KINDS.initialState ? 'cyan' : 'violet',
+    iconIdentifier: appearance[kind]?.icon ?? 'workflow',
+    accentToken: appearance[kind]?.accent ?? 'muted',
     defaultData,
     inputPorts: active ? stateInput : [],
     outputPorts: active ? stateOutput : [],
@@ -51,6 +89,7 @@ function entry(
     inspectorComponent: active ? StateNodeInspector : GenericNodeInspector,
     validationRules: [],
     flowKinds: active ? ['device_behavior'] : ['device_behavior_reserved'],
+    summary: active ? stateSummary : undefined,
   }
 }
 
@@ -71,8 +110,8 @@ function designEntry(
     displayName,
     description,
     category,
-    iconIdentifier: 'workflow',
-    accentToken: category === 'Logical' ? 'amber' : category === 'Time' ? 'cyan' : 'green',
+    iconIdentifier: appearance[kind]?.icon ?? 'logic',
+    accentToken: appearance[kind]?.accent ?? 'guard',
     defaultData: { label: displayName, ...defaultData },
     inputPorts,
     outputPorts: signalOutput,
@@ -80,6 +119,7 @@ function designEntry(
     inspectorComponent: DesignNodeInspector,
     validationRules: [],
     flowKinds: ['device_behavior'],
+    summary: designSummary,
   }
 }
 

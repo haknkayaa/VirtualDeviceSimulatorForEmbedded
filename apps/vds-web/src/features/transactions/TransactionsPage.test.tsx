@@ -57,7 +57,8 @@ describe('live transactions workspace', () => {
     useEventStore.getState().setConnection('disconnected')
     renderRoute(<TransactionsPage />)
     expect(await screen.findByText('Capture stream disconnected')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Bus Analyzer' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Transactions' })).toBeInTheDocument()
+    expect(screen.getByText('Bus Analyzer')).toBeInTheDocument()
   })
 
   it('pairs live transaction events and renders waveform, hex, and telemetry', async () => {
@@ -81,20 +82,59 @@ describe('live transactions workspace', () => {
     expect(screen.getByText('TX Buffer')).toBeInTheDocument()
     expect(screen.getByText('00000010')).toBeInTheDocument()
     expect(screen.getByText('|..|')).toBeInTheDocument()
-    expect(await screen.findByText('Bus Health Summary')).toBeInTheDocument()
+    expect(await screen.findByText('Bus telemetry')).toBeInTheDocument()
     expect(await screen.findByRole('meter', { name: 'Success rate: 100.0%' })).toBeInTheDocument()
-    expect(await screen.findAllByText('7.00 B/s')).toHaveLength(2)
-    expect(screen.getByText('TOTAL THROUGHPUT (LIVE)')).toBeInTheDocument()
+    expect(await screen.findByText('7.00 B/s')).toBeInTheDocument()
+    expect(screen.getByText('4.00 B/s')).toBeInTheDocument()
+    expect(screen.getByText('3.00 B/s')).toBeInTheDocument()
+    expect(screen.getByText('Throughput')).toBeInTheDocument()
     expect(screen.getByText('0.00%')).toBeInTheDocument()
-    expect(screen.getByText('14 µs')).toBeInTheDocument()
-    expect(screen.getByText('LATENCY P95 (LIVE)')).toBeInTheDocument()
+    expect(screen.getByText('Latency p95')).toBeInTheDocument()
+    expect(screen.getAllByText('14 µs')).toHaveLength(2)
+    expect(screen.getByText('12 µs')).toBeInTheDocument()
 
     const pause = screen.getByRole('button', { name: 'Pause' })
+    const resume = screen.getByRole('button', { name: 'Resume' })
+    expect(resume).toBeDisabled()
     await user.click(pause)
     expect(pause).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: 'Start Capture' }))
+    await user.click(resume)
     expect(pause).toBeEnabled()
     await user.click(screen.getByRole('button', { name: 'Clear' }))
     expect(screen.getByText('Waiting for bus traffic')).toBeInTheDocument()
+  })
+
+  it('selects and locks the transaction named by the ?transaction= deep link', async () => {
+    mockApi()
+    useEventStore.getState().setConnection('connected')
+    useEventStore.getState().acceptEvents([
+      event({ event_id: 1, event_type: 'transaction_started', payload: { kind: 'transaction_started', transaction_id: 7, request: [0x9f] } }),
+      event({ event_id: 2, event_type: 'transaction_completed', payload: { kind: 'transaction_completed', transaction_id: 7, response: [0xef], result: 'success', error_code: null } }),
+      event({ event_id: 3, event_type: 'transaction_started', timestamp_wall_ns: 1_780_000_000_000_100_000, payload: { kind: 'transaction_started', transaction_id: 8, request: [0x05] } }),
+      event({ event_id: 4, event_type: 'transaction_completed', timestamp_wall_ns: 1_780_000_000_000_200_000, payload: { kind: 'transaction_completed', transaction_id: 8, response: [], result: 'error', error_code: 'device_busy' } }),
+    ])
+    renderRoute(<TransactionsPage />, '/transactions?transaction=spi-flash-0%3A7', '/transactions')
+
+    expect(await screen.findByText('spi-flash-0 · #7')).toBeInTheDocument()
+    expect(screen.getByText('Selection locked')).toBeInTheDocument()
+    expect(screen.getByRole('row', { selected: true })).toHaveTextContent('9F ⇄ EF')
+    expect(screen.getByRole('button', { name: /Follow/ })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('follows the newest transaction without a deep link', async () => {
+    const user = userEvent.setup()
+    mockApi()
+    useEventStore.getState().setConnection('connected')
+    useEventStore.getState().acceptEvents([
+      event({ event_id: 1, event_type: 'transaction_started', payload: { kind: 'transaction_started', transaction_id: 7, request: [0x9f] } }),
+      event({ event_id: 2, event_type: 'transaction_completed', timestamp_wall_ns: 1_780_000_000_000_100_000, payload: { kind: 'transaction_completed', transaction_id: 8, response: [], result: 'error', error_code: 'device_busy' } }),
+    ])
+    renderRoute(<TransactionsPage />, '/transactions', '/transactions')
+
+    expect(await screen.findByText('spi-flash-0 · #8')).toBeInTheDocument()
+    expect(screen.getByText('Live tail')).toBeInTheDocument()
+    await user.click(screen.getByText('9F'))
+    expect(await screen.findByText('spi-flash-0 · #7')).toBeInTheDocument()
+    expect(screen.getByText('Selection locked')).toBeInTheDocument()
   })
 })

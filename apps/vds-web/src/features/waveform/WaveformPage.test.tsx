@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -50,7 +50,7 @@ describe('WaveformPage & Logic Analyzer Protocol Viewer', () => {
     useEventStore.getState().setConnection('connected')
     renderRoute(<WaveformPage />)
 
-    expect(await screen.findByRole('heading', { name: 'Logic Analyzer & Waveforms' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Logic Analyzer' })).toBeInTheDocument()
     expect(screen.getByText('No bus traffic captured yet')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'VCD' })).toBeDisabled()
   })
@@ -99,11 +99,12 @@ describe('WaveformPage & Logic Analyzer Protocol Viewer', () => {
     expect(vcdBtn).toBeEnabled()
 
     // Decoded packets table
-    expect(screen.getByText(/Decoded Protocol Packets/)).toBeInTheDocument()
-    expect(screen.getByText('OP 0x9F')).toBeInTheDocument()
+    expect(screen.getByText(/Decoded packets/i)).toBeInTheDocument()
+    const packetTable = screen.getByRole('table')
+    expect(within(packetTable).getByText('OP 0x9F')).toBeInTheDocument()
 
     // Clicking a packet sets timing cursors
-    const packetRow = screen.getByText('OP 0x9F').closest('tr')!
+    const packetRow = within(packetTable).getByText('OP 0x9F').closest('tr')!
     await user.click(packetRow)
 
     const timingHud = screen.getByRole('region', { name: 'Timing cursors measurement' })

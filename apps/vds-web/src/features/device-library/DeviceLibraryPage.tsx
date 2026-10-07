@@ -1,12 +1,15 @@
-import { Download, Ellipsis, PackageOpen, Upload } from 'lucide-react'
+import { Download, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { api } from '../../api/client'
+import { useAdapters, useDevices } from '../../api/queries'
 import { AsyncState } from '../../components/AsyncState'
 import { PageHeader } from '../../components/PageHeader'
 import { DevicePackageDetail } from './DevicePackageDetail'
 import { DevicePackageList } from './DevicePackageList'
-import { libraryPackageFromApi, type LibraryPackage } from './deviceLibraryCatalog'
+import { libraryPackageFromApi, matchesPackage, type LibraryPackage } from './deviceLibraryCatalog'
+import { buildPackageInstances } from './packageInstances'
+import './device-library.css'
 
 function readFileAsBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -17,6 +20,13 @@ function readFileAsBase64(file: File) {
   })
 }
 
+const busFilters = ['all', 'spi', 'i2c', 'gpio', 'uart']
+
+interface Notice {
+  tone: 'ok' | 'error'
+  text: string
+}
+
 export function DeviceLibraryPage() {
   const importInput = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
@@ -25,7 +35,9 @@ export function DeviceLibraryPage() {
   const [catalog, setCatalog] = useState<LibraryPackage[]>([])
   const [loading, setLoading] = useState(true)
   const [importing, setImporting] = useState(false)
-  const [importMessage, setImportMessage] = useState('')
+  const [notice, setNotice] = useState<Notice | null>(null)
+  const devices = useDevices()
+  const adapters = useAdapters()
 
   useEffect(() => {
     void api.devicePackages()
@@ -34,24 +46,25 @@ export function DeviceLibraryPage() {
         setCatalog(packages)
         setSelectedId((current) => current || packages[0]?.id || '')
       })
-      .catch(() => setImportMessage('Package service is unavailable'))
+      .catch(() => setNotice({ tone: 'error', text: 'Package service is unavailable' }))
       .finally(() => setLoading(false))
   }, [])
 
   const packages = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-    return catalog.filter((item) => {
-      const matchesBus = bus === 'all' || item.bus === bus
-      const searchable = [item.name, item.description, item.source, ...item.capabilities].join(' ').toLowerCase()
-      return matchesBus && (!normalizedQuery || searchable.includes(normalizedQuery))
-    })
+    const needle = query.trim().toLowerCase()
+    return catalog.filter((item) => matchesPackage(item, needle, bus))
   }, [bus, catalog, query])
+  const instances = useMemo(
+    () => buildPackageInstances(catalog.map((item) => item.id), devices.data, adapters.data),
+    [adapters.data, catalog, devices.data],
+  )
   const selected = catalog.find((item) => item.id === selectedId) ?? catalog[0]
+  const presentBuses = useMemo(() => new Set(catalog.map((item) => item.bus)), [catalog])
 
   const importPackage = async (files: FileList | null) => {
     if (!files?.length) return
     setImporting(true)
-    setImportMessage('')
+    setNotice(null)
     try {
       const entries = await Promise.all([...files].map(async (file) => {
         const relativePath = file.webkitRelativePath || file.name
@@ -62,20 +75,24 @@ export function DeviceLibraryPage() {
       const imported = libraryPackageFromApi(await api.importDevicePackage(entries))
       setCatalog((current) => current.some((item) => item.id === imported.id) ? current : [...current, imported])
       setSelectedId(imported.id)
-      setImportMessage(`${imported.name} installed`)
+      setNotice({ tone: 'ok', text: `${imported.name} installed` })
     } catch (error) {
-      setImportMessage(error instanceof Error ? error.message : 'Package import failed')
+      setNotice({ tone: 'error', text: error instanceof Error ? error.message : 'Package import failed' })
     } finally {
       setImporting(false)
       if (importInput.current) importInput.current.value = ''
     }
   }
 
+  const countLabel = packages.length === catalog.length
+    ? `${catalog.length} local package${catalog.length === 1 ? '' : 's'}`
+    : `${packages.length} of ${catalog.length} local packages`
+
   return (
-    <div className="page-stack device-library-page">
+    <div className="page device-library-page">
       <PageHeader
-        action={(
-          <div className="library-page-actions">
+        actions={(
+          <>
             <input
               {...{ webkitdirectory: '' }}
               aria-label="Choose device package directory"
@@ -85,49 +102,74 @@ export function DeviceLibraryPage() {
               ref={importInput}
               type="file"
             />
-            <button className="button button-secondary" disabled={importing} onClick={() => importInput.current?.click()} type="button">
-              <Download aria-hidden="true" size={14} /> {importing ? 'Importing…' : 'Import Package'}
+            <button
+              className="button"
+              disabled={importing}
+              onClick={() => importInput.current?.click()}
+              title="Import a device package directory (device-package.yaml, model/, docs/, assets/)"
+              type="button"
+            >
+              <Download aria-hidden="true" size={13} /> {importing ? 'Importing…' : 'Import Package'}
             </button>
-            <button className="button button-secondary" disabled title="Backend package export is not available." type="button">
-              <Upload aria-hidden="true" size={14} /> Export package
-            </button>
-            <button aria-label="More library actions" className="icon-button" disabled type="button"><Ellipsis aria-hidden="true" size={16} /></button>
-          </div>
+          </>
         )}
-        description="Inspect device packages installed in the local VDS4E package store."
-        eyebrow="Device Library / Installed Packages"
+        context={<span className="mono">{countLabel}</span>}
         title="Device Library"
-      />
-      <nav aria-label="Library collections" className="library-tabs">
-        <button aria-pressed="true" className="active" type="button">Installed <span>{catalog.length}</span></button>
-        <button disabled title="Community registry is not connected." type="button">Community <span>0</span></button>
-        <button disabled title="Private registry is not configured." type="button">Private Registry <span>0</span></button>
-        <button disabled title="Package update checks require a registry connection." type="button">Updates <span>0</span></button>
-      </nav>
-      <div className="device-library-workspace">
-        {loading ? <AsyncState kind="loading" title="Loading installed packages" /> : null}
-        {!loading && selected ? (
-          <>
+      >
+        <label className="search-input dl-search">
+          <Search aria-hidden="true" size={13} />
+          <input
+            aria-label="Search device packages"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search name, id, bus, version"
+            type="search"
+            value={query}
+          />
+        </label>
+        <div aria-label="Filter packages by bus" className="segmented" role="group">
+          {busFilters.map((value) => (
+            <button
+              aria-pressed={bus === value}
+              disabled={value !== 'all' && !presentBuses.has(value)}
+              key={value}
+              onClick={() => setBus(value)}
+              type="button"
+            >
+              {value === 'all' ? 'All' : value.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      </PageHeader>
+
+      {notice && (
+        <div className={`inline-alert ${notice.tone} dl-notice`} role="status">
+          <span className="dl-notice-text">{notice.text}</span>
+          <button aria-label="Dismiss" className="icon-button sm" onClick={() => setNotice(null)} type="button"><X aria-hidden="true" size={12} /></button>
+        </div>
+      )}
+
+      <div className="page-body fill dl-body">
+        {loading && <AsyncState kind="loading" title="Loading installed packages" />}
+        {!loading && selected && (
+          <div className="dl-layout">
             <DevicePackageList
-              bus={bus}
-              onBusChange={setBus}
-              onQueryChange={setQuery}
+              instances={instances}
               onSelect={setSelectedId}
               packages={packages}
-              query={query}
               selectedId={selected.id}
             />
-            <DevicePackageDetail item={selected} />
-          </>
-        ) : null}
-        {!loading && !selected ? <AsyncState kind="empty" title="No device packages installed" /> : null}
+            <DevicePackageDetail instance={instances.get(selected.id)} item={selected} key={selected.id} />
+          </div>
+        )}
+        {!loading && !selected && (
+          <AsyncState
+            centered
+            detail="Import a package directory containing device-package.yaml to add a device model."
+            kind="empty"
+            title="No device packages installed"
+          />
+        )}
       </div>
-      {importMessage ? (
-        <div className="library-local-note">
-          <PackageOpen aria-hidden="true" size={13} />
-          {importMessage}
-        </div>
-      ) : null}
     </div>
   )
 }

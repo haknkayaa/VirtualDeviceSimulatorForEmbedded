@@ -1,79 +1,69 @@
-import { CheckCircle2, RadioTower, RefreshCw, ShieldCheck } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ArrowRight, ChevronDown, ChevronRight } from 'lucide-react'
+import { memo, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 
-import { GlassPanel } from '../../components/GlassPanel'
-import type { Device, DeviceRegister } from '../../types/api'
+import type { Device } from '../../types/api'
 import type { DomainEvent } from '../../types/events'
+import { formatWallTime } from '../../utils/events'
 import { formatHex, formatVirtualTime } from '../../utils/format'
 import { buildLiveTransactions, transactionDirection, type LiveTransaction, type TransactionDirection, type TransactionStatus } from '../transactions/transactionModel'
+import { readPreference, writePreference } from './deviceModel'
 
 type TransactionFilter = 'all' | 'reads' | 'writes'
 
+const MAX_ROWS = 200
+const OPEN_PREFERENCE = 'vds4e.devices.transactionsOpen'
+
 interface DeviceFooterPanelsProps {
-  currentState: string | null
   device: Device | undefined
+  /** Device-scoped domain events in chronological order. */
   events: DomainEvent[]
-  isRefreshing: boolean
-  onRefreshRegisters: () => void
   onSelectRegister: (address: number) => void
-  registers: DeviceRegister[]
-  selectedRegister: DeviceRegister | undefined
 }
 
 interface RecentTransaction {
   id: string
+  source: 'bus' | 'register'
   context: string
+  registerAddress?: number
+  /** Register accesses carry one value, not wire bytes; render it as a register value. */
+  registerValue?: string
   direction: TransactionDirection
   request: number[]
   response: number[]
   status: TransactionStatus
+  errorCode?: string
   virtualTimeNs: number
   wallTimeNs: number
 }
 
 function transactionTime(transaction: RecentTransaction) {
-  const wallTimeNs = transaction.wallTimeNs
-  if (wallTimeNs > 0) {
-    return new Date(wallTimeNs / 1_000_000).toLocaleTimeString([], {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      fractionalSecondDigits: 3,
-    })
-  }
-  return formatVirtualTime(transaction.virtualTimeNs)
+  return transaction.wallTimeNs > 0 ? formatWallTime(transaction.wallTimeNs) : formatVirtualTime(transaction.virtualTimeNs)
 }
 
 function transactionBytes(values: number[]) {
   if (values.length === 0) return '—'
-  const preview = values.slice(0, 3).map((value) => formatHex(value)).join(' ')
-  return values.length > 3 ? `${preview}…` : preview
+  const preview = values.slice(0, 8).map((value) => value.toString(16).toUpperCase().padStart(2, '0')).join(' ')
+  return values.length > 8 ? `${preview} …` : preview
 }
 
-function buildRegisterTransactions(events: DomainEvent[], device: Device | undefined): RecentTransaction[] {
+function buildRegisterTransactions(events: DomainEvent[]): RecentTransaction[] {
   const transactions: RecentTransaction[] = []
   for (const event of events) {
-    if (event.payload.kind !== 'register_read' && event.payload.kind !== 'register_write') continue
-    if (event.payload.kind === 'register_read') {
-      transactions.push({
-        id: `register:${event.event_id}`,
-        context: `${device?.name ?? device?.id ?? 'Device'} · ${formatHex(event.payload.address, 16)}`,
-        direction: 'rx',
-        request: [],
-        response: event.payload.value === null ? [] : [event.payload.value],
-        status: 'success',
-        virtualTimeNs: event.timestamp_virtual_ns,
-        wallTimeNs: event.timestamp_wall_ns,
-      })
-      continue
-    }
+    const payload = event.payload
+    if (payload.kind !== 'register_read' && payload.kind !== 'register_write') continue
+    const context = payload.name ?? formatHex(payload.address, 16)
+    const read = payload.kind === 'register_read'
+    const value = read ? payload.value : payload.new_value
     transactions.push({
       id: `register:${event.event_id}`,
-      context: `${device?.name ?? device?.id ?? 'Device'} · ${formatHex(event.payload.address, 16)}`,
-      direction: 'tx',
-      request: event.payload.new_value === null ? [] : [event.payload.new_value],
-      response: [],
+      source: 'register',
+      context,
+      registerAddress: payload.address,
+      registerValue: value === null ? '—' : formatHex(value),
+      direction: read ? 'rx' : 'tx',
+      request: !read && value !== null ? [value] : [],
+      response: read && value !== null ? [value] : [],
       status: 'success',
       virtualTimeNs: event.timestamp_virtual_ns,
       wallTimeNs: event.timestamp_wall_ns,
@@ -85,224 +75,110 @@ function buildRegisterTransactions(events: DomainEvent[], device: Device | undef
 function normalizeBusTransaction(transaction: LiveTransaction): RecentTransaction {
   return {
     id: transaction.id,
-    context: `${transaction.busType.toUpperCase()} #${transaction.transactionId}`,
+    source: 'bus',
+    // Runtime-injected transactions (scenario steps) have no adapter transaction id.
+    context: transaction.id.includes(':ev')
+      ? `${transaction.busType.toUpperCase()} · injected`
+      : `${transaction.busType.toUpperCase()} #${transaction.transactionId}`,
     direction: transactionDirection(transaction),
     request: transaction.request,
     response: transaction.response,
     status: transaction.status,
+    errorCode: transaction.errorCode,
     virtualTimeNs: transaction.completedVirtualNs ?? transaction.startedVirtualNs ?? 0,
     wallTimeNs: transaction.completedWallNs ?? transaction.startedWallNs ?? 0,
   }
 }
 
-function buildScenarioTransactions(events: DomainEvent[], device: Device | undefined): RecentTransaction[] {
-  const pending = new Map<string, DomainEvent & { payload: Extract<DomainEvent['payload'], { kind: 'transaction_started' }> }>()
-  const transactions: RecentTransaction[] = []
+const directionLabel: Record<TransactionDirection, string> = { full_duplex: 'I/O', rx: 'Read', tx: 'Write' }
+const directionClass: Record<TransactionDirection, string> = { full_duplex: 'transaction-duplex', rx: 'transaction-read', tx: 'transaction-write' }
 
-  for (const event of events) {
-    if (
-      !event.scenario_run_id ||
-      (event.payload.kind !== 'transaction_started' && event.payload.kind !== 'transaction_completed') ||
-      event.payload.transaction_id !== null
-    ) continue
-    const key = `${event.scenario_run_id}:${event.device_id ?? ''}`
-    if (event.payload.kind === 'transaction_started') {
-      pending.set(key, event as DomainEvent & { payload: Extract<DomainEvent['payload'], { kind: 'transaction_started' }> })
-      continue
-    }
-    if (event.payload.kind !== 'transaction_completed') continue
-    const started = pending.get(key)
-    if (!started) continue
-    pending.delete(key)
-    const request = started.payload.request
-    const response = event.payload.response
-    const direction = transactionDirection({ request, response } as LiveTransaction)
-    transactions.push({
-      id: `scenario:${event.scenario_run_id}:${started.event_id}`,
-      context: `${device?.bus?.toUpperCase() ?? 'DEVICE'} · scenario`,
-      direction,
-      request,
-      response,
-      status: event.payload.result === 'success' ? 'success' : 'error',
-      virtualTimeNs: event.timestamp_virtual_ns,
-      wallTimeNs: event.timestamp_wall_ns,
-    })
-  }
+const TransactionRow = memo(function TransactionRow({ transaction, onSelectRegister }: { transaction: RecentTransaction; onSelectRegister: (address: number) => void }) {
+  const address = transaction.registerAddress
+  return (
+    <tr
+      className={address !== undefined ? 'clickable' : undefined}
+      onClick={address !== undefined ? () => onSelectRegister(address) : undefined}
+      title={address !== undefined ? 'Select register' : undefined}
+    >
+      <td className="mono dim">{transactionTime(transaction)}</td>
+      <td><span className={`dv-dir ${directionClass[transaction.direction]}`}>{directionLabel[transaction.direction]}</span></td>
+      <td className="mono">{transaction.context}</td>
+      <td className="mono dv-bytes" title={transaction.request.map((value) => formatHex(value)).join(' ')}>{transaction.registerValue && transaction.direction === 'tx' ? transaction.registerValue : transactionBytes(transaction.request)}</td>
+      <td className="mono dv-bytes" title={transaction.response.map((value) => formatHex(value)).join(' ')}>{transaction.registerValue && transaction.direction === 'rx' ? transaction.registerValue : transactionBytes(transaction.response)}</td>
+      <td className={`mono dv-result dv-result-${transaction.status}`}>
+        {transaction.status === 'error' ? transaction.errorCode ?? 'error' : transaction.status === 'running' ? 'in flight' : transaction.status === 'partial' ? 'partial' : 'ok'}
+      </td>
+    </tr>
+  )
+})
 
-  return transactions
-}
-
-export function DeviceFooterPanels({
-  currentState,
-  device,
-  events,
-  isRefreshing,
-  onRefreshRegisters,
-  onSelectRegister,
-  registers,
-  selectedRegister,
-}: DeviceFooterPanelsProps) {
+/**
+ * Collapsible bottom pane with the device's recent bus and register
+ * transactions, derived from the live event stream.
+ */
+export function DeviceFooterPanels({ device, events, onSelectRegister }: DeviceFooterPanelsProps) {
   const [transactionFilter, setTransactionFilter] = useState<TransactionFilter>('all')
-  const [draftValue, setDraftValue] = useState(() =>
-    selectedRegister ? formatHex(selectedRegister.value, selectedRegister.width_bits) : '',
+  const [open, setOpen] = useState(() => readPreference(OPEN_PREFERENCE, true))
+  const all = useMemo(
+    () => [
+      ...buildLiveTransactions(events, device ? [device] : []).map(normalizeBusTransaction),
+      ...buildRegisterTransactions(events),
+    ].sort((left, right) => right.wallTimeNs - left.wallTimeNs || right.virtualTimeNs - left.virtualTimeNs),
+    [device, events],
   )
   const transactions = useMemo(
-    () => {
-      const chronologicalEvents = [...events].reverse()
-      return [
-        ...buildLiveTransactions(chronologicalEvents, device ? [device] : []).map(normalizeBusTransaction),
-        ...buildScenarioTransactions(chronologicalEvents, device),
-        ...buildRegisterTransactions(chronologicalEvents, device),
-      ]
-      .sort((left, right) => right.wallTimeNs - left.wallTimeNs || right.virtualTimeNs - left.virtualTimeNs)
+    () => all
       .filter((transaction) => {
         if (transactionFilter === 'reads') return transaction.direction !== 'tx'
         if (transactionFilter === 'writes') return transaction.direction !== 'rx'
         return true
       })
-      .slice(0, 4)
-    },
-    [device, events, transactionFilter],
+      .slice(0, MAX_ROWS),
+    [all, transactionFilter],
   )
-  const metadataCoverage = registers.length === 0
-    ? 0
-    : Math.round(
-        (registers.filter((register) => register.reset_value !== undefined && Boolean(register.description)).length
-          / registers.length)
-          * 100,
-      )
+  const errors = useMemo(() => all.filter((transaction) => transaction.status === 'error').length, [all])
+
+  const toggle = () => {
+    setOpen((current) => {
+      writePreference(OPEN_PREFERENCE, !current)
+      return !current
+    })
+  }
 
   return (
-    <section aria-label="Device register tools" className="device-footer-grid">
-      <GlassPanel
-        action={(
-          <div aria-label="Transaction filters" className="footer-card-tabs" role="group">
+    <section aria-label="Recent device transactions" className={`dv-bottom${open ? ' open' : ''}`}>
+      <header className="dv-bottom-head">
+        <button aria-expanded={open} aria-label={open ? 'Collapse recent transactions' : 'Expand recent transactions'} className="icon-button sm" onClick={toggle} type="button">
+          {open ? <ChevronDown aria-hidden="true" size={13} /> : <ChevronRight aria-hidden="true" size={13} />}
+        </button>
+        <h2 className="panel-title">Recent Transactions</h2>
+        <span className="panel-meta">{all.length}{errors ? ` · ${errors} failed` : ''}</span>
+        {open && (
+          <div aria-label="Transaction filters" className="segmented" role="group">
             {(['all', 'reads', 'writes'] as const).map((filter) => (
-              <button
-                aria-pressed={transactionFilter === filter}
-                className={transactionFilter === filter ? 'active' : ''}
-                key={filter}
-                onClick={() => setTransactionFilter(filter)}
-                type="button"
-              >
+              <button aria-pressed={transactionFilter === filter} key={filter} onClick={() => setTransactionFilter(filter)} type="button">
                 {filter[0].toUpperCase() + filter.slice(1)}
               </button>
             ))}
           </div>
         )}
-        className="device-footer-card recent-transactions-card"
-        title="Recent Transactions"
-      >
-        {transactions.length === 0 ? (
-          <div className="footer-card-empty">Device transactions will appear here from the live event stream.</div>
-        ) : (
-          <div className="recent-transaction-list">
-            {transactions.map((transaction) => {
-              const direction = transaction.direction
-              const directionLabel = direction === 'full_duplex' ? 'I/O' : direction === 'rx' ? 'Read' : 'Write'
-              return (
-                <div className="recent-transaction-row" key={transaction.id}>
-                  <time>{transactionTime(transaction)}</time>
-                  <span className={direction === 'rx' ? 'transaction-read' : direction === 'tx' ? 'transaction-write' : 'transaction-duplex'}>
-                    <i /> {directionLabel}
-                  </span>
-                  <code
-                    className="transaction-summary"
-                    title={`${transaction.context} · TX: ${transaction.request.map((value) => formatHex(value)).join(' ')} · RX: ${transaction.response.map((value) => formatHex(value)).join(' ')}`}
-                  >
-                    {transactionBytes(transaction.request)} → {transactionBytes(transaction.response)}
-                  </code>
-                  <strong className={transaction.status === 'error' ? 'transaction-status-error' : ''}><i /> {transaction.status === 'running' ? 'Live' : transaction.status === 'partial' ? 'Partial' : transaction.status === 'error' ? 'Error' : 'OK'}</strong>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </GlassPanel>
-
-      <GlassPanel className="device-footer-card value-controls-card" title="Value Controls">
-        <div className="value-control-fields">
-          <label>
-            <span>Address</span>
-            <select
-              aria-label="Value control register"
-              disabled={registers.length === 0}
-              onChange={(event) => onSelectRegister(Number(event.target.value))}
-              value={selectedRegister?.address ?? ''}
-            >
-              {registers.map((register) => (
-                <option key={register.address} value={register.address}>
-                  {formatHex(register.address, 16)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span>Value (Hex)</span>
-            <input
-              aria-label="Register value draft"
-              disabled={!selectedRegister}
-              onChange={(event) => setDraftValue(event.target.value)}
-              value={draftValue}
-            />
-          </label>
-          <div className="value-width">
-            <span>Data Width</span>
-            <div>
-              {[8, 16, 32].map((width) => (
-                <button
-                  aria-pressed={selectedRegister?.width_bits === width}
-                  disabled
-                  key={width}
-                  type="button"
-                >
-                  {width}-bit
-                </button>
-              ))}
-            </div>
-          </div>
+        <Link className="button button-ghost button-sm dv-bottom-link" to="/transactions">Transactions <ArrowRight aria-hidden="true" size={12} /></Link>
+      </header>
+      {open && (
+        <div className="dv-bottom-body">
+          {transactions.length === 0
+            ? <p className="dv-bottom-empty">Transactions for this device appear here from the live event stream.</p>
+            : (
+              <table className="data-table">
+                <thead><tr><th>Time</th><th>Dir</th><th>Context</th><th>TX</th><th>RX</th><th>Result</th></tr></thead>
+                <tbody>
+                  {transactions.map((transaction) => <TransactionRow key={transaction.id} onSelectRegister={onSelectRegister} transaction={transaction} />)}
+                </tbody>
+              </table>
+            )}
         </div>
-        <div className="value-control-actions">
-          <button className="button button-secondary" disabled={!selectedRegister || isRefreshing} onClick={onRefreshRegisters} type="button">
-            <RefreshCw aria-hidden="true" className={isRefreshing ? 'spin' : ''} size={13} /> Read
-          </button>
-          <button className="button button-secondary" disabled title="Register writes are not exposed by the Control API." type="button">
-            Write
-          </button>
-          <button className="button button-secondary" disabled title="Register writes are not exposed by the Control API." type="button">
-            Write &amp; Verify
-          </button>
-        </div>
-      </GlassPanel>
-
-      <GlassPanel className="device-footer-card validation-state-card" title="Validation & State">
-        <dl className="footer-detail-list">
-          <div><dt>Register Map CRC</dt><dd>Not exposed</dd></div>
-          <div><dt>Last Verified</dt><dd>{registers.length > 0 ? 'Live snapshot' : '—'}</dd></div>
-          <div><dt>Mismatches</dt><dd>Not evaluated</dd></div>
-        </dl>
-        <div className="coverage-row">
-          <span>Metadata coverage</span>
-          <div><i style={{ width: `${metadataCoverage}%` }} /></div>
-          <strong>{metadataCoverage}%</strong>
-        </div>
-        <div className="validation-state">
-          <span>State</span>
-          <strong><ShieldCheck aria-hidden="true" size={14} /> {currentState ?? 'Unknown'}</strong>
-          {currentState && <CheckCircle2 aria-label="State snapshot available" size={15} />}
-        </div>
-      </GlassPanel>
-
-      <GlassPanel className="device-footer-card device-information-card" title="Device Information">
-        <dl className="footer-detail-list">
-          <div><dt>Type</dt><dd>{device?.type ?? 'Not reported'}</dd></div>
-          <div><dt>Model</dt><dd>{device?.model ?? 'Not reported'}</dd></div>
-          <div><dt>Version</dt><dd>{device?.version ?? 'Not reported'}</dd></div>
-          <div><dt>Interface</dt><dd>{device?.bus?.toUpperCase() ?? 'Not reported'}</dd></div>
-          <div><dt>Registers</dt><dd>{registers.length}</dd></div>
-          <div><dt>Telemetry</dt><dd className="telemetry-value"><RadioTower aria-hidden="true" size={12} /> Live events</dd></div>
-        </dl>
-      </GlassPanel>
+      )}
     </section>
   )
 }

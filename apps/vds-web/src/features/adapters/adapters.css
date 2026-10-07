@@ -1,0 +1,116 @@
+/* Adapters: host-integration topology (tree + inspector). Prefix: adp- */
+.adp-body { padding: var(--space-2); }
+.adp-layout { display: grid; flex: 1 1 auto; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: var(--space-2); min-height: 0; }
+.adp-tree-panel, .adp-inspector { min-height: 0; }
+
+/* ---------- Tree ---------- */
+.adp-tree { display: flex; flex-direction: column; padding: 2px 0; }
+.adp-tree-item { border-bottom: 1px solid var(--divider); }
+.adp-tree-item.selected { box-shadow: inset 2px 0 0 var(--accent); }
+.adp-tree-adapter { display: flex; align-items: center; padding-right: var(--space-1); }
+.adp-tree-item.selected .adp-tree-adapter { background: var(--selection); }
+.adp-tree-row {
+  display: grid; flex: 1 1 auto; grid-template-columns: 7px auto minmax(0, max-content) minmax(0, 1fr) auto auto;
+  align-items: center; gap: var(--space-2); min-width: 0; height: 28px; padding: 0 var(--space-2) 0 var(--space-3);
+  color: var(--text); background: transparent; border: 0; font-size: var(--fs-sm); text-align: left;
+}
+.adp-tree-adapter:hover { background: var(--bg-2); }
+.adp-tree-item.selected .adp-tree-adapter:hover { background: var(--selection); }
+.adp-tree-name { color: var(--text-strong); font-weight: 600; }
+.adp-tree-id { color: var(--text-faint); font-size: var(--fs-xs); }
+.adp-tree-state { justify-self: end; color: var(--text-faint); font-family: var(--font-mono); font-size: var(--fs-2xs); text-transform: uppercase; }
+.adp-tree-state.adp-state-loaded { color: var(--ok); }
+.adp-tree-state.adp-state-error { color: var(--err); }
+.adp-tree-state.adp-state-loading, .adp-tree-state.adp-state-unloading { color: var(--warn); }
+.adp-tree-power { flex: 0 0 auto; }
+
+.adp-tree-bindings { display: flex; flex-direction: column; padding-bottom: 3px; }
+.adp-tree-binding {
+  position: relative; display: grid; grid-template-columns: minmax(0, 112px) 54px minmax(0, 1fr); align-items: center; gap: var(--space-2);
+  width: 100%; height: 22px; padding: 0 var(--space-3) 0 38px;
+  color: var(--text-muted); background: transparent; border: 0; font-size: var(--fs-xs); text-align: left;
+}
+.adp-tree-binding::before { content: ''; position: absolute; top: 0; bottom: 50%; left: 21px; width: 9px; border-bottom: 1px solid var(--border-strong); border-left: 1px solid var(--border-strong); }
+button.adp-tree-binding:hover { background: var(--bg-2); }
+.adp-tree-binding.selected { background: var(--selection); }
+.adp-tree-binding-empty { grid-template-columns: minmax(0, 112px) minmax(0, 1fr); }
+.adp-tree-binding code { color: var(--text-strong); font-size: var(--fs-xs); }
+.adp-tree-endpoint { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--fs-xs); }
+.adp-tree-device { color: var(--text); }
+.adp-tree-binding .dim { color: var(--text-faint); }
+
+/* Not exposed to Linux: adapter unloaded */
+.adp-node-down, .adp-tree-binding code.adp-node-down { color: var(--text-faint); text-decoration: line-through; text-decoration-color: var(--text-faint); }
+.adp-legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.adp-legend .status-dot { margin-left: 4px; }
+
+/* ---------- Inspector ---------- */
+.adp-inspector { overflow: hidden; }
+.adp-inspector-head {
+  display: flex; flex: 0 0 auto; align-items: center; gap: var(--space-2); min-height: 38px; padding: 0 var(--space-2) 0 var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+.adp-inspector-head h2 { overflow: hidden; font-size: var(--fs-md); text-overflow: ellipsis; white-space: nowrap; }
+.adp-inspector-id { color: var(--text-faint); font-size: var(--fs-xs); }
+.adp-inspector-actions { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
+.adp-inspector-body { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--space-3); min-height: 0; padding: var(--space-3); overflow: auto; }
+.adp-inspector-foot { display: flex; flex: 0 0 auto; justify-content: flex-end; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border); }
+.adp-inspector > .panel-body { display: flex; align-items: center; justify-content: center; }
+
+.adp-inspector .inline-alert svg { flex: 0 0 auto; margin-top: 2px; }
+.adp-inspector .inline-alert.error svg { color: var(--err); }
+.adp-inspector .inline-alert.warn svg { color: var(--warn); }
+.adp-inspector .inline-alert code { font-size: var(--fs-xs); }
+.adp-alert-text { display: flex; flex-direction: column; gap: 3px; }
+.adp-cmd { padding: 1px 6px; color: var(--text-strong); background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius-sm); user-select: all; }
+
+.adp-section { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.adp-section > .panel-section-title { display: flex; align-items: center; gap: 6px; padding: 0 0 2px; border-bottom: 1px solid var(--divider); }
+.adp-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-3) var(--space-5); }
+.adp-kv { grid-template-columns: minmax(110px, max-content) minmax(0, 1fr); }
+.adp-kv dt, .adp-kv dd { padding: 3px 0; }
+.adp-pids { display: flex; flex-wrap: wrap; gap: 4px; }
+.adp-pids .chip { color: var(--text-strong); }
+
+.adp-empty, .adp-note { color: var(--text-muted); font-size: var(--fs-sm); }
+.adp-empty code, .adp-note code { color: var(--text-strong); font-size: var(--fs-xs); }
+
+.adp-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.adp-bindings tbody tr:last-child td { border-bottom: 0; }
+.adp-bindings .adp-row-actions { width: 1%; text-align: right; }
+.adp-device-link { color: var(--text-strong); font-weight: 550; }
+.adp-device-link:hover { color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px; }
+.adp-bindings code.adp-node { color: var(--text-strong); }
+.adp-bindings code.adp-node-down { color: var(--text-faint); }
+.adp-lines { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+
+.adp-guidance { display: flex; flex-direction: column; gap: 2px; padding: 6px var(--space-3); color: var(--text-muted); background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); }
+.adp-guidance strong { color: var(--text-strong); font-weight: 600; }
+
+.adp-attach-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2); }
+.adp-attach-form > .field:first-child { flex: 1 1 220px; max-width: 320px; }
+.adp-endpoint-field { width: 110px; }
+.adp-attach-preview { display: grid; gap: 4px; }
+.adp-attach-preview code { display: inline-flex; align-items: center; height: var(--control-h); padding: 0 8px; color: var(--text-strong); background: var(--bg-2); border: 1px dashed var(--border-strong); border-radius: var(--radius); font-size: var(--fs-xs); }
+.adp-attach-form > .adp-field-error { flex-basis: 100%; }
+.adp-field-error { color: var(--err); font-size: var(--fs-xs); }
+.adp-field-warn { color: var(--warn) !important; }
+.adp-inspector input[aria-invalid='true'] { border-color: var(--err) !important; }
+
+/* ---------- Create form ---------- */
+.adp-form-grid { display: grid; align-items: start; grid-template-columns: repeat(auto-fill, minmax(220px, 280px)); gap: var(--space-2) var(--space-3); }
+.adp-abi-readout { display: flex; align-items: center; gap: var(--space-2); height: var(--control-h); }
+.adp-abi-readout code { color: var(--text-strong); font-size: var(--fs-xs); }
+.adp-bus-driver { padding: 0 5px; color: var(--text-muted); background: var(--bg-3); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: var(--fs-2xs); line-height: 17px; }
+
+/* ---------- Authorization dialog ---------- */
+.adp-dialog-close { margin-left: auto; }
+.adp-auth-body { display: flex; flex-direction: column; gap: var(--space-3); }
+.adp-auth-body p code { font-size: var(--fs-xs); }
+.adp-auth-commands { border: 1px solid var(--border); border-radius: var(--radius); }
+.adp-auth-commands tbody tr:last-child td { border-bottom: 0; }
+.adp-auth-commands code { color: var(--text-strong); user-select: all; }
+
+@media (max-width: 960px) {
+  .adp-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(160px, 40%) minmax(0, 1fr); }
+}

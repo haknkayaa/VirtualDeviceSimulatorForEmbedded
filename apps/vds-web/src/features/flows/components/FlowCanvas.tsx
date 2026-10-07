@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Background,
   BackgroundVariant,
+  Controls,
   MarkerType,
   MiniMap,
   ReactFlow,
@@ -22,8 +23,32 @@ import { edgeRegistry } from '../registry/edgeRegistry'
 import { nodeRegistry } from '../registry/nodeRegistry'
 import { useFlowKeyboardShortcuts } from '../hooks/useFlowKeyboardShortcuts'
 import { useFlowStore } from '../store/flowStore'
-import type { FlowCanvasEdge, FlowCanvasNode, ValidationIssue } from '../types/flow'
+import type { FlowCanvasEdge, FlowCanvasNode, FlowRuntimeStatus, ValidationIssue } from '../types/flow'
 import { validateFlowConnection } from '../validation/validator'
+
+const runtimeMarkerColors: Partial<Record<FlowRuntimeStatus, string>> = {
+  active: 'var(--live)', running: 'var(--live)', pending: 'var(--info)',
+  passed: 'var(--ok)', transitioned: 'var(--ok)',
+  failed: 'var(--err)', error: 'var(--err)', rejected: 'var(--err)',
+}
+
+/** Arrowheads follow the edge stroke state; React Flow dedupes markers per colour. */
+function edgeMarkerColor(selected: boolean, runtimeStatus: FlowRuntimeStatus, issues: ValidationIssue[]) {
+  if (selected) return 'var(--accent)'
+  const runtime = runtimeMarkerColors[runtimeStatus]
+  if (runtime) return runtime
+  if (issues.some((issue) => issue.severity === 'error')) return 'var(--err)'
+  if (issues.length) return 'var(--warn)'
+  return 'var(--text-faint)'
+}
+
+function minimapNodeClass(node: FlowCanvasNode) {
+  const status = node.data.runtimeStatus
+  const issues = node.data.issues
+  if (status !== 'idle') return `flow-minimap-node runtime-${status}`
+  if (issues.some((issue) => issue.severity === 'error')) return 'flow-minimap-node invalid'
+  return `flow-minimap-node accent-${node.data.definition?.accentToken ?? 'muted'}${node.selected ? ' selected' : ''}`
+}
 
 interface FlowCanvasProps {
   issues: ValidationIssue[]
@@ -44,8 +69,11 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
   const defaultEdgeKind = typeof store.document.metadata.default_edge_kind === 'string' && edgeRegistry.has(store.document.metadata.default_edge_kind)
     ? store.document.metadata.default_edge_kind
     : 'default'
+  // Controlled nodes must carry their measured size, otherwise the minimap skips them.
+  const [measured, setMeasured] = useState<Record<string, { width: number; height: number }>>({})
   const nodes = useMemo<FlowCanvasNode[]>(() => store.document.nodes.map((node) => ({
     id: node.id,
+    measured: measured[node.id],
     type: nodeRegistry.has(node.kind) ? node.kind : 'unknown',
     position: node.position,
     selected: store.selectedNodeIds.includes(node.id),
@@ -57,24 +85,29 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
       issues: issues.filter((issue) => issue.nodeId === node.id),
       readOnly: store.readOnly,
     },
-  })), [issues, store.document.nodes, store.readOnly, store.runtimeStatuses, store.selectedNodeIds])
-  const edges = useMemo<FlowCanvasEdge[]>(() => store.document.edges.map((edge) => ({
-    id: edge.id,
-    type: edgeRegistry.has(edge.kind) ? edge.kind : 'unknown',
-    source: edge.source,
-    sourceHandle: edge.sourceHandle,
-    target: edge.target,
-    targetHandle: edge.targetHandle,
-    selected: store.selectedEdgeIds.includes(edge.id),
-    reconnectable: !store.readOnly,
-    markerEnd: { type: MarkerType.ArrowClosed },
-    data: {
-      document: edge,
-      issues: issues.filter((issue) => issue.edgeId === edge.id),
-      readOnly: store.readOnly,
-      runtimeStatus: store.runtimeStatuses[edge.id] ?? 'idle',
-    },
-  })), [issues, store.document.edges, store.readOnly, store.runtimeStatuses, store.selectedEdgeIds])
+  })), [issues, measured, store.document.nodes, store.readOnly, store.runtimeStatuses, store.selectedNodeIds])
+  const edges = useMemo<FlowCanvasEdge[]>(() => store.document.edges.map((edge) => {
+    const selected = store.selectedEdgeIds.includes(edge.id)
+    const edgeIssues = issues.filter((issue) => issue.edgeId === edge.id)
+    const runtimeStatus = store.runtimeStatuses[edge.id] ?? 'idle'
+    return {
+      id: edge.id,
+      type: edgeRegistry.has(edge.kind) ? edge.kind : 'unknown',
+      source: edge.source,
+      sourceHandle: edge.sourceHandle,
+      target: edge.target,
+      targetHandle: edge.targetHandle,
+      selected,
+      reconnectable: !store.readOnly,
+      markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: edgeMarkerColor(selected, runtimeStatus, edgeIssues) },
+      data: {
+        document: edge,
+        issues: edgeIssues,
+        readOnly: store.readOnly,
+        runtimeStatus,
+      },
+    }
+  }), [issues, store.document.edges, store.readOnly, store.runtimeStatuses, store.selectedEdgeIds])
 
   const fitView = useCallback(() => { void instance.fitView({ padding: 0.2, duration: 260 }) }, [instance])
   const shortcutOptions = useMemo(() => ({ fitView, save: onSave, canvasFocused }), [canvasFocused, fitView, onSave])
@@ -84,6 +117,8 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
   }, [instance, store.document.viewport])
 
   const onNodesChange = useCallback((changes: NodeChange<FlowCanvasNode>[]) => {
+    const sized = changes.flatMap((change) => change.type === 'dimensions' && change.dimensions ? [[change.id, change.dimensions] as const] : [])
+    if (sized.length) setMeasured((current) => ({ ...current, ...Object.fromEntries(sized) }))
     const removed = changes.filter((change) => change.type === 'remove').map((change) => change.id)
     if (removed.length) store.removeNodes(removed)
     const selectionChanges = changes.filter((change) => change.type === 'select')
@@ -124,13 +159,13 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
 
   return (
     <div
+      aria-label="Flow canvas"
       className="flow-canvas"
       onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setCanvasFocused(false) }}
       onFocus={() => setCanvasFocused(true)}
       tabIndex={0}
     >
       <ReactFlow<FlowCanvasNode, FlowCanvasEdge>
-        colorMode="dark"
         defaultViewport={store.document.viewport}
         defaultEdgeOptions={{ type: defaultEdgeKind }}
         deleteKeyCode={null}
@@ -171,8 +206,16 @@ export function FlowCanvas({ issues, onSave, canvasFocused, setCanvasFocused }: 
         snapGrid={[20, 20]}
         snapToGrid
       >
-        <Background color="rgba(140, 148, 166, .22)" gap={20} size={1} variant={BackgroundVariant.Dots} />
-        <MiniMap className="flow-minimap" maskColor="rgba(5, 7, 11, .72)" pannable zoomable />
+        <Background gap={20} size={1} variant={BackgroundVariant.Dots} />
+        <Controls className="flow-controls" fitViewOptions={{ padding: 0.2, duration: 260 }} showInteractive={false} />
+        <MiniMap
+          ariaLabel="Flow overview"
+          className="flow-minimap"
+          nodeBorderRadius={2}
+          nodeClassName={minimapNodeClass}
+          pannable
+          zoomable
+        />
       </ReactFlow>
     </div>
   )

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Web UI redesigned as an engineering workstation: one navigation rail and a
+  bottom status bar replace the double navigation, placeholder account chrome and
+  footer; a token-based design system (dark and light) replaces the glass styling.
+- The Web UI home page is now an Overview of Linux device nodes → adapters →
+  devices with live bus counters, a derived problems list, recent bus traffic,
+  the last scenario run, signal activity, host telemetry and an event tail.
+- Transactions and the Logic Analyzer share one capture toolbar; Transactions
+  supports `?transaction=` deep links and shows scenario-injected traffic.
+- Devices is a three-pane register/command/fault workbench; Adapters shows
+  daemon PIDs, kernel-module hints and conflict checks; the Event Log follows the
+  tail only while scrolled to the bottom.
+- The unused `react-circular-progressbar` Web UI dependency was removed.
+
 ## [0.1.1] - 2026-10-07
 
 ### Added

@@ -18,7 +18,6 @@
     "@xyflow/react": "^12.12.0",
     "lucide-react": "^1.52.0",
     "react": "^19.3.0",
-    "react-circular-progressbar": "^2.2.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4",
     "zustand": "^5.0.15"

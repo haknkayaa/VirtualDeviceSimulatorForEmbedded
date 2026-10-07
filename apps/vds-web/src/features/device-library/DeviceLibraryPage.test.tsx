@@ -41,20 +41,23 @@ describe('device library', () => {
   it('filters installed packages and changes the detail selection', async () => {
     renderRoute(<DeviceLibraryPage />)
 
-    expect(await screen.findByRole('button', { name: /Installed 2/i })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /Community 0/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /Private Registry 0/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /Updates 0/i })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: /Micron MT25QL256/i })).toHaveAttribute('aria-pressed', 'true')
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search device packages' }), 'micron')
     expect(screen.getByRole('button', { name: /Micron MT25QL256/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Atmel AT24C256/i })).not.toBeInTheDocument()
+    expect(screen.getByText('1 of 2 local packages')).toBeInTheDocument()
+
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Search device packages' }))
+    await userEvent.click(screen.getByRole('button', { name: 'I2C' }))
+    expect(screen.queryByRole('button', { name: /Micron MT25QL256/i })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'All' }))
 
     await userEvent.clear(screen.getByRole('searchbox', { name: 'Search device packages' }))
     await userEvent.click(screen.getByRole('button', { name: /Atmel AT24C256/i }))
     expect(screen.getByText('Atmel AT24C256', { selector: 'h2' })).toBeInTheDocument()
     expect(screen.getByText('Installed', { selector: '.package-install-state strong' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Add Device' })).toHaveAttribute('href', '/devices')
+    expect(screen.getByRole('link', { name: 'Add Device' })).toHaveAttribute('href', '/devices?add=1')
   })
 
   it('uploads a selected package directory and adds it to the catalog', async () => {

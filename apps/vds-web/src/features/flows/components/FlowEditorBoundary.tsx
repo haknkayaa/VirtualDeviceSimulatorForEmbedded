@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { AlertCircle } from 'lucide-react'
 
 export class FlowEditorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null }
@@ -12,9 +13,12 @@ export class FlowEditorBoundary extends Component<{ children: ReactNode }, { err
   render() {
     if (!this.state.error) return this.props.children
     return (
-      <div className="flow-editor-failure" role="alert">
-        <strong>Visual editor could not render</strong>
-        <span>{this.state.error.message}</span>
+      <div className="async-state async-error centered flow-editor-failure" role="alert">
+        <AlertCircle aria-hidden="true" size={16} />
+        <div>
+          <strong>Visual editor could not render</strong>
+          <p className="mono">{this.state.error.message}</p>
+        </div>
       </div>
     )
   }
