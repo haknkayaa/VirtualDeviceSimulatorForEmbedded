@@ -1,4 +1,4 @@
-import { Activity, Bell, Boxes, Cable, CircleHelp, Gauge, LibraryBig, Moon, Radio, ScrollText, Settings, Sun, UserRound } from 'lucide-react'
+import { Activity, AudioWaveform, Bell, Boxes, Cable, CircleHelp, Gauge, LibraryBig, Moon, Radio, ScrollText, Settings, Sun, UserRound } from 'lucide-react'
 import { useMemo } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 
@@ -16,6 +16,7 @@ const navigation = [
   { to: '/devices', label: 'Devices', icon: Boxes, end: false },
   { to: '/adapters', label: 'Adapters', icon: Cable, end: false },
   { to: '/transactions', label: 'Transactions', icon: Activity, end: false },
+  { to: '/waveform', label: 'Logic Analyzer', icon: AudioWaveform, end: false },
   { to: '/device-library', label: 'Device Library', icon: LibraryBig, end: false },
   { to: '/logs', label: 'Logs', icon: ScrollText, end: false },
 ] as const
@@ -25,6 +26,7 @@ const workspaceNavigation = [
   { to: '/devices', label: 'Devices', end: false },
   { to: '/adapters', label: 'Adapters', end: false },
   { to: '/transactions', label: 'Transactions', end: false },
+  { to: '/waveform', label: 'Logic Analyzer', end: false },
   { to: '/device-library', label: 'Device Library', end: false },
   { to: '/logs', label: 'Logs', end: false },
 ] as const

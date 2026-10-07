@@ -61,9 +61,9 @@ ranking.
 | Full Linux boot | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Bare-metal / RTOS support | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | Custom peripheral modeling | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Declarative hardware description | ✅ | ❌ | ✅ | ✅ | ⚠️ | ⚠️ |
-| Device Tree import | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | Planned |
-| Automatic virtual board generation from DTS | ❌ | ❌ | ❌ | ⚠️ | ❌ | Planned |
+| Declarative hardware description | ✅ | ❌ | ✅ | ✅ | ⚠️ | ✅ |
+| Device Tree import | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| Automatic virtual board generation from DTS | ❌ | ❌ | ❌ | ⚠️ | ❌ | ✅ |
 | Yocto-oriented workflow | ⚠️ | ✅ | ⚠️ | ⚠️ | ⚠️ | ⚠️ |
 | Browser-based UI | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Visual hardware designer | ⚠️ | ❌ | ⚠️ | ✅ | ⚠️ | ⚠️ |
