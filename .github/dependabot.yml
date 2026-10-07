@@ -19,6 +19,11 @@ updates:
       web-dependencies:
         patterns:
           - "*"
+    # typescript-eslint peers on typescript <6.1, so a TypeScript 7 bump makes the
+    # whole group uninstallable (npm ci ERESOLVE). Re-enable once it supports 7.
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
