@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `tests/e2e/drdy`: real-ABI end-to-end test (spidev_test, gpio-sim, gpiomon) for
+  the signal topology flow, with a QEMU runner.
 - Public device signal ports, `signal_bindings`, and a `topology.yaml` that
   connects them to GPIO lines with deterministic zero-delay or `delay_ns`
   propagation (ADR 0011).
@@ -16,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional `topology` key in the server configuration.
 - Separate CI jobs for Rust, web UI, native adapters (with ASan/UBSan) and examples.
 - CodeQL analysis, Dependabot configuration and a security policy.
+
+### Fixed
+- `vds4e-spi-cuse` implements `SPI_IOC_RD_MODE32` and `SPI_IOC_WR_MODE32`, so the
+  upstream `spidev_test` works.
+- Web UI lint errors in the waveform feature fixed at their source.
+- The live-server signal pump now logs the device events it applies and reports a
+  persistent failure once.
 
 ### Changed
 - `uart-pty` adapter builds the shared bridge via `add_subdirectory`.
