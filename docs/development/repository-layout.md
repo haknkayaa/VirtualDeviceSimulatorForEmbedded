@@ -1,43 +1,74 @@
 # Repository layout
 
-The directory layout follows section 9 of `VDS4E_ARCHITECTURE.md`.
+The repository keeps the runtime, host ABI adapters, device packages and Web
+control plane separate.
 
-The Phase 0 and first vertical-slice Cargo workspace members are:
+## Applications
 
-- `apps/vds-server`: headless daemon, Unix-socket data plane, REST control
-  plane, and WebSocket event transport
-- `apps/vds-cli`: local data-plane diagnostic client
-- `apps/vds-web`: optional React/Vite control-plane client with REST snapshots,
-  replay-aware WebSocket events, device controls, and scenario run views
-- `crates/vds-core`: backend-independent clock, deterministic one-shot
-  scheduler, generic finite-state machine, device, registry, transaction,
-  configuration, portable DevicePackage manifest SDK, and error foundations
-- `crates/vds-protocol`: Protobuf contract and length-prefixed framing
-- `crates/vds-device-model`: declarative generic device-model loading and
-  command handling, including device-specific state definitions, register
-  actions, guards, pending operations, and busy state
-- `crates/vds-registers`: declarative RO/WO/RW register validation and runtime
-  value ownership
-- `crates/vds-scenario`: declarative scenario parsing, sequential deterministic
-  execution, public runtime orchestration, assertions, and JSON results
-- `crates/vds-events`: typed domain-event envelope and payloads, monotonic event
-  IDs, bounded replay ring, filters, and non-blocking broadcast subscriptions
-- `device-models/`: independently movable device packages. Each package owns a
-  `device-package.yaml` manifest plus its model, flows, scenarios, fixtures,
-  documentation, and assets.
-- `schemas/device-package.schema.json`: public, versioned DevicePackage contract
-- `adapters/spi-cuse`: Linux `spidev` CUSE adapter exposing `/dev/spidevX.Y` to
-  unmodified SPI applications and standard `spidev_test`
-- `adapters/i2c-cuse`: Linux `i2c-dev` CUSE adapter exposing `/dev/i2c-N` to
-  unmodified I²C tools and applications
-- `adapters/bridge`: internal shared C transport bridge used by Linux host
-  adapters to communicate with the Unix-socket data plane
-- `adapters/gpio-sim`: privileged kernel gpio-sim lifecycle helper that exposes
-  real `/dev/gpiochipX` devices to libgpiod applications
+- `apps/vds-server`: authoritative runtime owner, Unix-socket data plane,
+  REST API and WebSocket event transport.
+- `apps/vds-cli`: local diagnostics, device-package tooling and headless
+  scenario commands.
+- `apps/vds-web`: React/Vite control and observability client.
 
-Directories are added only with working source. Future components stay in the
-roadmap until implementation begins; placeholder directories are not kept.
+## Rust crates
 
-Company-private protocol implementations, examples, fixtures, and test vectors
-must live in separate private repositories. The public repository exposes only
-generic extension points and must remain fully usable without those extensions.
+- `crates/vds-core`: device registry, clocks, scheduling, topology and common
+  runtime foundations.
+- `crates/vds-device-model`: declarative device-model parsing and generic
+  device behavior.
+- `crates/vds-registers`: register/bitfield validation and runtime values.
+- `crates/vds-scenario`: deterministic scenario parsing and execution.
+- `crates/vds-events`: typed domain events, replay and persistence support.
+- `crates/vds-protocol`: Protobuf data-plane contract and framing.
+- `crates/vds-importer`: draft model import from hardware descriptions such as
+  CMSIS-SVD and Device Tree source.
+
+## Linux host adapters
+
+- `adapters/bridge`: shared C transport/codec layer used by native helpers.
+- `adapters/spi-cuse`: `/dev/spidevX.Y` CUSE adapter.
+- `adapters/i2c-cuse`: `/dev/i2c-N` CUSE adapter.
+- `adapters/gpio-sim`: kernel gpio-sim lifecycle/synchronization helper.
+- `adapters/uart-pty`: unprivileged UART PTY helper.
+
+Host adapters translate Linux ABIs and transport requests to the runtime. They
+must not become a second implementation of device semantics.
+
+## Device packages and schemas
+
+- `device-models/examples/`: independently movable example device packages.
+- `schemas/`: versioned public package/model/topology contracts.
+- `config/`: repository example configuration and topology.
+
+A device package owns its model, flows, scenarios, fixtures, documentation and
+assets beneath one package root.
+
+## Tests and examples
+
+- `examples/`: normal application examples that use Linux interfaces.
+- `tests/e2e/drdy/`: privileged SPI/I²C + GPIO real-ABI signal tests.
+- Rust and Web unit/integration tests remain beside the code they validate.
+
+## Build and packaging
+
+- `./configure`: prerequisite/configuration stage.
+- `./build.sh`: repository-wide staged build.
+- `./install`: installation/staging step with `PREFIX` and `DESTDIR`.
+- `packaging/debian/`: Debian package assembly.
+- `.github/workflows/ci.yml`: regular main-branch verification.
+- `.github/workflows/e2e-abi.yml`: manual privileged ABI verification.
+- `.github/workflows/release.yml`: tag-driven Debian release.
+
+## Documentation
+
+- `README.md`: product overview and quick start.
+- `VDS4E_ARCHITECTURE.md`: authoritative architecture.
+- `docs/guides/`: operational user/contributor guides.
+- `docs/development/`: implementation and authoring references.
+- `docs/adr/`: accepted architecture decisions.
+- `docs/ROADMAP.md`: planned work.
+
+Future components stay in the roadmap until implementation begins. Company
+private protocols, models, fixtures and test vectors belong outside the public
+repository.
