@@ -50,6 +50,10 @@ pub struct ScenarioResult {
     pub steps_failed: usize,
     pub steps_skipped: usize,
     pub steps: Vec<StepResult>,
+    /// Declared device behavior the run exercised (ADR 0013); present only
+    /// when the caller supplied coverage targets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage: Option<crate::ScenarioCoverage>,
 }
 
 impl ScenarioResult {

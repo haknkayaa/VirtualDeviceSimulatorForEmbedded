@@ -21,6 +21,14 @@ function stubApi(adapters: Adapter[]) {
     if (url.endsWith('/faults')) return jsonResponse([])
     if (url.endsWith('/scenarios')) return jsonResponse([{ id: 'jedec', name: 'JEDEC identification', timeout_ms: 20, steps: 2, device_ids: ['flash'] }])
     if (url.endsWith('/scenarios/jedec')) return jsonResponse({ schema_version: 1, scenario: { id: 'jedec', name: 'JEDEC', timeout_ms: 20 }, steps: [{ id: 'read', action: 'send_spi', continue_on_failure: false }, { id: 'assert', action: 'assert_response', continue_on_failure: false }] })
+    if (url.endsWith('/runs/run-7/result')) {
+      const metric = (covered: number, total: number, missed: string[] = []) => ({ covered, total, missed })
+      return jsonResponse({
+        scenario_id: 'jedec', status: 'passed', started_virtual_ns: 0, completed_virtual_ns: 1, duration_virtual_ns: 1,
+        steps_total: 2, steps_passed: 2, steps_failed: 0, steps_skipped: 0, steps: [],
+        coverage: { devices: [{ device_id: 'flash', commands: metric(1, 21, ['WRITE_ENABLE']), registers: metric(0, 12), states: metric(2, 7), transitions: metric(1, 16), faults: metric(0, 0) }] },
+      })
+    }
     if (url.endsWith('/telemetry/buses')) return jsonResponse({ generated_at_wall_ns: 0, window_seconds: 60, buses: [] })
     return jsonResponse({})
   }))
@@ -71,5 +79,21 @@ describe('OverviewPage', () => {
     expect(await within(attention).findByText(/Kernel module missing: cuse/)).toBeInTheDocument()
     expect(within(attention).getByText('sudo modprobe cuse')).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Live device path' })).getByText('Not loaded · cuse missing')).toBeInTheDocument()
+  })
+
+  it('shows the finished run\'s coverage summary', async () => {
+    useEventStore.getState().acceptEvents([
+      { event_id: 5, event_type: 'scenario_step_completed', timestamp_virtual_ns: 2_000, timestamp_wall_ns: 0, scenario_run_id: 'run-7', payload: { kind: 'scenario_step_completed', step_id: 'read', action: 'send_spi', status: 'passed', error: null } },
+      { event_id: 6, event_type: 'scenario_completed', timestamp_virtual_ns: 3_000, timestamp_wall_ns: 0, scenario_run_id: 'run-7', payload: { kind: 'scenario_completed', scenario_id: 'jedec', status: 'passed', steps_passed: 2, steps_failed: 0, steps_skipped: 0 } },
+    ])
+    stubApi([loadedAdapter])
+    renderRoute(<OverviewPage />)
+
+    const scenario = await screen.findByRole('region', { name: 'Scenario run' })
+    const coverage = await within(scenario).findByRole('definition')
+    expect(coverage).toHaveTextContent('commands 1/21')
+    expect(coverage).toHaveTextContent('transitions 1/16')
+    expect(coverage).not.toHaveTextContent('faults')
+    expect(within(coverage).getByText('1/21').closest('span')).toHaveAttribute('title', 'Not exercised: WRITE_ENABLE')
   })
 })

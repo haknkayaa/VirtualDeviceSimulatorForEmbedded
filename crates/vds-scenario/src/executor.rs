@@ -12,8 +12,8 @@ use tracing::{info, warn};
 use vds_events::{EventBus, EventDraft, EventPayload};
 
 use crate::{
-    CommandResult, ObservedEvent, ResultStatus, ScenarioAction, ScenarioDocument, ScenarioResult,
-    ScenarioRuntime, StepFailureKind, StepResult,
+    CommandResult, CoverageTargets, ObservedEvent, ResultStatus, ScenarioAction, ScenarioDocument,
+    ScenarioResult, ScenarioRuntime, StepFailureKind, StepResult, coverage::CoverageRecorder,
 };
 
 pub struct ScenarioExecutor<R> {
@@ -24,6 +24,8 @@ pub struct ScenarioExecutor<R> {
     event_bus: Option<Arc<EventBus>>,
     scenario_run_id: Option<String>,
     cancel: Option<Arc<AtomicBool>>,
+    coverage_targets: Option<Arc<CoverageTargets>>,
+    coverage: CoverageRecorder,
 }
 
 impl<R: ScenarioRuntime> ScenarioExecutor<R> {
@@ -37,7 +39,16 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
             event_bus: None,
             scenario_run_id: None,
             cancel: None,
+            coverage_targets: None,
+            coverage: CoverageRecorder::default(),
         }
+    }
+
+    /// Reports which declared device behavior each run exercised (ADR 0013).
+    #[must_use]
+    pub fn with_coverage(mut self, targets: Arc<CoverageTargets>) -> Self {
+        self.coverage_targets = Some(targets);
+        self
     }
 
     /// Stops the run before the next step once the flag is set.
@@ -58,6 +69,14 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
         self.results.clear();
         self.events.clear();
         self.event_cursor = 0;
+        self.coverage = CoverageRecorder::default();
+        if let Some(targets) = &self.coverage_targets {
+            for device in targets.scope(document) {
+                if let Ok(Some(state)) = self.runtime.current_state(&device) {
+                    self.coverage.state(&device, &state);
+                }
+            }
+        }
         let started = self.runtime.now_ns();
         let deadline =
             started.saturating_add(document.scenario.timeout_ms.saturating_mul(1_000_000));
@@ -192,6 +211,10 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
             steps_failed: failed,
             steps_skipped: skipped,
             steps,
+            coverage: self
+                .coverage_targets
+                .as_ref()
+                .map(|targets| self.coverage.report(targets, &targets.scope(document))),
         }
     }
 
@@ -286,6 +309,7 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
 
     fn send_spi(&mut self, device: &str, tx: &str, save_as: &str) -> Result<(), String> {
         let bytes = parse_hex(tx)?;
+        self.coverage.spi_request(device, &bytes);
         self.publish(
             Some(device),
             EventPayload::TransactionStarted {
@@ -306,6 +330,7 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
                     },
                 );
                 if let Some(register) = &transfer.register {
+                    self.coverage.register(device, register);
                     self.publish(Some(device), EventPayload::from_register(register));
                 }
                 self.record_events(
@@ -401,6 +426,7 @@ impl<R: ScenarioRuntime> ScenarioExecutor<R> {
 
     fn record_events(&mut self, events: Vec<ObservedEvent>) {
         for observed in &events {
+            self.coverage.event(&observed.device_id, &observed.event);
             self.publish(
                 Some(&observed.device_id),
                 EventPayload::from_device_event(&observed.event),

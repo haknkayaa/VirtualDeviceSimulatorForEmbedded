@@ -194,6 +194,32 @@ export interface BusTelemetryResponse {
   buses: BusTelemetry[]
 }
 
+export interface TopologyPendingDelivery {
+  due_ns: number
+  value: boolean
+}
+
+export interface TopologyConnection {
+  /** `<device>.<signal>` */
+  from: string
+  /** `<device>.<line>` */
+  to: string
+  source_device: string
+  source_signal: string
+  target_device: string
+  target_line: string
+  delay_ns: number
+  /** Last sampled source level; null until first sampled. */
+  level: boolean | null
+  pending: TopologyPendingDelivery[]
+}
+
+export interface Topology {
+  attached: boolean
+  path: string | null
+  connections: TopologyConnection[]
+}
+
 export interface Fault {
   id: string
   device_id: string
@@ -250,6 +276,21 @@ export interface StepResult {
   error?: string
 }
 
+export interface CoverageMetric {
+  covered: number
+  total: number
+  /** Declared items the run did not exercise. */
+  missed: string[]
+}
+
+export type CoverageMetricName = 'commands' | 'registers' | 'states' | 'transitions' | 'faults'
+
+export type DeviceCoverage = { device_id: string } & Record<CoverageMetricName, CoverageMetric>
+
+export interface ScenarioCoverage {
+  devices: DeviceCoverage[]
+}
+
 export interface ScenarioResult {
   scenario_id: string
   status: StepStatus
@@ -261,6 +302,8 @@ export interface ScenarioResult {
   steps_failed: number
   steps_skipped: number
   steps: StepResult[]
+  /** Declared device behavior the run exercised (ADR 0013). */
+  coverage?: ScenarioCoverage
 }
 
 export interface RunRecord {

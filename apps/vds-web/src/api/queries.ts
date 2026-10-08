@@ -16,6 +16,7 @@ export const queryKeys = {
   registers: (id: string) => ['devices', id, 'registers'] as const,
   state: (id: string) => ['devices', id, 'state'] as const,
   faults: ['faults'] as const,
+  topology: ['topology'] as const,
   scenarios: ['scenarios'] as const,
   scenario: (id: string) => ['scenarios', id] as const,
   run: (id: string) => ['runs', id] as const,
@@ -154,6 +155,10 @@ export function useDeviceState(id: string | undefined) {
     queryFn: () => api.state(id as string),
     enabled: Boolean(id),
   })
+}
+
+export function useTopology() {
+  return useQuery({ queryKey: queryKeys.topology, queryFn: api.topology, refetchInterval: 2_000 })
 }
 
 export function useFaults() {
