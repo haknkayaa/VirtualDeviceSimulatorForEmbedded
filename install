@@ -33,6 +33,7 @@ required_outputs=(
   "$EXAMPLE_BUILD_DIR/mt25ql256_tool"
   "$EXAMPLE_BUILD_DIR/at24c256_tool"
   "$EXAMPLE_BUILD_DIR/uart_ping"
+  "$EXAMPLE_BUILD_DIR/gpio_tool"
 )
 
 for output in "${required_outputs[@]}"; do
@@ -79,6 +80,8 @@ install_file 0755 "$EXAMPLE_BUILD_DIR/at24c256_tool" \
   "$INSTALL_ROOT/bin/at24c256_tool"
 install_file 0755 "$EXAMPLE_BUILD_DIR/uart_ping" \
   "$INSTALL_ROOT/bin/uart_ping"
+install_file 0755 "$EXAMPLE_BUILD_DIR/gpio_tool" \
+  "$INSTALL_ROOT/bin/gpio_tool"
 
 install_tree "$ROOT_DIR/build/web" \
   "$INSTALL_ROOT/share/vds4e/web"

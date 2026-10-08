@@ -57,13 +57,15 @@ static void *make_device_accessible(void *argument) {
 }
 
 static int configure_lifecycle(vds4e_i2c_config_t *config) {
+  if (prctl(PR_SET_PDEATHSIG, SIGTERM) != 0) {
+    perror("failed to configure parent-death cleanup");
+    return -1;
+  }
+
   if (config->parent_pid > 0) {
-    if (prctl(PR_SET_PDEATHSIG, SIGTERM) != 0 ||
-        getppid() != config->parent_pid) {
-      return -1;
-    }
     pthread_t watcher;
     if (pthread_create(&watcher, NULL, watch_parent, &config->parent_pid) != 0) {
+      perror("failed to start parent watcher");
       return -1;
     }
     (void)pthread_detach(watcher);
@@ -71,6 +73,7 @@ static int configure_lifecycle(vds4e_i2c_config_t *config) {
 
   pthread_t permissions;
   if (pthread_create(&permissions, NULL, make_device_accessible, config) != 0) {
+    perror("failed to start permissions worker");
     return -1;
   }
   (void)pthread_detach(permissions);

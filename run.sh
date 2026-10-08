@@ -25,6 +25,8 @@ case "$ADAPTER_AUTH" in
     fi
     echo "Authorize VDS4E adapter helpers once for this development session..."
     sudo -v
+    sudo modprobe cuse 2>/dev/null || true
+    sudo modprobe gpio-sim 2>/dev/null || true
     export VDS4E_ADAPTER_AUTH=sudo
     ;;
   pkexec)

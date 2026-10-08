@@ -13,6 +13,8 @@ I2C_CUSE_BUILD_DIR="$ROOT_DIR/build/adapters/i2c-cuse"
 I2C_CUSE_EXECUTABLE="$I2C_CUSE_BUILD_DIR/vds4e-i2c-cuse"
 UART_PTY_BUILD_DIR="$ROOT_DIR/build/adapters/uart-pty"
 UART_PTY_EXECUTABLE="$UART_PTY_BUILD_DIR/vds4e-uart-pty"
+GPIO_SIM_BUILD_DIR="$ROOT_DIR/build/adapters/gpio-sim"
+GPIO_SIM_EXECUTABLE="$GPIO_SIM_BUILD_DIR/vds4e-gpio-sim"
 LOCK_FILE="${TMPDIR:-/tmp}/vds4e-dev-${UID}.lock"
 SERVER_PID=""
 WEB_PID=""
@@ -140,6 +142,14 @@ cmake \
   -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$UART_PTY_BUILD_DIR" --parallel
 
+echo "Configuring and building the GPIO simulator adapter..."
+prepare_cmake_build_dir "$ROOT_DIR/adapters/gpio-sim" "$GPIO_SIM_BUILD_DIR"
+cmake \
+  -S "$ROOT_DIR/adapters/gpio-sim" \
+  -B "$GPIO_SIM_BUILD_DIR" \
+  -DCMAKE_BUILD_TYPE=Debug
+cmake --build "$GPIO_SIM_BUILD_DIR" --parallel
+
 if [[ "${VDS4E_ADAPTER_AUTH:-pkexec}" == "sudo" ]]; then
   # sudo's default credential cache is terminal-scoped. Keep the server in
   # this terminal session so adapter helpers can use the one authorization
@@ -149,6 +159,7 @@ if [[ "${VDS4E_ADAPTER_AUTH:-pkexec}" == "sudo" ]]; then
     VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
     VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
     VDS4E_UART_PTY_EXECUTABLE="$UART_PTY_EXECUTABLE" \
+    VDS4E_GPIO_SIM_EXECUTABLE="$GPIO_SIM_EXECUTABLE" \
     "$ROOT_DIR/build/rust/debug/vds-server" --config config/vds-server.yaml &
   SERVER_PID=$!
 else
@@ -156,6 +167,7 @@ else
     VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
     VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
     VDS4E_UART_PTY_EXECUTABLE="$UART_PTY_EXECUTABLE" \
+    VDS4E_GPIO_SIM_EXECUTABLE="$GPIO_SIM_EXECUTABLE" \
     cargo run -p vds-server -- --config config/vds-server.yaml &
   SERVER_PID=$!
   SERVER_OWN_PROCESS_GROUP=true
