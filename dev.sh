@@ -5,6 +5,7 @@ set -Eeuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WEB_DIR="$ROOT_DIR/apps/vds-web"
 WEB_PORT="${VDS_WEB_PORT:-4174}"
+WEB_HOST="${VDS_WEB_HOST:-0.0.0.0}"
 CONTROL_PORT=8080
 SPI_CUSE_BUILD_DIR="$ROOT_DIR/build/adapters/spi-cuse"
 SPI_CUSE_EXECUTABLE="$SPI_CUSE_BUILD_DIR/vds4e-spi-cuse"
@@ -162,12 +163,16 @@ fi
 
 wait_for_control_api
 
-setsid npm --prefix "$WEB_DIR" run dev -- --host 127.0.0.1 --port "$WEB_PORT" --strictPort &
+setsid npm --prefix "$WEB_DIR" run dev -- --host "$WEB_HOST" --port "$WEB_PORT" --strictPort &
 WEB_PID=$!
 
 echo
 echo "VDS4E development workspace is starting:"
 echo "  Web UI:      http://127.0.0.1:$WEB_PORT"
+echo "  Web bind:    $WEB_HOST:$WEB_PORT"
+if [[ "$WEB_HOST" == "0.0.0.0" ]]; then
+  echo "  Remote UI:   http://<Linux-host-IP>:$WEB_PORT"
+fi
 echo "  Control API: http://127.0.0.1:$CONTROL_PORT/api/v1/health"
 echo "  Data plane:  /tmp/vds4e.sock"
 echo

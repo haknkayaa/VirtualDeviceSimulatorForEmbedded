@@ -17,7 +17,7 @@ spec:
     options:
       mode: 0
       transfer_bits: 8
-      max_frequency_hz: 10000000
+      max_frequency_hz: 120000000
   runtime:
     driver: generic-spi-command
     model: model/device.yaml
