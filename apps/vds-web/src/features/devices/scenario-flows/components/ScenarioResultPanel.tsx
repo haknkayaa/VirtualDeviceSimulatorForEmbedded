@@ -3,6 +3,7 @@ import { Download } from 'lucide-react'
 import { StatusBadge } from '../../../../components/StatusBadge'
 import type { ScenarioResult } from '../../../../types/api'
 import { formatVirtualTime } from '../../../../utils/format'
+import { ScenarioCoverageTable } from './ScenarioCoverageTable'
 
 export function ScenarioResultPanel({ result, onExportJunit, junitPending }: { result: ScenarioResult; onExportJunit: () => void; junitPending: boolean }) {
   const json = `${JSON.stringify(result, null, 2)}\n`
@@ -19,6 +20,7 @@ export function ScenarioResultPanel({ result, onExportJunit, junitPending }: { r
           <button className="button button-sm" disabled={junitPending} onClick={onExportJunit} type="button"><Download size={12} /> {junitPending ? 'Preparing JUnit…' : 'Export JUnit XML'}</button>
         </span>
       </div>
+      {result.coverage && <ScenarioCoverageTable coverage={result.coverage} />}
       <div className="scenario-run-steps">
         <table className="data-table">
           <thead><tr><th className="num">#</th><th>Step</th><th>Action</th><th>Status</th><th className="num">Start</th><th className="num">Duration</th><th>Detail</th></tr></thead>

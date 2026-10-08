@@ -19,6 +19,9 @@ Properties are emitted in this stable order:
 2. `vds4e.run_id`
 3. `vds4e.scenario_revision`
 4. `vds4e.virtual_duration_ns`
+5. `vds4e.coverage.<device>.<metric>` for each device in the run's coverage
+   report and each metric (`commands`, `registers`, `states`, `transitions`,
+   `faults`), valued `covered/total` (see [scenario coverage](scenario-coverage.md))
 
 XML is UTF-8. Attribute and text values are escaped, and characters forbidden by XML 1.0 are replaced safely.
 
@@ -38,6 +41,8 @@ vds-cli scenario run device-models/examples/micron-mt25ql256aba8esf-0sit/scenari
 ```
 
 `--run-id` and `--revision` set report metadata only. Their defaults are `cli` and `1`.
+The CLI also prints one `coverage <device>: …` summary line per device on
+standard error.
 
 ## Control API
 

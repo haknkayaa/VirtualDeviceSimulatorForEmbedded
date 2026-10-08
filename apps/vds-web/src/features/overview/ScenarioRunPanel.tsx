@@ -2,11 +2,12 @@ import { CircleCheck, CircleDashed, CircleDot, CircleX, FolderOpen, Play } from 
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 
-import { useScenario, useScenarios, useStartScenario } from '../../api/queries'
+import { useRunResult, useScenario, useScenarios, useStartScenario } from '../../api/queries'
 import { AsyncState } from '../../components/AsyncState'
 import { Panel } from '../../components/Panel'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useEventStore } from '../../stores/eventStore'
+import type { CoverageMetricName, RunStatus, ScenarioCoverage } from '../../types/api'
 import { formatVirtualTime, humanize } from '../../utils/format'
 import { latestScenarioRun, mergeScenarioSteps, type ScenarioStepState } from './overviewModel'
 
@@ -26,6 +27,30 @@ const stepLabels: Record<ScenarioStepState, string> = {
   skipped: 'Skipped',
 }
 
+const coverageMetrics: CoverageMetricName[] = ['commands', 'registers', 'states', 'transitions', 'faults']
+
+/** One line per device: `commands 3/21 · states 3/7 · …`, skipping undeclared metrics. */
+function CoverageSummary({ coverage }: { coverage: ScenarioCoverage }) {
+  return (
+    <dl aria-label="Coverage" className="scn-coverage">
+      {coverage.devices.map((device) => (
+        <div key={device.device_id}>
+          <dt title={device.device_id}>Coverage{coverage.devices.length > 1 ? ` · ${device.device_id}` : ''}</dt>
+          <dd>
+            {coverageMetrics
+              .filter((name) => device[name].total > 0)
+              .map((name) => (
+                <span key={name} title={device[name].missed.length ? `Not exercised: ${device[name].missed.join(', ')}` : 'All exercised'}>
+                  {name} <b className="mono">{device[name].covered}/{device[name].total}</b>
+                </span>
+              ))}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
 /** The latest scenario run with its step-by-step progress. */
 export function ScenarioRunPanel() {
   const events = useEventStore((state) => state.events)
@@ -33,6 +58,7 @@ export function ScenarioRunPanel() {
   const definition = useScenario(run?.scenarioId)
   const scenarios = useScenarios()
   const startScenario = useStartScenario()
+  const result = useRunResult(run?.runId ?? null, run && run.status !== 'running' ? run.status as RunStatus : undefined)
   const steps = useMemo(
     () => (run ? mergeScenarioSteps(run, definition.data?.steps) : []),
     [definition.data?.steps, run],
@@ -68,6 +94,7 @@ export function ScenarioRunPanel() {
         <div aria-label={`${percent}% complete`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={percent} className={`scn-progress${failedRun ? ' failed' : ''}`} role="progressbar">
           <i style={{ width: `${percent}%` }} />
         </div>
+        {result.data?.coverage && result.data.coverage.devices.length > 0 && <CoverageSummary coverage={result.data.coverage} />}
         <ol className="scn-steps">
           {steps.map((step, index) => {
             const Icon = stepIcons[step.state]

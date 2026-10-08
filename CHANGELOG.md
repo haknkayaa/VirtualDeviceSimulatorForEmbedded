@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `GET /api/v1/topology` lists the attached board topology's signal connections
+  with their delay, last sampled source level and in-flight delayed deliveries.
+- The Web UI shows *Signal connections* on the Overview and, scoped to the
+  device, on the Devices Configuration tab.
+- Scenario coverage (ADR 0013): run results report, per device the scenario
+  touches, which declared commands, registers, states, state transitions and
+  faults were exercised. Shown in the JSON result, as `vds4e.coverage.*` JUnit
+  properties, as a CLI summary on standard error, in the Visual Scenario
+  Editor's result panel and on the Overview's *Scenario run* panel.
+- `vds-cli import dts SOURCE --output DIR` drafts a loadable device package per
+  enabled SPI, I2C and GPIO Device Tree peripheral and writes a `board.md` summary
+  with endpoints, interrupts, skipped nodes and the `device_packages` entries.
+  Interrupts routed to a board GPIO controller become a GPIO bank draft and a
+  `topology.yaml` that wires the peripheral's `irq` output to that line.
+
 ### Changed
 - The Web UI Overview shows the live device path from the application under
   test through each adapter (Linux device node) to its virtual device, with
@@ -19,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "Failures only" filter.
 - Web UI visual system: navy surfaces, a larger type scale and sentence-case
   headings instead of uppercase labels.
+
+### Fixed
+- The Device Tree importer no longer drops the second of two identical parts
+  on different buses; the second gets a bus-prefixed ID.
 
 ## [0.1.2] - 2026-10-07
 

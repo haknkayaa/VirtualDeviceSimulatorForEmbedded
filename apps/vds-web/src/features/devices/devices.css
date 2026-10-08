@@ -310,3 +310,4 @@
   .dv-inspector { grid-column: 2; border-top: 1px solid var(--border); border-left: 0; }
   .dv-head-meta { padding-left: 0; }
 }
+.dv-tab-body > .signal-connections { flex: 0 0 auto; max-height: 40%; border-top: 1px solid var(--divider); }
