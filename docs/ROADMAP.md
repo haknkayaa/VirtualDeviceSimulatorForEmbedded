@@ -17,10 +17,11 @@ Out of scope for version 1 and candidates for follow-up ADRs:
 - input ports and bidirectional or open-drain lines;
 - multiple drivers on one line;
 - `generic-gpio-bank` and other models exposing signal ports;
-- domain events for signal changes and publishing events from the live pump;
-- control-plane and Web UI views of connections;
+- editing connections from the control plane or Web UI (a read-only view and
+  `GET /api/v1/topology` exist);
 - attaching a topology to devices created at runtime;
-- Device Tree driven topology generation.
+- Device Tree driven topology generation beyond GPIO-routed interrupts
+  (`vds-cli import dts` covers `interrupt-parent` GPIO controllers).
 
 ## Additional host adapters and buses
 
@@ -67,6 +68,9 @@ responsibilities of the VDS4E device runtime.
 ### Platform import and generation
 
 - Import Device Tree sources and overlays into a reviewable topology draft.
+  (`vds-cli import dts` drafts loadable device packages and turns interrupts
+  routed to GPIO controllers into `topology.yaml`; `*-gpios` properties and
+  non-GPIO interrupt controllers are not mapped yet.)
 - Generate a virtual-board draft from DTS connectivity, addresses, interrupts,
   and compatible strings without claiming unsupported device behavior.
 - Import relevant Yocto machine and distribution metadata. `SDKMACHINE=x86_64`
@@ -128,8 +132,9 @@ responsibilities of the VDS4E device runtime.
 
 ### Collaboration, automation, and scale
 
-- Add coverage metrics for models, state transitions, registers, faults, and
-  scenarios.
+- Extend scenario coverage ([ADR 0013](adr/0013-measure-scenario-coverage-against-device-models.md):
+  commands, registers, states, transitions and faults per run) to suites,
+  bitfields and I2C/GPIO/UART actions, and add CI thresholds.
 - Expand test-case management and regression dashboards around the existing
   headless scenario and JUnit interfaces.
 - Support distributed, cloud-scale simulation workers with deterministic input

@@ -79,6 +79,22 @@ pub fn load_registry_with_clock(
     Ok(registry)
 }
 
+/// Coverage targets for the devices [`load_registry_with_clock`] creates from
+/// the same configuration (ADR 0013).
+///
+/// # Errors
+/// Returns an error when a configured package or its model cannot be loaded.
+pub fn load_coverage_targets(
+    config: &ServerConfig,
+) -> Result<vds_scenario::CoverageTargets, ServerError> {
+    let models = config
+        .resolved_device_packages()?
+        .iter()
+        .map(load_package_runtime_model)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(vds_scenario::CoverageTargets::from_models(&models))
+}
+
 pub(crate) fn load_package_runtime_model(
     package: &DevicePackage,
 ) -> Result<DeviceModel, ServerError> {

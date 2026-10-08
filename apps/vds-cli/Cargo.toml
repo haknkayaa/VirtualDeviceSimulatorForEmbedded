@@ -10,6 +10,7 @@ repository.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 vds-core = { path = "../../crates/vds-core" }
+vds-importer = { path = "../../crates/vds-importer" }
 vds-protocol = { path = "../../crates/vds-protocol" }
 vds-scenario = { path = "../../crates/vds-scenario" }
 vds-server = { path = "../vds-server" }

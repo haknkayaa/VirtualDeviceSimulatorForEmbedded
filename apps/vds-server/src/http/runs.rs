@@ -184,10 +184,13 @@ impl RunManager {
                     Arc::clone(&events),
                     Some(task_run_id.clone()),
                 );
+                let coverage =
+                    crate::load_coverage_targets(&config).map_err(|error| error.to_string())?;
                 let runtime = RegistryRuntime::new(Arc::new(registry), clock);
                 let mut executor = ScenarioExecutor::new(runtime)
                     .with_event_bus(events, task_run_id)
-                    .with_cancellation(task_cancel);
+                    .with_cancellation(task_cancel)
+                    .with_coverage(Arc::new(coverage));
                 Ok::<_, String>(executor.run(&scenario))
             });
             // A blocking thread cannot be killed; the watchdog releases the runner

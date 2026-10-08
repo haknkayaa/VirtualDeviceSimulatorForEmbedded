@@ -20,6 +20,7 @@ import type {
   ScenarioDocument,
   ScenarioResult,
   ScenarioSummary,
+  Topology,
   WriteDeviceRegisterInput,
 } from '../types/api'
 import type { FlowDocument } from '../features/flows/types/flow'
@@ -122,6 +123,7 @@ export const api = {
   state: (id: string) => request<DeviceState>(`/devices/${encodeURIComponent(id)}/state`),
   reset: (id: string) =>
     request<DeviceState>(`/devices/${encodeURIComponent(id)}/reset`, { method: 'POST' }),
+  topology: () => request<Topology>('/topology'),
   faults: () => request<Fault[]>('/faults'),
   setFault: (id: string, enabled: boolean) =>
     request<void>(`/faults/${encodeURIComponent(id)}/${enabled ? 'enable' : 'disable'}`, {

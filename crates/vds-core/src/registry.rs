@@ -102,6 +102,12 @@ impl DeviceRegistry {
         self.router().is_some()
     }
 
+    /// Snapshot of the attached topology's connections; `None` without a topology.
+    #[must_use]
+    pub fn topology_connections(&self) -> Option<Vec<crate::topology::ConnectionSnapshot>> {
+        self.router().map(|router| router.snapshot())
+    }
+
     fn router(&self) -> Option<Arc<crate::topology::SignalRouter>> {
         self.router
             .read()
