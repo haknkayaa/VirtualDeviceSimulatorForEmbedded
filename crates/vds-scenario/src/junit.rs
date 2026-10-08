@@ -62,6 +62,21 @@ pub fn to_junit_xml(result: &ScenarioResult, metadata: JUnitReportMetadata<'_>) 
         result.duration_virtual_ns
     )
     .expect("writing to String cannot fail");
+    for device in result
+        .coverage
+        .iter()
+        .flat_map(|coverage| coverage.devices.iter())
+    {
+        let device_id = xml_escape(&device.device_id);
+        for (name, metric) in device.metrics() {
+            writeln!(
+                xml,
+                "    <property name=\"vds4e.coverage.{device_id}.{name}\" value=\"{}/{}\"/>",
+                metric.covered, metric.total
+            )
+            .expect("writing to String cannot fail");
+        }
+    }
     writeln!(xml, "  </properties>").expect("writing to String cannot fail");
     for step in &result.steps {
         write_testcase(&mut xml, &scenario_id, step);
@@ -190,6 +205,7 @@ mod tests {
             steps_failed: failed,
             steps_skipped: skipped,
             steps,
+            coverage: None,
         }
     }
 

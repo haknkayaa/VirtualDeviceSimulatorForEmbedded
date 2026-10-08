@@ -513,8 +513,16 @@ fn extract_topology(
 
         if !is_bus_controller && let Some(parent_bus) = buses.iter().find(|b| b.name == next_bus) {
             let peripheral_bus_type = parent_bus.bus_type;
-            let stub = build_device_stub(node, peripheral_bus_type, &next_bus);
-            if !devices.iter().any(|d| d.id == stub.id) {
+            let mut stub = build_device_stub(node, peripheral_bus_type, &next_bus);
+            // The same node seen twice on one bus (e.g. base tree plus overlay) is one
+            // device; the same part on another bus is a second device.
+            if !devices
+                .iter()
+                .any(|d| d.id == stub.id && d.bus_name == stub.bus_name)
+            {
+                if devices.iter().any(|d| d.id == stub.id) {
+                    stub.id = format!("{}-{}", generate_device_id(&next_bus, None, None), stub.id);
+                }
                 devices.push(stub);
             }
         }

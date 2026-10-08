@@ -1,11 +1,16 @@
 //! Declarative deterministic scenario orchestration for VDS4E.
 
+mod coverage;
 mod definition;
 mod executor;
 mod junit;
 mod result;
 mod runtime;
 
+pub use coverage::{
+    CoverageMetric, CoverageTargets, DeviceCoverage, DeviceCoverageTargets, ScenarioCoverage,
+    transition_label,
+};
 pub use definition::{ScenarioAction, ScenarioDefinition, ScenarioDocument, ScenarioStep};
 pub use executor::ScenarioExecutor;
 pub use junit::{JUnitReportMetadata, to_junit_xml};

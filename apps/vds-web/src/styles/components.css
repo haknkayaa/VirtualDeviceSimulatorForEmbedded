@@ -262,3 +262,9 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .event-tail-type { color: var(--text-muted); }
 .event-tail-detail { color: var(--text); font-family: var(--font-mono); font-size: var(--fs-xs); }
 .event-tail-id { color: var(--text-faint); font-family: var(--font-mono); font-size: var(--fs-2xs); text-align: right; }
+
+/* Signal connections (board topology) */
+.signal-table td a { color: var(--text-strong); text-decoration: none; }
+.signal-table td a:hover { color: var(--accent); text-decoration: underline; }
+.signal-table td:nth-child(2) { width: 24px; padding: 0; text-align: center; }
+.signal-level { display: inline-flex; align-items: center; gap: var(--space-2); }

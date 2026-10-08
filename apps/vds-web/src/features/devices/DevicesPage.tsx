@@ -22,6 +22,7 @@ import {
 import { AsyncState } from '../../components/AsyncState'
 import { PageHeader } from '../../components/PageHeader'
 import { Panel } from '../../components/Panel'
+import { SignalConnectionsPanel } from '../../components/SignalConnectionsPanel'
 import { useEventStore } from '../../stores/eventStore'
 import { AddDeviceDialog } from './AddDeviceDialog'
 import { BitfieldInspector } from './BitfieldInspector'
@@ -227,7 +228,12 @@ export function DevicesPage() {
 
     if (activeTab === 'configuration') {
       return device.data
-        ? <DeviceConfiguration adapter={adapterAssignment?.adapter} adapters={adapters.data ?? []} binding={adapterAssignment?.binding} device={device.data} onSaveStateChange={updateConfigurationAction} />
+        ? (
+          <>
+            <DeviceConfiguration adapter={adapterAssignment?.adapter} adapters={adapters.data ?? []} binding={adapterAssignment?.binding} device={device.data} onSaveStateChange={updateConfigurationAction} />
+            <SignalConnectionsPanel deviceId={device.data.id} />
+          </>
+        )
         : <AsyncState kind="loading" title="Loading device configuration" />
     }
 

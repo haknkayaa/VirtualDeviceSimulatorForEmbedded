@@ -21,3 +21,4 @@ update `VDS4E_ARCHITECTURE.md` before implementing the change.
 - [0010: Use PTY endpoints for UART integration](0010-use-pty-endpoints-for-uart.md)
 - [0011: Connect devices through public signal ports](0011-connect-devices-through-public-signal-ports.md)
 - [0012: Observe signal propagation and drive timers by deadline](0012-observe-signals-and-drive-timers-by-deadline.md)
+- [0013: Measure scenario coverage against device models](0013-measure-scenario-coverage-against-device-models.md) — proposed
