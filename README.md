@@ -11,58 +11,12 @@ VDS4E is not a CPU or board emulator. It focuses on the boundary between an Embe
 
 ## See VDS4E
 
-[Website](https://vds4e.dev) · [Product film (2:30)](https://vds4e.dev/#product-film) · [Download a release](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/releases)
+[Website](https://vds4e.dev) · [Watch the product film](https://vds4e.dev/#product-film) · [GitHub Releases](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/releases)
 
-[![VDS4E runtime dashboard](docs/images/dashboard.png)](https://vds4e.dev/#product-film)
-
-Actual application captures with bundled example models. The captured session shows missing host-kernel prerequisites and deliberately rejected commands; these diagnostics are part of the workflow.
-
-<details>
-<summary>Explore the application screenshots</summary>
-
-### Host adapters
-
-Linux-facing bindings and host prerequisites.
-
-![Host adapters](docs/images/adapters.png)
-
-### Registers and bit fields
-
-Micron SPI flash state, access rules, reset values, and bit fields.
-
-![Registers and bit fields](docs/images/registers.png)
-
-### Transaction analyzer
-
-Requests, responses, errors, and decoded SPI signals.
-
-![Transaction analyzer](docs/images/transactions.png)
-
-### Logic analyzer
-
-Virtual signal channels and decoded packets.
-
-![Logic analyzer](docs/images/logic-analyzer.png)
-
-### Scenario event log
-
-Scenario steps and device state transitions.
-
-![Scenario event log](docs/images/event-log.png)
-
-### Device library
-
-Installed example model packages.
-
-![Device library](docs/images/library.png)
-
-### Visual scenario editor
-
-JEDEC-ID scenario with virtual time, SPI operations, and assertions.
-
-![Visual scenario editor](docs/images/scenarios.png)
-
-</details>
+VDS4E includes a browser-based engineering workbench for live device bring-up,
+adapter configuration, register inspection, transaction tracing, logic analysis,
+scenario execution and fault diagnosis. The UI runs with the packaged server;
+no separate Web server is required for release installations.
 
 ## Why VDS4E?
 
@@ -120,11 +74,33 @@ The detailed design and architectural boundaries are documented in [VDS4E_ARCHIT
 
 SPI and I²C CUSE adapters and the GPIO `gpio-sim` integration require appropriate host-kernel support and privileges. UART PTY operation is unprivileged.
 
+## What's available on `main`
+
+| Capability | What you can do |
+| --- | --- |
+| **Bring-up-first Overview** | Follow the Linux device node → adapter → virtual peripheral path, inspect live traffic, runtime state, problem diagnostics, scenario progress and bus activity. |
+| **Register and device workbench** | Inspect registers, bitfields, state, commands, fault controls, configuration and transaction history for each device. |
+| **Transaction and logic analysis** | Examine bus requests/responses, protocol data, failures, virtual signals and capture timelines; filter failed transactions and deep-link to a capture. |
+| **Declarative device modeling** | Build versioned SPI, I²C, GPIO and UART device packages with registers, command behavior, state transitions, time-dependent operations and fault injection. |
+| **Board-level signal topology** | Route a modeled sensor's DRDY/IRQ output to a kernel-visible GPIO line; inspect connections, current signal levels and pending delayed deliveries in the UI or `GET /api/v1/topology`. |
+| **Device Tree import** | Draft SPI/I²C/GPIO packages from a DTS file, plus a reviewed board summary and a GPIO-interrupt `topology.yaml` draft where supported. |
+| **Scenario coverage** | See which declared commands, registers, states, transitions and faults a run actually exercised. Export machine-readable JSON and JUnit properties. |
+| **Real Linux application examples** | Run sample C applications against SPI flash, I²C EEPROM, GPIO (libgpiod) and UART (PTY), using ordinary Linux interfaces rather than VDS4E-specific mocks. |
+
+These are source-tree capabilities, not a promise that every feature above is
+included in the latest published `.deb`. See [the changelog](CHANGELOG.md)
+for changes made after the latest tagged release. DTS import produces editable
+drafts, **not** validated device-specific behavior extracted automatically
+from a hardware description.
+
 ## Quick start
 
 ### Install a release package
 
 Tagged releases publish an `amd64` Debian package and SHA-256 checksum.
+The latest published package is **v0.1.2**; newer capabilities described above
+may require a build from the current `main` branch.
+
 
 Download the package from [GitHub Releases](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/releases), then install it:
 
@@ -218,6 +194,29 @@ vds-cli device-package validate ./my-sensor
 
 The bundled examples include generic SPI/I²C/GPIO/UART devices, AT24C EEPROM models and a Micron MT25QL256 flash model.
 
+### Example applications
+
+The repository includes standalone Embedded Linux examples that exercise the
+same interfaces as ordinary production applications:
+
+| Example | Linux interface | What it exercises |
+| --- | --- | --- |
+| [Micron MT25QL256](examples/micron-mt25ql256-embedded/) | SPI `/dev/spidevX.Y` | flash identification and command transactions |
+| [Atmel AT24C256](examples/atmel-at24c256-embedded/) | I²C `/dev/i2c-N` | EEPROM address and data transactions |
+| [Generic GPIO tool](examples/generic-gpio-embedded/) | libgpiod `/dev/gpiochipN` | line inspection, input/output and edge monitoring |
+| [UART ping](examples/generic-uart-embedded/) | PTY `/dev/pts/N` | serial request/response |
+
+From a source checkout with prerequisites installed:
+
+```shell
+./examples/run_all.sh --build-only
+```
+
+Start VDS4E and load the relevant adapters and device bindings before running
+the examples. `./examples/run_all.sh` also attempts to exercise discovered
+device nodes; it may need host privileges for the kernel-backed interfaces.
+The actual `gpiochipN` and PTY numbers depend on the host.
+
 See the [Device Package SDK](docs/development/device-package-sdk.md), [behavior-flow reference](docs/device-models/device-behavior-flow-reference.md), and package/model schemas under [schemas/](schemas/).
 
 ## Cross-device signals
@@ -244,6 +243,9 @@ read-clear status deasserts DRDY
 
 This allows application behavior based on interrupts/data-ready lines to be exercised without adding simulator-specific code to the application.
 
+The workbench and `GET /api/v1/topology` also expose a **read-only view** of
+the attached connections, last sampled source levels and delayed deliveries.
+
 See [Topology](docs/guides/topology.md).
 
 ## Scenarios and deterministic device behavior
@@ -261,6 +263,25 @@ vds-cli scenario run \
 ```
 
 The live server uses a real-time-backed simulator clock. Live runs therefore retain deterministic device-model semantics but are still subject to normal operating-system scheduling jitter. VDS4E does not claim whole-system or bit-for-bit determinism for live native processes.
+
+## Scenario coverage
+
+Scenario results can report model-level coverage, so a passing test does not
+silently imply that every declared behavior was exercised. Coverage tracks:
+
+- commands sent to a modeled device;
+- registers reached through normal device operations;
+- entered/exited states and observed state transitions;
+- triggered fault definitions.
+
+You can inspect coverage in the CLI output, scenario JSON results, JUnit
+properties, the Visual Scenario Editor and the Overview's latest-run panel.
+Coverage is **informational**; it does not automatically fail CI when a
+threshold is missed.
+
+Read the [coverage reference](docs/development/scenario-coverage.md)
+and [ADR 0013](docs/adr/0013-measure-scenario-coverage-against-device-models.md)
+for the exact counting rules and current SPI-scenario scope.
 
 ## Control and observability
 
@@ -294,7 +315,7 @@ The `vds-importer` crate can draft declarative models from:
 
 Importer output is intentionally a starting point rather than a finished behavioral model. Device-specific semantics still need to be reviewed and completed by the model author.
 
-Draft one device package per enabled SPI, I2C and GPIO peripheral of a board's Device Tree:
+Draft device packages for enabled SPI, I²C and GPIO peripherals in a board's Device Tree (available on `main`):
 
 ```shell
 vds-cli import dts board.dts --output drafts/
@@ -362,6 +383,8 @@ A real Linux ABI E2E harness is available under `tests/e2e/` for privileged inte
 | [SPI / I²C / GPIO / UART](docs/guides/) | Linux host-interface guides and examples |
 | [Topology guide](docs/guides/topology.md) | cross-device signal routing |
 | [Device Package SDK](docs/development/device-package-sdk.md) | package contract and author workflow |
+| [Scenario coverage](docs/development/scenario-coverage.md) | coverage accounting for commands, registers, states, transitions and faults |
+| [C example applications](examples/) | hardware-facing sample tools and run-all script |
 | [ADRs](docs/adr/README.md) | architecture decisions |
 | [Roadmap](docs/ROADMAP.md) | planned capabilities |
 | [Contributing](CONTRIBUTING.md) | development and contribution guidance |
