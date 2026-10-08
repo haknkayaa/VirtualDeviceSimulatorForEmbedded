@@ -5,22 +5,66 @@ build. Return to the [README](../../README.md) for the project overview.
 
 ## Prerequisites
 
-- Rust 1.91.1, selected by `rust-toolchain.toml`
-- Node.js and npm
-- Protocol Buffers compiler (`protoc`)
-- C11 compiler, Make, CMake, and pkg-config
-- FUSE3 development files for CUSE adapters
-- optional host compatibility tools: `i2c-tools`, `gpiod`, and `spi-tools`
+Building or developing VDS4E from source requires:
 
-Ubuntu/Debian:
+- **C/C++ toolchain & libraries**: C11 compiler, Make, CMake, pkg-config, Protocol Buffers compiler (`protoc`), and FUSE3 (`libfuse3-dev`)
+- **Rust toolchain & Cargo**: Rust 1.91.1 (selected by `rust-toolchain.toml`), installed via `rustup`
+- **Node.js & npm**: Node.js 20+ (recommended: Node.js 22 LTS) for the Web UI
+- **Host compatibility tools** (optional, for Linux ABI tests): `i2c-tools`, `gpiod`, and `spi-tools`
+
+### 1. System packages (Ubuntu/Debian)
+
+Install the C/C++ build tools, protobuf compiler, FUSE3 headers, and curl:
 
 ```shell
 sudo apt-get update
 sudo apt-get install -y \
-  build-essential cmake pkg-config libfuse3-dev protobuf-compiler \
+  build-essential cmake pkg-config libfuse3-dev protobuf-compiler curl \
   i2c-tools libi2c-dev \
   gpiod libgpiod-dev \
   spi-tools
+```
+
+### 2. Rust and Cargo (`rustup`)
+
+VDS4E pins Rust 1.91.1 with `clippy` and `rustfmt` in `rust-toolchain.toml`. Install the official Rust toolchain installer (`rustup`), which automatically selects the pinned toolchain when building in this repository:
+
+```shell
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source "$HOME/.cargo/env"
+```
+
+Verify that Cargo and rustc are in your PATH:
+
+```shell
+cargo --version
+rustc --version
+```
+
+### 3. Node.js and npm
+
+The Web UI (`apps/vds-web`) requires modern Node.js (Node 20+ / Node 22 LTS). Install it via NodeSource or `nvm`:
+
+**Via NodeSource:**
+
+```shell
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+**Via nvm (Node Version Manager):**
+
+```shell
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.bashrc
+nvm install 22
+```
+
+Verify that Node and npm are available:
+
+```shell
+node --version
+npm --version
 ```
 
 Kernel-backed adapters additionally require the host's `cuse` or `gpio-sim`
@@ -52,6 +96,22 @@ The script starts:
 - Web UI: `http://127.0.0.1:4174`
 - Control API: `http://127.0.0.1:8080/api/v1/health`
 - Transaction data plane: `/tmp/vds4e.sock`
+
+The development UI listens on `0.0.0.0` by default, allowing access from another
+machine, such as a Windows PC on the same network. Start it on the Linux host with:
+
+```shell
+./run.sh
+```
+
+Open `http://<Linux-host-IP>:4174` on the other machine. Use `hostname -I` on
+Linux to find its address; `0.0.0.0` is a listening address, not a browser
+destination. API and WebSocket requests use the Web server's existing proxy,
+so the control API can keep listening on loopback. The development UI gives
+access to the control API without authentication; use this on a trusted network.
+To restrict access to the Linux host, use `VDS_WEB_HOST=127.0.0.1 ./run.sh`.
+If Linux runs in a VM, its network configuration must allow the Windows host
+to reach port 4174 (for example, bridged networking or NAT port forwarding).
 
 Keep the terminal open and press `Ctrl+C` to stop both processes. If port 4174
 is occupied, either stop the existing workspace or select another UI port:

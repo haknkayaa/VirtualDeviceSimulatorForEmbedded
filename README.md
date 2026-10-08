@@ -168,6 +168,8 @@ Package installation intentionally does not load privileged kernel modules autom
 
 ### Run from source
 
+Building or running from source requires Rust (`rustup` / `cargo`), Node.js/npm, and system build tools. See [Getting started: Prerequisites](docs/guides/getting-started.md#prerequisites) for one-step installation instructions.
+
 For development:
 
 ```shell
@@ -176,7 +178,7 @@ cd VirtualDeviceSimulatorForEmbedded
 ./run.sh
 ```
 
-The development launcher starts the Web UI, control API and transaction data plane. See [Getting started](docs/guides/getting-started.md) for prerequisites and privilege details.
+The development launcher starts the Web UI, control API and transaction data plane. See [Getting started](docs/guides/getting-started.md) for privilege details.
 
 For the staged production-style build:
 

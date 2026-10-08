@@ -5,6 +5,7 @@
 # Usage:
 #   ./run.sh
 #   VDS_WEB_PORT=4200 ./run.sh
+#   VDS_WEB_HOST=127.0.0.1 ./run.sh  # Restrict access to this machine.
 
 set -Eeuo pipefail
 
