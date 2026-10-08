@@ -9,6 +9,61 @@ VDS4E is a hardwareless integration-testing environment for Embedded Linux softw
 
 VDS4E is not a CPU or board emulator. It focuses on the boundary between an Embedded Linux application and the device interfaces it already uses.
 
+## See VDS4E
+
+[Website](https://vds4e.dev) · [Product film (2:30)](https://vds4e.dev/#product-film) · [Download a release](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/releases)
+
+[![VDS4E runtime dashboard](docs/images/dashboard.png)](https://vds4e.dev/#product-film)
+
+Actual application captures with bundled example models. The captured session shows missing host-kernel prerequisites and deliberately rejected commands; these diagnostics are part of the workflow.
+
+<details>
+<summary>Explore the application screenshots</summary>
+
+### Host adapters
+
+Linux-facing bindings and host prerequisites.
+
+![Host adapters](docs/images/adapters.png)
+
+### Registers and bit fields
+
+Micron SPI flash state, access rules, reset values, and bit fields.
+
+![Registers and bit fields](docs/images/registers.png)
+
+### Transaction analyzer
+
+Requests, responses, errors, and decoded SPI signals.
+
+![Transaction analyzer](docs/images/transactions.png)
+
+### Logic analyzer
+
+Virtual signal channels and decoded packets.
+
+![Logic analyzer](docs/images/logic-analyzer.png)
+
+### Scenario event log
+
+Scenario steps and device state transitions.
+
+![Scenario event log](docs/images/event-log.png)
+
+### Device library
+
+Installed example model packages.
+
+![Device library](docs/images/library.png)
+
+### Visual scenario editor
+
+JEDEC-ID scenario with virtual time, SPI operations, and assertions.
+
+![Visual scenario editor](docs/images/scenarios.png)
+
+</details>
+
 ## Why VDS4E?
 
 Traditional mocks often replace application code paths. Full-system emulators model much more of the machine than many application-level tests need. VDS4E sits between those approaches:
@@ -309,3 +364,7 @@ Licensed under the [Apache License 2.0](LICENSE).
 ## Maintainer
 
 Hakan Kaya ([@haknkayaa](https://github.com/haknkayaa))
+
+VDS4E is currently developed independently by Hakan Kaya. The open-source core is available under Apache 2.0.
+
+Contact: [hakan@vds4e.dev](mailto:hakan@vds4e.dev) · [Project website](https://vds4e.dev)
