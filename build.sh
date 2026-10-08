@@ -90,6 +90,13 @@ echo "Building generic UART Embedded Linux tool..."
   "$ROOT_DIR/examples/generic-uart-embedded/uart_ping.c" \
   -o "$EXAMPLE_BUILD_DIR/uart_ping"
 
+echo "Building generic GPIO Embedded Linux tool..."
+"${CC:-cc}" \
+  -O2 -g -Wall -Wextra -Wpedantic -Werror -std=c11 -D_POSIX_C_SOURCE=200809L \
+  "$ROOT_DIR/examples/generic-gpio-embedded/gpio_tool.c" \
+  -o "$EXAMPLE_BUILD_DIR/gpio_tool" \
+  -lgpiod
+
 touch "$STATE_DIR/.built"
 
 echo
