@@ -1,0 +1,11 @@
+# KiCad auto-generated files
+*-backups/
+fp-info-cache
+*.kicad_prl
+
+# Gerber/fabrication output
+gerber/
+fabrication/
+
+# 3D model cache
+*.3dshapes/

@@ -1,0 +1,3233 @@
+{
+ "board_mm": [
+  76.0,
+  50.0
+ ],
+ "parts": [
+  {
+   "ref": "U1",
+   "value": "ESP32-S3-WROOM-1-N8R8",
+   "footprint": "ESP32-S3-WROOM-1",
+   "x": 63.25,
+   "y": 30.0,
+   "rot": 270,
+   "side": "top",
+   "courtyard": [
+    49.755,
+    5.955,
+    91.045,
+    54.045
+   ]
+  },
+  {
+   "ref": "J1",
+   "value": "USB-C 16P",
+   "footprint": "USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal",
+   "x": 3.1,
+   "y": 24.0,
+   "rot": 270,
+   "side": "top",
+   "courtyard": [
+    -1.125,
+    18.635,
+    7.905,
+    29.365
+   ]
+  },
+  {
+   "ref": "U14",
+   "value": "AP63203WU-7",
+   "footprint": "TSOT-23-6",
+   "x": 4.3,
+   "y": 32.6,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    2.205,
+    30.855,
+    6.395,
+    34.345
+   ]
+  },
+  {
+   "ref": "L1",
+   "value": "4.7uH Isat>=1A",
+   "footprint": "L_Taiyo-Yuden_NR-30xx",
+   "x": 4.3,
+   "y": 37.0,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    2.455,
+    35.155,
+    6.145,
+    38.845
+   ]
+  },
+  {
+   "ref": "F1",
+   "value": "0.5A/30V",
+   "footprint": "Fuse_1812_4532Metric",
+   "x": 10.5,
+   "y": 25.0,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    8.505,
+    22.005,
+    12.495,
+    27.995
+   ]
+  },
+  {
+   "ref": "D11",
+   "value": "SMAJ24A",
+   "footprint": "D_SMA",
+   "x": 15.5,
+   "y": 25.0,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    13.705,
+    21.455,
+    17.295,
+    28.545
+   ]
+  },
+  {
+   "ref": "D1",
+   "value": "TPD2E2U06",
+   "footprint": "SOT-553",
+   "x": 10.0,
+   "y": 20.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    8.755,
+    19.505,
+    11.245,
+    21.495
+   ]
+  },
+  {
+   "ref": "U15",
+   "value": "TPS26600PWPR",
+   "footprint": "HTSSOP-16-1EP_4.4x5mm_P0.65mm_EP3.4x5mm",
+   "x": 24.0,
+   "y": 21.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    20.455,
+    18.555,
+    27.545,
+    24.345
+   ]
+  },
+  {
+   "ref": "U16",
+   "value": "TPS2553DBVR",
+   "footprint": "SOT-23-6",
+   "x": 31.0,
+   "y": 21.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    28.905,
+    19.755,
+    33.095,
+    23.245
+   ]
+  },
+  {
+   "ref": "U3",
+   "value": "iCE40UP5K-SG48I",
+   "footprint": "QFN-48-1EP_7x7mm_P0.5mm_EP5.6x5.6mm",
+   "x": 44.5,
+   "y": 21.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    40.325,
+    17.325,
+    48.675,
+    25.675
+   ]
+  },
+  {
+   "ref": "U4",
+   "value": "APS6404L 8MB",
+   "footprint": "SOIC-8_3.9x4.9mm_P1.27mm",
+   "x": 44.5,
+   "y": 31.0,
+   "rot": 90,
+   "side": "top",
+   "courtyard": [
+    41.755,
+    27.255,
+    47.245,
+    34.745
+   ]
+  },
+  {
+   "ref": "U5",
+   "value": "TLV75712P",
+   "footprint": "SOT-23-5",
+   "x": 41.8,
+   "y": 15.0,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    39.705,
+    13.255,
+    43.895,
+    16.745
+   ]
+  },
+  {
+   "ref": "Y1",
+   "value": "12MHz 3V3",
+   "footprint": "Oscillator_SMD_YXC_2016-4Pin_2.0x1.6mm",
+   "x": 47.5,
+   "y": 15.0,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    45.955,
+    13.655,
+    49.045,
+    16.345
+   ]
+  },
+  {
+   "ref": "DS1",
+   "value": "OLED 128x64 0.96in (candidate)",
+   "footprint": "OLED_0.96in_128x64_Panel",
+   "x": 22.35,
+   "y": 39.77,
+   "rot": 180,
+   "side": "top",
+   "courtyard": [
+    8.705,
+    29.845,
+    35.995,
+    49.695
+   ]
+  },
+  {
+   "ref": "J6",
+   "value": "FH12-30S-0.5SH",
+   "footprint": "Hirose_FH12-30S-0.5SH_1x30-1MP_P0.50mm_Horizontal",
+   "x": 22.35,
+   "y": 24.8,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    11.755,
+    21.755,
+    32.945,
+    29.745
+   ]
+  },
+  {
+   "ref": "D2",
+   "value": "PWR green",
+   "footprint": "LED_0603_1608Metric",
+   "x": 52.0,
+   "y": 42.0,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    50.475,
+    41.225,
+    53.525,
+    42.775
+   ]
+  },
+  {
+   "ref": "D3",
+   "value": "LINK",
+   "footprint": "LED_0603_1608Metric",
+   "x": 55.5,
+   "y": 42.0,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    53.975,
+    41.225,
+    57.025,
+    42.775
+   ]
+  },
+  {
+   "ref": "D4",
+   "value": "FPGA",
+   "footprint": "LED_0603_1608Metric",
+   "x": 59.0,
+   "y": 42.0,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    57.475,
+    41.225,
+    60.525,
+    42.775
+   ]
+  },
+  {
+   "ref": "D5",
+   "value": "VTREF",
+   "footprint": "LED_0603_1608Metric",
+   "x": 62.5,
+   "y": 42.0,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    60.975,
+    41.225,
+    64.025,
+    42.775
+   ]
+  },
+  {
+   "ref": "SW1",
+   "value": "RESET",
+   "footprint": "SW_SPST_EVQP7A",
+   "x": 44.0,
+   "y": 48.2,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    41.205,
+    46.455,
+    46.795,
+    50.595
+   ]
+  },
+  {
+   "ref": "SW2",
+   "value": "BOOT",
+   "footprint": "SW_SPST_EVQP7A",
+   "x": 64.0,
+   "y": 48.2,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    61.205,
+    46.455,
+    66.795,
+    50.595
+   ]
+  },
+  {
+   "ref": "U8",
+   "value": "PCA9617ADP",
+   "footprint": "TSSOP-8_3x3mm_P0.65mm",
+   "x": 41.7,
+   "y": 10.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    38.705,
+    8.655,
+    44.695,
+    12.345
+   ]
+  },
+  {
+   "ref": "U9",
+   "value": "PCA9617ADP",
+   "footprint": "TSSOP-8_3x3mm_P0.65mm",
+   "x": 48.0,
+   "y": 10.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    45.005,
+    8.655,
+    50.995,
+    12.345
+   ]
+  },
+  {
+   "ref": "U10",
+   "value": "SN74AVC4T245RSV",
+   "footprint": "UQFN-16_1.8x2.6mm_P0.4mm",
+   "x": 52.6,
+   "y": 10.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    51.055,
+    8.555,
+    54.145,
+    12.445
+   ]
+  },
+  {
+   "ref": "U6",
+   "value": "SN74AVC4T245RSV",
+   "footprint": "UQFN-16_1.8x2.6mm_P0.4mm",
+   "x": 55.8,
+   "y": 10.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    54.255,
+    8.555,
+    57.345,
+    12.445
+   ]
+  },
+  {
+   "ref": "U7",
+   "value": "SN74AVC4T245RSV",
+   "footprint": "UQFN-16_1.8x2.6mm_P0.4mm",
+   "x": 59.0,
+   "y": 10.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    57.455,
+    8.555,
+    60.545,
+    12.445
+   ]
+  },
+  {
+   "ref": "U11",
+   "value": "SN74AXC4T774RSV",
+   "footprint": "UQFN-16_1.8x2.6mm_P0.4mm",
+   "x": 62.2,
+   "y": 10.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    60.655,
+    8.555,
+    63.745,
+    12.445
+   ]
+  },
+  {
+   "ref": "U13",
+   "value": "SN74AXC4T774RSV",
+   "footprint": "UQFN-16_1.8x2.6mm_P0.4mm",
+   "x": 65.4,
+   "y": 10.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    63.855,
+    8.555,
+    66.945,
+    12.445
+   ]
+  },
+  {
+   "ref": "D6",
+   "value": "TPD4E05U06",
+   "footprint": "USON-10_2.5x1.0mm_P0.5mm_TI_DQA",
+   "x": 41.0,
+   "y": 8.0,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    40.045,
+    6.455,
+    41.955,
+    9.545
+   ]
+  },
+  {
+   "ref": "D7",
+   "value": "TPD4E05U06",
+   "footprint": "USON-10_2.5x1.0mm_P0.5mm_TI_DQA",
+   "x": 47.0,
+   "y": 8.0,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    46.045,
+    6.455,
+    47.955,
+    9.545
+   ]
+  },
+  {
+   "ref": "D8",
+   "value": "TPD4E05U06",
+   "footprint": "USON-10_2.5x1.0mm_P0.5mm_TI_DQA",
+   "x": 53.0,
+   "y": 8.0,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    52.045,
+    6.455,
+    53.955,
+    9.545
+   ]
+  },
+  {
+   "ref": "D9",
+   "value": "TPD4E05U06",
+   "footprint": "USON-10_2.5x1.0mm_P0.5mm_TI_DQA",
+   "x": 59.0,
+   "y": 8.0,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    58.045,
+    6.455,
+    59.955,
+    9.545
+   ]
+  },
+  {
+   "ref": "D10",
+   "value": "TPD4E05U06",
+   "footprint": "USON-10_2.5x1.0mm_P0.5mm_TI_DQA",
+   "x": 65.0,
+   "y": 8.0,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    64.045,
+    6.455,
+    65.955,
+    9.545
+   ]
+  },
+  {
+   "ref": "J3",
+   "value": "RPi 40-pin",
+   "footprint": "PinHeader_2x20_P2.54mm_Vertical",
+   "x": 8.81,
+   "y": 4.77,
+   "rot": 90,
+   "side": "top",
+   "courtyard": [
+    6.985,
+    0.405,
+    58.885,
+    6.585
+   ]
+  },
+  {
+   "ref": "J10",
+   "value": "DIRECT I/O",
+   "footprint": "PinHeader_2x12_P2.54mm_Vertical",
+   "x": 8.81,
+   "y": 15.0,
+   "rot": 90,
+   "side": "top",
+   "courtyard": [
+    6.995,
+    10.635,
+    38.565,
+    16.815
+   ]
+  },
+  {
+   "ref": "H1",
+   "value": "M2.5",
+   "footprint": "MountingHole_2.7mm_M2.5_Pad_Via",
+   "x": 3.5,
+   "y": 3.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    0.507,
+    0.503,
+    6.495,
+    6.497
+   ]
+  },
+  {
+   "ref": "H2",
+   "value": "M2.5",
+   "footprint": "MountingHole_2.7mm_M2.5_Pad_Via",
+   "x": 72.5,
+   "y": 3.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    69.507,
+    0.503,
+    75.495,
+    6.497
+   ]
+  },
+  {
+   "ref": "H3",
+   "value": "M2.5",
+   "footprint": "MountingHole_2.7mm_M2.5_Pad_Via",
+   "x": 3.5,
+   "y": 46.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    0.507,
+    43.503,
+    6.495,
+    49.497
+   ]
+  },
+  {
+   "ref": "H4",
+   "value": "M2.5",
+   "footprint": "MountingHole_2.7mm_M2.5_Pad_Via",
+   "x": 72.5,
+   "y": 46.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    69.507,
+    43.503,
+    75.495,
+    49.497
+   ]
+  },
+  {
+   "ref": "U17",
+   "value": "TPS22917DBV",
+   "footprint": "SOT-23-6",
+   "x": 53.5,
+   "y": 15.5,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    51.405,
+    13.755,
+    55.595,
+    17.245
+   ]
+  },
+  {
+   "ref": "U18",
+   "value": "SN74LVC2G32DCU",
+   "footprint": "VSSOP-8_2.3x2mm_P0.5mm",
+   "x": 39.5,
+   "y": 38.5,
+   "rot": 90,
+   "side": "top",
+   "courtyard": [
+    38.205,
+    36.175,
+    40.795,
+    40.825
+   ]
+  },
+  {
+   "ref": "U19",
+   "value": "SN74LVC2G32DCU",
+   "footprint": "VSSOP-8_2.3x2mm_P0.5mm",
+   "x": 43.0,
+   "y": 38.5,
+   "rot": 90,
+   "side": "top",
+   "courtyard": [
+    41.705,
+    36.175,
+    44.295,
+    40.825
+   ]
+  },
+  {
+   "ref": "U20",
+   "value": "SN74LVC2G02DCU",
+   "footprint": "VSSOP-8_2.3x2mm_P0.5mm",
+   "x": 46.5,
+   "y": 38.5,
+   "rot": 90,
+   "side": "top",
+   "courtyard": [
+    45.205,
+    36.175,
+    47.795,
+    40.825
+   ]
+  },
+  {
+   "ref": "U21",
+   "value": "TLV7011DBV",
+   "footprint": "SOT-23-5",
+   "x": 42.5,
+   "y": 43.2,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    40.405,
+    41.455,
+    44.595,
+    44.945
+   ]
+  },
+  {
+   "ref": "U22",
+   "value": "APS6404L 8MB (DNP, 16MB option)",
+   "footprint": "SOIC-8_3.9x4.9mm_P1.27mm",
+   "x": 44.5,
+   "y": 31.0,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    41.755,
+    27.255,
+    47.245,
+    34.745
+   ]
+  },
+  {
+   "ref": "D12",
+   "value": "BZT52C3V6",
+   "footprint": "D_SOD-123",
+   "x": 21.5,
+   "y": 26.8,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    19.105,
+    25.605,
+    23.895,
+    27.995
+   ]
+  },
+  {
+   "ref": "D13",
+   "value": "BZT52C3V6",
+   "footprint": "D_SOD-123",
+   "x": 26.5,
+   "y": 26.8,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    24.105,
+    25.605,
+    28.895,
+    27.995
+   ]
+  },
+  {
+   "ref": "U23",
+   "value": "TPS3808G01",
+   "footprint": "SOT-23-6",
+   "x": 58.0,
+   "y": 16.0,
+   "rot": 0,
+   "side": "top",
+   "courtyard": [
+    55.905,
+    14.255,
+    60.095,
+    17.745
+   ]
+  },
+  {
+   "ref": "C23",
+   "value": "10n",
+   "footprint": "C_0402_1005Metric",
+   "x": 23.0,
+   "y": 17.58,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    22.045,
+    17.075,
+    23.955,
+    18.085
+   ]
+  },
+  {
+   "ref": "C24",
+   "value": "1u 50V",
+   "footprint": "C_0603_1608Metric",
+   "x": 4.3,
+   "y": 32.6,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    2.775,
+    31.825,
+    5.825,
+    33.375
+   ]
+  },
+  {
+   "ref": "C25",
+   "value": "10u 16V",
+   "footprint": "C_0805_2012Metric",
+   "x": 19.15,
+   "y": 22.65,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    18.125,
+    20.905,
+    20.175,
+    24.395
+   ]
+  },
+  {
+   "ref": "C26",
+   "value": "1u",
+   "footprint": "C_0402_1005Metric",
+   "x": 25.39,
+   "y": 17.7,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    24.435,
+    17.195,
+    26.345,
+    18.205
+   ]
+  },
+  {
+   "ref": "C27",
+   "value": "10u",
+   "footprint": "C_0805_2012Metric",
+   "x": 30.8,
+   "y": 18.51,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    29.055,
+    17.485,
+    32.545,
+    19.535
+   ]
+  },
+  {
+   "ref": "R16",
+   "value": "100k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 19.4,
+   "y": 19.49,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    18.885,
+    18.515,
+    19.915,
+    20.465
+   ]
+  },
+  {
+   "ref": "R17",
+   "value": "37.4k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 20.84,
+   "y": 17.58,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    19.865,
+    17.065,
+    21.815,
+    18.095
+   ]
+  },
+  {
+   "ref": "R18",
+   "value": "100k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 29.16,
+   "y": 24.51,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    28.185,
+    23.995,
+    30.135,
+    25.025
+   ]
+  },
+  {
+   "ref": "R19",
+   "value": "24.9k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 17.81,
+   "y": 19.48,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    17.295,
+    18.505,
+    18.325,
+    20.455
+   ]
+  },
+  {
+   "ref": "R21",
+   "value": "39k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 18.15,
+   "y": 17.6,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    17.175,
+    17.085,
+    19.125,
+    18.115
+   ]
+  },
+  {
+   "ref": "R22",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 69.2,
+   "y": 40.93,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    68.685,
+    39.955,
+    69.715,
+    41.905
+   ]
+  },
+  {
+   "ref": "R23",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 25.21,
+   "y": 28.85,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    24.235,
+    28.335,
+    26.185,
+    29.365
+   ]
+  },
+  {
+   "ref": "R24",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 22.79,
+   "y": 28.85,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    21.815,
+    28.335,
+    23.765,
+    29.365
+   ]
+  },
+  {
+   "ref": "R25",
+   "value": "0R",
+   "footprint": "R_0402_1005Metric",
+   "x": 18.03,
+   "y": 25.99,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    17.515,
+    25.015,
+    18.545,
+    26.965
+   ]
+  },
+  {
+   "ref": "R26",
+   "value": "88.7k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 34.0,
+   "y": 21.5,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    33.485,
+    20.525,
+    34.515,
+    22.475
+   ]
+  },
+  {
+   "ref": "R27",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 67.62,
+   "y": 19.36,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    66.645,
+    18.845,
+    68.595,
+    19.875
+   ]
+  },
+  {
+   "ref": "R28",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 32.38,
+   "y": 24.16,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    31.405,
+    23.645,
+    33.355,
+    24.675
+   ]
+  },
+  {
+   "ref": "C1",
+   "value": "10u 50V",
+   "footprint": "C_1206_3216Metric",
+   "x": 4.91,
+   "y": 35.02,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    2.565,
+    33.825,
+    7.255,
+    36.215
+   ]
+  },
+  {
+   "ref": "C2",
+   "value": "22u",
+   "footprint": "C_0805_2012Metric",
+   "x": 7.19,
+   "y": 31.79,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    6.165,
+    30.045,
+    8.215,
+    33.535
+   ]
+  },
+  {
+   "ref": "C3",
+   "value": "22u",
+   "footprint": "C_0805_2012Metric",
+   "x": 4.9,
+   "y": 37.56,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    3.155,
+    36.535,
+    6.645,
+    38.585
+   ]
+  },
+  {
+   "ref": "C4",
+   "value": "100n",
+   "footprint": "C_0603_1608Metric",
+   "x": 4.09,
+   "y": 30.61,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    2.565,
+    29.835,
+    5.615,
+    31.385
+   ]
+  },
+  {
+   "ref": "C5",
+   "value": "100n 50V",
+   "footprint": "C_0603_1608Metric",
+   "x": 1.55,
+   "y": 33.8,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    0.775,
+    32.275,
+    2.325,
+    35.325
+   ]
+  },
+  {
+   "ref": "R93",
+   "value": "100k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 1.38,
+   "y": 30.68,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    0.405,
+    30.165,
+    2.355,
+    31.195
+   ]
+  },
+  {
+   "ref": "R94",
+   "value": "47k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 8.16,
+   "y": 34.91,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    7.645,
+    33.935,
+    8.675,
+    35.885
+   ]
+  },
+  {
+   "ref": "C30",
+   "value": "1u",
+   "footprint": "C_0402_1005Metric",
+   "x": 44.5,
+   "y": 21.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    43.545,
+    20.995,
+    45.455,
+    22.005
+   ]
+  },
+  {
+   "ref": "C31",
+   "value": "4u7",
+   "footprint": "C_0603_1608Metric",
+   "x": 44.29,
+   "y": 22.98,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    42.765,
+    22.205,
+    45.815,
+    23.755
+   ]
+  },
+  {
+   "ref": "C32",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 44.29,
+   "y": 20.02,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    43.335,
+    19.515,
+    45.245,
+    20.525
+   ]
+  },
+  {
+   "ref": "C33",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 46.33,
+   "y": 20.69,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    45.825,
+    19.735,
+    46.835,
+    21.645
+   ]
+  },
+  {
+   "ref": "C34",
+   "value": "4u7",
+   "footprint": "C_0603_1608Metric",
+   "x": 42.3,
+   "y": 20.31,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    41.525,
+    18.785,
+    43.075,
+    21.835
+   ]
+  },
+  {
+   "ref": "C35",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 47.06,
+   "y": 23.06,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    46.105,
+    22.555,
+    48.015,
+    23.565
+   ]
+  },
+  {
+   "ref": "C36",
+   "value": "4u7",
+   "footprint": "C_0603_1608Metric",
+   "x": 45.11,
+   "y": 24.95,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    43.585,
+    24.175,
+    46.635,
+    25.725
+   ]
+  },
+  {
+   "ref": "C37",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 44.3,
+   "y": 18.51,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    43.345,
+    18.005,
+    45.255,
+    19.015
+   ]
+  },
+  {
+   "ref": "C38",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 48.0,
+   "y": 21.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    47.045,
+    20.995,
+    48.955,
+    22.005
+   ]
+  },
+  {
+   "ref": "C39",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 41.58,
+   "y": 23.42,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    40.625,
+    22.915,
+    42.535,
+    23.925
+   ]
+  },
+  {
+   "ref": "C40",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 46.59,
+   "y": 18.69,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    45.635,
+    18.185,
+    47.545,
+    19.195
+   ]
+  },
+  {
+   "ref": "C41",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 42.74,
+   "y": 25.09,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    42.235,
+    24.135,
+    43.245,
+    26.045
+   ]
+  },
+  {
+   "ref": "C42",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 40.52,
+   "y": 21.1,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    40.015,
+    20.145,
+    41.025,
+    22.055
+   ]
+  },
+  {
+   "ref": "C63",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 48.18,
+   "y": 19.92,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    47.225,
+    19.415,
+    49.135,
+    20.425
+   ]
+  },
+  {
+   "ref": "C64",
+   "value": "1n 25V C0G",
+   "footprint": "C_0402_1005Metric",
+   "x": 53.5,
+   "y": 15.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    52.545,
+    14.995,
+    54.455,
+    16.005
+   ]
+  },
+  {
+   "ref": "C68",
+   "value": "1u",
+   "footprint": "C_0402_1005Metric",
+   "x": 47.89,
+   "y": 24.46,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    46.935,
+    23.955,
+    48.845,
+    24.965
+   ]
+  },
+  {
+   "ref": "C69",
+   "value": "1u",
+   "footprint": "C_0402_1005Metric",
+   "x": 42.02,
+   "y": 17.74,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    41.065,
+    17.235,
+    42.975,
+    18.245
+   ]
+  },
+  {
+   "ref": "C70",
+   "value": "1u",
+   "footprint": "C_0402_1005Metric",
+   "x": 44.3,
+   "y": 17.0,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    43.345,
+    16.495,
+    45.255,
+    17.505
+   ]
+  },
+  {
+   "ref": "C71",
+   "value": "4u7",
+   "footprint": "C_0603_1608Metric",
+   "x": 39.01,
+   "y": 21.9,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    38.235,
+    20.375,
+    39.785,
+    23.425
+   ]
+  },
+  {
+   "ref": "C72",
+   "value": "4u7",
+   "footprint": "C_0603_1608Metric",
+   "x": 46.65,
+   "y": 16.44,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    45.875,
+    14.915,
+    47.425,
+    17.965
+   ]
+  },
+  {
+   "ref": "C73",
+   "value": "4u7",
+   "footprint": "C_0603_1608Metric",
+   "x": 40.63,
+   "y": 26.08,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    39.855,
+    24.555,
+    41.405,
+    27.605
+   ]
+  },
+  {
+   "ref": "C74",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 45.1,
+   "y": 26.46,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    44.145,
+    25.955,
+    46.055,
+    26.965
+   ]
+  },
+  {
+   "ref": "R100",
+   "value": "100k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 58.0,
+   "y": 16.0,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    57.025,
+    15.485,
+    58.975,
+    16.515
+   ]
+  },
+  {
+   "ref": "R101",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 54.12,
+   "y": 16.86,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    53.145,
+    16.345,
+    55.095,
+    17.375
+   ]
+  },
+  {
+   "ref": "R13",
+   "value": "2k2",
+   "footprint": "R_0402_1005Metric",
+   "x": 40.27,
+   "y": 18.83,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    39.755,
+    17.855,
+    40.785,
+    19.805
+   ]
+  },
+  {
+   "ref": "R30",
+   "value": "100R",
+   "footprint": "R_0402_1005Metric",
+   "x": 48.02,
+   "y": 25.73,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    47.045,
+    25.215,
+    48.995,
+    26.245
+   ]
+  },
+  {
+   "ref": "R32",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 67.62,
+   "y": 41.16,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    67.105,
+    40.185,
+    68.135,
+    42.135
+   ]
+  },
+  {
+   "ref": "R33",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 48.6,
+   "y": 17.83,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    48.085,
+    16.855,
+    49.115,
+    18.805
+   ]
+  },
+  {
+   "ref": "R34",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 41.27,
+   "y": 16.44,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    40.295,
+    15.925,
+    42.245,
+    16.955
+   ]
+  },
+  {
+   "ref": "R86",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 43.5,
+   "y": 15.58,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    42.525,
+    15.065,
+    44.475,
+    16.095
+   ]
+  },
+  {
+   "ref": "R99",
+   "value": "147k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 38.97,
+   "y": 24.92,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    38.455,
+    23.945,
+    39.485,
+    25.895
+   ]
+  },
+  {
+   "ref": "C43",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 39.5,
+   "y": 38.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    38.545,
+    37.995,
+    40.455,
+    39.005
+   ]
+  },
+  {
+   "ref": "C44",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 40.12,
+   "y": 39.86,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    39.165,
+    39.355,
+    41.075,
+    40.365
+   ]
+  },
+  {
+   "ref": "C45",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 39.29,
+   "y": 37.02,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    38.335,
+    36.515,
+    40.245,
+    37.525
+   ]
+  },
+  {
+   "ref": "C46",
+   "value": "1u",
+   "footprint": "C_0402_1005Metric",
+   "x": 41.7,
+   "y": 10.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    40.745,
+    9.995,
+    42.655,
+    11.005
+   ]
+  },
+  {
+   "ref": "C47",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 66.09,
+   "y": 41.2,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    65.585,
+    40.245,
+    66.595,
+    42.155
+   ]
+  },
+  {
+   "ref": "C48",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 37.54,
+   "y": 38.92,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    37.035,
+    37.965,
+    38.045,
+    39.875
+   ]
+  },
+  {
+   "ref": "C75",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 41.33,
+   "y": 37.69,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    40.825,
+    36.735,
+    41.835,
+    38.645
+   ]
+  },
+  {
+   "ref": "Q1",
+   "value": "DMG2305UX",
+   "footprint": "SOT-23",
+   "x": 33.54,
+   "y": 7.95,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    31.565,
+    6.205,
+    35.515,
+    9.695
+   ]
+  },
+  {
+   "ref": "Q2",
+   "value": "2N7002",
+   "footprint": "SOT-23",
+   "x": 29.56,
+   "y": 8.35,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    27.815,
+    6.375,
+    31.305,
+    10.325
+   ]
+  },
+  {
+   "ref": "R35",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 52.6,
+   "y": 10.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    51.625,
+    9.985,
+    53.575,
+    11.015
+   ]
+  },
+  {
+   "ref": "R36",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 62.2,
+   "y": 10.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    61.225,
+    9.985,
+    63.175,
+    11.015
+   ]
+  },
+  {
+   "ref": "R37",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 59.0,
+   "y": 10.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    58.025,
+    9.985,
+    59.975,
+    11.015
+   ]
+  },
+  {
+   "ref": "R38",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 55.8,
+   "y": 10.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    54.825,
+    9.985,
+    56.775,
+    11.015
+   ]
+  },
+  {
+   "ref": "R39",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 38.31,
+   "y": 19.53,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    37.335,
+    19.015,
+    39.285,
+    20.045
+   ]
+  },
+  {
+   "ref": "R40",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 50.23,
+   "y": 18.42,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    49.715,
+    17.445,
+    50.745,
+    19.395
+   ]
+  },
+  {
+   "ref": "R41",
+   "value": "10R",
+   "footprint": "R_0402_1005Metric",
+   "x": 42.32,
+   "y": 11.86,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    41.345,
+    11.345,
+    43.295,
+    12.375
+   ]
+  },
+  {
+   "ref": "R42",
+   "value": "470k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 36.4,
+   "y": 7.1,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    35.885,
+    6.125,
+    36.915,
+    8.075
+   ]
+  },
+  {
+   "ref": "R43",
+   "value": "470k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 37.9,
+   "y": 7.1,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    37.385,
+    6.125,
+    38.415,
+    8.075
+   ]
+  },
+  {
+   "ref": "R44",
+   "value": "1k",
+   "footprint": "R_0402_1005Metric",
+   "x": 64.63,
+   "y": 19.48,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    63.655,
+    18.965,
+    65.605,
+    19.995
+   ]
+  },
+  {
+   "ref": "R45",
+   "value": "100k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 42.5,
+   "y": 43.2,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    41.525,
+    42.685,
+    43.475,
+    43.715
+   ]
+  },
+  {
+   "ref": "R46",
+   "value": "30k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 43.12,
+   "y": 44.56,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    42.145,
+    44.045,
+    44.095,
+    45.075
+   ]
+  },
+  {
+   "ref": "R91",
+   "value": "47k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 37.12,
+   "y": 9.11,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    36.145,
+    8.595,
+    38.095,
+    9.625
+   ]
+  },
+  {
+   "ref": "R92",
+   "value": "47k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 42.29,
+   "y": 41.72,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    41.315,
+    41.205,
+    43.265,
+    42.235
+   ]
+  },
+  {
+   "ref": "R95",
+   "value": "3.0M 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 27.09,
+   "y": 7.34,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    26.575,
+    6.365,
+    27.605,
+    8.315
+   ]
+  },
+  {
+   "ref": "R96",
+   "value": "750k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 25.65,
+   "y": 7.76,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    25.135,
+    6.785,
+    26.165,
+    8.735
+   ]
+  },
+  {
+   "ref": "R97",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 39.09,
+   "y": 9.36,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    38.575,
+    8.385,
+    39.605,
+    10.335
+   ]
+  },
+  {
+   "ref": "R98",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 26.27,
+   "y": 9.55,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    25.295,
+    9.035,
+    27.245,
+    10.065
+   ]
+  },
+  {
+   "ref": "U24",
+   "value": "TLV7011DBV",
+   "footprint": "SOT-23-5",
+   "x": 39.58,
+   "y": 45.12,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    37.835,
+    43.025,
+    41.325,
+    47.215
+   ]
+  },
+  {
+   "ref": "C6",
+   "value": "10u",
+   "footprint": "C_0805_2012Metric",
+   "x": 66.84,
+   "y": 17.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    65.095,
+    16.475,
+    68.585,
+    18.525
+   ]
+  },
+  {
+   "ref": "C7",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 64.62,
+   "y": 41.08,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    64.115,
+    40.125,
+    65.125,
+    42.035
+   ]
+  },
+  {
+   "ref": "C8",
+   "value": "1u",
+   "footprint": "C_0402_1005Metric",
+   "x": 68.41,
+   "y": 43.35,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    67.905,
+    42.395,
+    68.915,
+    44.305
+   ]
+  },
+  {
+   "ref": "R10",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 63.19,
+   "y": 41.42,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    62.675,
+    40.445,
+    63.705,
+    42.395
+   ]
+  },
+  {
+   "ref": "R3",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 61.89,
+   "y": 19.52,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    60.915,
+    19.005,
+    62.865,
+    20.035
+   ]
+  },
+  {
+   "ref": "R4",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 63.88,
+   "y": 18.18,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    62.905,
+    17.665,
+    64.855,
+    18.695
+   ]
+  },
+  {
+   "ref": "R5",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 66.61,
+   "y": 43.48,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    65.635,
+    42.965,
+    67.585,
+    43.995
+   ]
+  },
+  {
+   "ref": "R6",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 64.34,
+   "y": 43.17,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    63.365,
+    42.655,
+    65.315,
+    43.685
+   ]
+  },
+  {
+   "ref": "R7",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 61.59,
+   "y": 41.51,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    61.075,
+    40.535,
+    62.105,
+    42.485
+   ]
+  },
+  {
+   "ref": "R8",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 68.19,
+   "y": 15.67,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    67.215,
+    15.155,
+    69.165,
+    16.185
+   ]
+  },
+  {
+   "ref": "R9",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 60.3,
+   "y": 41.09,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    59.785,
+    40.115,
+    60.815,
+    42.065
+   ]
+  },
+  {
+   "ref": "TP1",
+   "value": "DEBUG_TX",
+   "footprint": "TestPoint_Pad_D1.0mm",
+   "x": 59.66,
+   "y": 18.83,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    58.612,
+    17.784,
+    60.705,
+    19.876
+   ]
+  },
+  {
+   "ref": "TP10",
+   "value": "FPGA_3V3",
+   "footprint": "TestPoint_Pad_D1.0mm",
+   "x": 48.71,
+   "y": 15.29,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    47.662,
+    14.244,
+    49.755,
+    16.336
+   ]
+  },
+  {
+   "ref": "TP11",
+   "value": "VTREF_IO",
+   "footprint": "TestPoint_Pad_D1.0mm",
+   "x": 40.01,
+   "y": 12.34,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    38.962,
+    11.294,
+    41.055,
+    13.386
+   ]
+  },
+  {
+   "ref": "TP2",
+   "value": "DEBUG_RX",
+   "footprint": "TestPoint_Pad_D1.0mm",
+   "x": 63.6,
+   "y": 16.07,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    62.552,
+    15.024,
+    64.645,
+    17.116
+   ]
+  },
+  {
+   "ref": "TP3",
+   "value": "SPARE0",
+   "footprint": "TestPoint_Pad_D1.0mm",
+   "x": 68.2,
+   "y": 45.85,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    67.152,
+    44.804,
+    69.245,
+    46.896
+   ]
+  },
+  {
+   "ref": "TP4",
+   "value": "SPARE1",
+   "footprint": "TestPoint_Pad_D1.0mm",
+   "x": 65.84,
+   "y": 45.34,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    64.792,
+    44.294,
+    66.885,
+    46.386
+   ]
+  },
+  {
+   "ref": "TP5",
+   "value": "GND",
+   "footprint": "TestPoint_Pad_D1.0mm",
+   "x": 61.46,
+   "y": 43.87,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    60.412,
+    42.824,
+    62.505,
+    44.916
+   ]
+  },
+  {
+   "ref": "TP6",
+   "value": "VBUS",
+   "footprint": "TestPoint_Pad_D1.0mm",
+   "x": 9.8,
+   "y": 32.6,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    8.752,
+    31.554,
+    10.845,
+    33.646
+   ]
+  },
+  {
+   "ref": "TP7",
+   "value": "+3V3",
+   "footprint": "TestPoint_Pad_D1.0mm",
+   "x": 58.38,
+   "y": 41.31,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    57.332,
+    40.264,
+    59.425,
+    42.356
+   ]
+  },
+  {
+   "ref": "TP8",
+   "value": "FPGA_1V2",
+   "footprint": "TestPoint_Pad_D1.0mm",
+   "x": 36.87,
+   "y": 23.89,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    35.822,
+    22.844,
+    37.915,
+    24.936
+   ]
+  },
+  {
+   "ref": "TP9",
+   "value": "FPGA_VCCPLL",
+   "footprint": "TestPoint_Pad_D1.0mm",
+   "x": 36.5,
+   "y": 21.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    35.452,
+    20.454,
+    37.545,
+    22.546
+   ]
+  },
+  {
+   "ref": "C20",
+   "value": "1u 10V",
+   "footprint": "C_0402_1005Metric",
+   "x": 20.6,
+   "y": 28.78,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    19.645,
+    28.275,
+    21.555,
+    29.285
+   ]
+  },
+  {
+   "ref": "C21",
+   "value": "1u 10V",
+   "footprint": "C_0402_1005Metric",
+   "x": 22.95,
+   "y": 30.21,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    21.995,
+    29.705,
+    23.905,
+    30.715
+   ]
+  },
+  {
+   "ref": "C22",
+   "value": "2u2 16V",
+   "footprint": "C_0402_1005Metric",
+   "x": 20.58,
+   "y": 30.43,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    19.625,
+    29.925,
+    21.535,
+    30.935
+   ]
+  },
+  {
+   "ref": "C65",
+   "value": "4u7 16V",
+   "footprint": "C_0603_1608Metric",
+   "x": 25.91,
+   "y": 30.58,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    24.385,
+    29.805,
+    27.435,
+    31.355
+   ]
+  },
+  {
+   "ref": "C66",
+   "value": "1u",
+   "footprint": "C_0402_1005Metric",
+   "x": 65.84,
+   "y": 15.71,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    64.885,
+    15.205,
+    66.795,
+    16.215
+   ]
+  },
+  {
+   "ref": "C67",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 61.52,
+   "y": 17.3,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    61.015,
+    16.345,
+    62.025,
+    18.255
+   ]
+  },
+  {
+   "ref": "R14",
+   "value": "4k7",
+   "footprint": "R_0402_1005Metric",
+   "x": 67.4,
+   "y": 14.28,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    66.425,
+    13.765,
+    68.375,
+    14.795
+   ]
+  },
+  {
+   "ref": "R15",
+   "value": "4k7",
+   "footprint": "R_0402_1005Metric",
+   "x": 63.58,
+   "y": 45.02,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    63.065,
+    44.045,
+    64.095,
+    45.995
+   ]
+  },
+  {
+   "ref": "R20",
+   "value": "390k 1%",
+   "footprint": "R_0402_1005Metric",
+   "x": 18.12,
+   "y": 28.42,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    17.605,
+    27.445,
+    18.635,
+    29.395
+   ]
+  },
+  {
+   "ref": "R1",
+   "value": "5k1",
+   "footprint": "R_0402_1005Metric",
+   "x": 1.61,
+   "y": 17.75,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    0.635,
+    17.235,
+    2.585,
+    18.265
+   ]
+  },
+  {
+   "ref": "R2",
+   "value": "5k1",
+   "footprint": "R_0402_1005Metric",
+   "x": 3.99,
+   "y": 17.53,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    3.015,
+    17.015,
+    4.965,
+    18.045
+   ]
+  },
+  {
+   "ref": "R29",
+   "value": "1k",
+   "footprint": "R_0402_1005Metric",
+   "x": 52.0,
+   "y": 42.0,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    51.025,
+    41.485,
+    52.975,
+    42.515
+   ]
+  },
+  {
+   "ref": "C49",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 43.53,
+   "y": 9.69,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    43.025,
+    8.735,
+    44.035,
+    10.645
+   ]
+  },
+  {
+   "ref": "C50",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 44.26,
+   "y": 12.06,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    43.755,
+    11.105,
+    44.765,
+    13.015
+   ]
+  },
+  {
+   "ref": "C51",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 42.31,
+   "y": 13.44,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    41.355,
+    12.935,
+    43.265,
+    13.945
+   ]
+  },
+  {
+   "ref": "C52",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 43.09,
+   "y": 7.29,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    42.585,
+    6.335,
+    43.595,
+    8.245
+   ]
+  },
+  {
+   "ref": "C53",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 44.83,
+   "y": 8.93,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    44.325,
+    7.975,
+    45.335,
+    9.885
+   ]
+  },
+  {
+   "ref": "C54",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 45.62,
+   "y": 11.31,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    45.115,
+    10.355,
+    46.125,
+    12.265
+   ]
+  },
+  {
+   "ref": "C55",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 44.51,
+   "y": 14.02,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    43.555,
+    13.515,
+    45.465,
+    14.525
+   ]
+  },
+  {
+   "ref": "C56",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 40.7,
+   "y": 14.89,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    39.745,
+    14.385,
+    41.655,
+    15.395
+   ]
+  },
+  {
+   "ref": "C57",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 47.14,
+   "y": 11.3,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    46.635,
+    10.345,
+    47.645,
+    12.255
+   ]
+  },
+  {
+   "ref": "C58",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 46.29,
+   "y": 13.53,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    45.785,
+    12.575,
+    46.795,
+    14.485
+   ]
+  },
+  {
+   "ref": "C59",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 48.7,
+   "y": 10.5,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    48.195,
+    9.545,
+    49.205,
+    11.455
+   ]
+  },
+  {
+   "ref": "C60",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 48.81,
+   "y": 12.89,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    47.855,
+    12.385,
+    49.765,
+    13.395
+   ]
+  },
+  {
+   "ref": "C61",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 48.81,
+   "y": 8.11,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    48.305,
+    7.155,
+    49.315,
+    9.065
+   ]
+  },
+  {
+   "ref": "C62",
+   "value": "100n",
+   "footprint": "C_0402_1005Metric",
+   "x": 38.18,
+   "y": 17.68,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    37.225,
+    17.175,
+    39.135,
+    18.185
+   ]
+  },
+  {
+   "ref": "R48",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 50.2,
+   "y": 10.5,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    49.685,
+    9.525,
+    50.715,
+    11.475
+   ]
+  },
+  {
+   "ref": "R50",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 50.05,
+   "y": 8.31,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    49.535,
+    7.335,
+    50.565,
+    9.285
+   ]
+  },
+  {
+   "ref": "R51",
+   "value": "4k7",
+   "footprint": "R_0402_1005Metric",
+   "x": 57.23,
+   "y": 19.24,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    56.255,
+    18.725,
+    58.205,
+    19.755
+   ]
+  },
+  {
+   "ref": "R52",
+   "value": "4k7",
+   "footprint": "R_0402_1005Metric",
+   "x": 60.12,
+   "y": 16.46,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    59.605,
+    15.485,
+    60.635,
+    17.435
+   ]
+  },
+  {
+   "ref": "R53",
+   "value": "4k7",
+   "footprint": "R_0402_1005Metric",
+   "x": 64.31,
+   "y": 14.13,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    63.335,
+    13.615,
+    65.285,
+    14.645
+   ]
+  },
+  {
+   "ref": "R54",
+   "value": "4k7",
+   "footprint": "R_0402_1005Metric",
+   "x": 59.44,
+   "y": 43.65,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    58.925,
+    42.675,
+    59.955,
+    44.625
+   ]
+  },
+  {
+   "ref": "R55",
+   "value": "33R",
+   "footprint": "R_0402_1005Metric",
+   "x": 53.22,
+   "y": 11.86,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    52.245,
+    11.345,
+    54.195,
+    12.375
+   ]
+  },
+  {
+   "ref": "R56",
+   "value": "33R",
+   "footprint": "R_0402_1005Metric",
+   "x": 53.98,
+   "y": 13.16,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    53.005,
+    12.645,
+    54.955,
+    13.675
+   ]
+  },
+  {
+   "ref": "R57",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 51.6,
+   "y": 13.33,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    50.625,
+    12.815,
+    52.575,
+    13.845
+   ]
+  },
+  {
+   "ref": "R58",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 48.0,
+   "y": 27.56,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    47.485,
+    26.585,
+    48.515,
+    28.535
+   ]
+  },
+  {
+   "ref": "R59",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 38.99,
+   "y": 27.3,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    38.475,
+    26.325,
+    39.505,
+    28.275
+   ]
+  },
+  {
+   "ref": "R60",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 56.42,
+   "y": 11.86,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    55.445,
+    11.345,
+    57.395,
+    12.375
+   ]
+  },
+  {
+   "ref": "R61",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 55.59,
+   "y": 9.02,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    54.615,
+    8.505,
+    56.565,
+    9.535
+   ]
+  },
+  {
+   "ref": "R62",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 57.18,
+   "y": 13.16,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    56.205,
+    12.645,
+    58.155,
+    13.675
+   ]
+  },
+  {
+   "ref": "R63",
+   "value": "100k",
+   "footprint": "R_0402_1005Metric",
+   "x": 55.6,
+   "y": 7.51,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    54.625,
+    6.995,
+    56.575,
+    8.025
+   ]
+  },
+  {
+   "ref": "R64",
+   "value": "33R",
+   "footprint": "R_0402_1005Metric",
+   "x": 59.62,
+   "y": 11.86,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    58.645,
+    11.345,
+    60.595,
+    12.375
+   ]
+  },
+  {
+   "ref": "R65",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 51.49,
+   "y": 17.62,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    50.975,
+    16.645,
+    52.005,
+    18.595
+   ]
+  },
+  {
+   "ref": "R66",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 40.97,
+   "y": 29.23,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    40.455,
+    28.255,
+    41.485,
+    30.205
+   ]
+  },
+  {
+   "ref": "R67",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 36.34,
+   "y": 19.11,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    35.825,
+    18.135,
+    36.855,
+    20.085
+   ]
+  },
+  {
+   "ref": "R68",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 48.04,
+   "y": 29.78,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    47.525,
+    28.805,
+    48.555,
+    30.755
+   ]
+  },
+  {
+   "ref": "R69",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 37.72,
+   "y": 27.42,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    37.205,
+    26.445,
+    38.235,
+    28.395
+   ]
+  },
+  {
+   "ref": "R70",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 51.28,
+   "y": 15.58,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    50.305,
+    15.065,
+    52.255,
+    16.095
+   ]
+  },
+  {
+   "ref": "R71",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 39.52,
+   "y": 29.59,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    39.005,
+    28.615,
+    40.035,
+    30.565
+   ]
+  },
+  {
+   "ref": "R72",
+   "value": "10k",
+   "footprint": "R_0402_1005Metric",
+   "x": 36.21,
+   "y": 26.13,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    35.695,
+    25.155,
+    36.725,
+    27.105
+   ]
+  },
+  {
+   "ref": "R73",
+   "value": "33R",
+   "footprint": "R_0402_1005Metric",
+   "x": 62.82,
+   "y": 11.86,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    61.845,
+    11.345,
+    63.795,
+    12.375
+   ]
+  },
+  {
+   "ref": "R74",
+   "value": "33R",
+   "footprint": "R_0402_1005Metric",
+   "x": 61.99,
+   "y": 9.02,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    61.015,
+    8.505,
+    62.965,
+    9.535
+   ]
+  },
+  {
+   "ref": "R75",
+   "value": "33R",
+   "footprint": "R_0402_1005Metric",
+   "x": 64.7,
+   "y": 10.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    63.725,
+    9.985,
+    65.675,
+    11.015
+   ]
+  },
+  {
+   "ref": "R76",
+   "value": "33R",
+   "footprint": "R_0402_1005Metric",
+   "x": 62.0,
+   "y": 13.49,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    61.025,
+    12.975,
+    62.975,
+    14.005
+   ]
+  },
+  {
+   "ref": "R77",
+   "value": "33R",
+   "footprint": "R_0402_1005Metric",
+   "x": 66.9,
+   "y": 10.5,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    65.925,
+    9.985,
+    67.875,
+    11.015
+   ]
+  },
+  {
+   "ref": "R78",
+   "value": "33R",
+   "footprint": "R_0402_1005Metric",
+   "x": 66.02,
+   "y": 11.86,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    65.045,
+    11.345,
+    66.995,
+    12.375
+   ]
+  },
+  {
+   "ref": "R79",
+   "value": "33R",
+   "footprint": "R_0402_1005Metric",
+   "x": 66.77,
+   "y": 8.41,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    66.255,
+    7.435,
+    67.285,
+    9.385
+   ]
+  },
+  {
+   "ref": "R80",
+   "value": "33R",
+   "footprint": "R_0402_1005Metric",
+   "x": 68.9,
+   "y": 10.5,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    68.385,
+    9.525,
+    69.415,
+    11.475
+   ]
+  },
+  {
+   "ref": "R87",
+   "value": "4k7 DNP",
+   "footprint": "R_0402_1005Metric",
+   "x": 34.71,
+   "y": 18.34,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    34.195,
+    17.365,
+    35.225,
+    19.315
+   ]
+  },
+  {
+   "ref": "R88",
+   "value": "4k7 DNP",
+   "footprint": "R_0402_1005Metric",
+   "x": 33.43,
+   "y": 18.49,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    32.915,
+    17.515,
+    33.945,
+    19.465
+   ]
+  },
+  {
+   "ref": "R89",
+   "value": "4k7 DNP",
+   "footprint": "R_0402_1005Metric",
+   "x": 51.28,
+   "y": 8.21,
+   "rot": 90,
+   "side": "bottom",
+   "courtyard": [
+    50.765,
+    7.235,
+    51.795,
+    9.185
+   ]
+  },
+  {
+   "ref": "R90",
+   "value": "4k7 DNP",
+   "footprint": "R_0402_1005Metric",
+   "x": 44.84,
+   "y": 6.63,
+   "rot": 0,
+   "side": "bottom",
+   "courtyard": [
+    43.865,
+    6.115,
+    45.815,
+    7.145
+   ]
+  }
+ ]
+}

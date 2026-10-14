@@ -1,0 +1,317 @@
+{
+  "design": "VDS4E Bridge One \u2014 Core Subsystem",
+  "revision": "0.1-core",
+  "date": "2026-10-14",
+  "author": "Antigravity Engineering Pair",
+  "scope": "Core MCU, Native USB-C, 3.3V Power, Decoupling, Reset/Boot, Debug Header",
+  "status": "DRAFT \u2014 Target bus level translators not implemented on this sheet; no PCB fabrication release",
+  "mcu": {
+    "part_number": "ESP32-S3-WROOM-1-N8R8",
+    "flash": "8MB Quad SPI Flash (Quad variant)",
+    "psram": "8MB Octal SPI PSRAM (IO35/36/37 dedicated and not broken out)",
+    "total_pads": 41,
+    "perimeter_pins": 40,
+    "thermal_ground_pad": 41
+  },
+  "power_rails": {
+    "VBUS": {
+      "nominal_voltage": 5.0,
+      "source": "USB-C Receptacle J1"
+    },
+    "+3V3": {
+      "nominal_voltage": 3.3,
+      "source": "LDO Regulator U2 (LD1117AS33TR)"
+    },
+    "GND": {
+      "nominal_voltage": 0.0,
+      "type": "Continuous Ground"
+    }
+  },
+  "components": [
+    {
+      "ref": "U1",
+      "val": "ESP32-S3-WROOM-1-N8R8",
+      "pkg": "RF_Module:ESP32-S3-WROOM-1",
+      "desc": "Espressif ESP32-S3 Wireless Module with Octal PSRAM"
+    },
+    {
+      "ref": "J1",
+      "val": "USB_C_Receptacle_USB2.0",
+      "pkg": "",
+      "desc": "KLS L-KLS1-5416-L1-01-R USB 2.0 Type-C Receptacle (footprint unverified pending custom CAD)"
+    },
+    {
+      "ref": "U2",
+      "val": "LD1117AS33TR",
+      "pkg": "Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+      "desc": "STMicroelectronics 3.3V 1A Low Dropout Linear Regulator (Tab=Pin2)"
+    },
+    {
+      "ref": "U3",
+      "val": "USBLC6-2SC6",
+      "pkg": "Package_TO_SOT_SMD:SOT-23-6",
+      "desc": "STMicroelectronics Very Low Capacitance ESD Protection for High Speed USB"
+    },
+    {
+      "ref": "R1",
+      "val": "5.1k",
+      "pkg": "Resistor_SMD:R_0603_1608Metric",
+      "desc": "USB Type-C CC1 5.1k\u03a9 pull-down resistor"
+    },
+    {
+      "ref": "R2",
+      "val": "5.1k",
+      "pkg": "Resistor_SMD:R_0603_1608Metric",
+      "desc": "USB Type-C CC2 5.1k\u03a9 pull-down resistor"
+    },
+    {
+      "ref": "R3",
+      "val": "22R",
+      "pkg": "Resistor_SMD:R_0603_1608Metric",
+      "desc": "USB D+ series impedance matching resistor"
+    },
+    {
+      "ref": "R4",
+      "val": "22R",
+      "pkg": "Resistor_SMD:R_0603_1608Metric",
+      "desc": "USB D- series impedance matching resistor"
+    },
+    {
+      "ref": "R5",
+      "val": "10k",
+      "pkg": "Resistor_SMD:R_0603_1608Metric",
+      "desc": "CHIP_EN reset line pull-up resistor"
+    },
+    {
+      "ref": "C1",
+      "val": "1uF",
+      "pkg": "Capacitor_SMD:C_0603_1608Metric",
+      "desc": "CHIP_EN power-on delay capacitor"
+    },
+    {
+      "ref": "SW1",
+      "val": "RESET",
+      "pkg": "",
+      "desc": "Tactile reset pushbutton (PTS526 vs PTS645 unverified footprint)"
+    },
+    {
+      "ref": "R6",
+      "val": "10k",
+      "pkg": "Resistor_SMD:R_0603_1608Metric",
+      "desc": "BOOT_N (GPIO0) strapping pull-up resistor"
+    },
+    {
+      "ref": "SW2",
+      "val": "BOOT",
+      "pkg": "",
+      "desc": "Tactile boot pushbutton (PTS526 vs PTS645 unverified footprint)"
+    },
+    {
+      "ref": "C2",
+      "val": "10uF",
+      "pkg": "Capacitor_SMD:C_0805_2012Metric",
+      "desc": "LDO VIN bulk filter capacitor (0805 candidate)"
+    },
+    {
+      "ref": "C3",
+      "val": "10uF",
+      "pkg": "Capacitor_SMD:C_0805_2012Metric",
+      "desc": "LDO VOUT stability capacitor (min 10uF effective, stability/part unresolved)"
+    },
+    {
+      "ref": "C4",
+      "val": "10uF",
+      "pkg": "Capacitor_SMD:C_0805_2012Metric",
+      "desc": "ESP32-S3 module +3V3 bulk decoupling capacitor (0805 candidate)"
+    },
+    {
+      "ref": "C5",
+      "val": "100nF",
+      "pkg": "Capacitor_SMD:C_0603_1608Metric",
+      "desc": "ESP32-S3 module high frequency ceramic bypass capacitor"
+    },
+    {
+      "ref": "J2",
+      "val": "DEBUG_UART0",
+      "pkg": "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical",
+      "desc": "1x4 2.54mm pitch UART0 debug/flashing header"
+    }
+  ],
+  "nets": {
+    "VBUS": [
+      "J1:A4",
+      "J1:A9",
+      "J1:B4",
+      "J1:B9",
+      "U3:5",
+      "U2:3",
+      "C2:1"
+    ],
+    "+3V3": [
+      "U2:2",
+      "C3:1",
+      "C4:1",
+      "C5:1",
+      "U1:2",
+      "R5:1",
+      "R6:1",
+      "J2:1"
+    ],
+    "GND": [
+      "J1:A1",
+      "J1:A12",
+      "J1:B1",
+      "J1:B12",
+      "J1:S1",
+      "U3:2",
+      "U2:1",
+      "C2:2",
+      "C3:2",
+      "C4:2",
+      "C5:2",
+      "C1:2",
+      "SW1:2",
+      "SW2:2",
+      "R1:2",
+      "R2:2",
+      "U1:1",
+      "U1:40",
+      "U1:41",
+      "J2:4"
+    ],
+    "USB_CC1": [
+      "J1:A5",
+      "R1:1"
+    ],
+    "USB_CC2": [
+      "J1:B5",
+      "R2:1"
+    ],
+    "USB_DP": [
+      "J1:A6",
+      "J1:B6",
+      "U3:3",
+      "U3:4",
+      "R3:1"
+    ],
+    "USB_DN": [
+      "J1:A7",
+      "J1:B7",
+      "U3:1",
+      "U3:6",
+      "R4:1"
+    ],
+    "USB_D_PLUS": [
+      "R3:2",
+      "U1:14"
+    ],
+    "USB_D_MINUS": [
+      "R4:2",
+      "U1:13"
+    ],
+    "CHIP_EN": [
+      "U1:3",
+      "R5:2",
+      "C1:1",
+      "SW1:1"
+    ],
+    "BOOT_N": [
+      "U1:27",
+      "R6:2",
+      "SW2:1"
+    ],
+    "DEBUG_TX": [
+      "U1:37",
+      "J2:2"
+    ],
+    "DEBUG_RX": [
+      "U1:36",
+      "J2:3"
+    ],
+    "I2C0_SDA_MCU": [
+      "U1:4"
+    ],
+    "I2C0_SCL_MCU": [
+      "U1:5"
+    ],
+    "I2C1_SDA_MCU": [
+      "U1:6"
+    ],
+    "I2C1_SCL_MCU": [
+      "U1:7"
+    ],
+    "TARGET_GPIO0_MCU": [
+      "U1:8"
+    ],
+    "SPI_DIR_MISO": [
+      "U1:9"
+    ],
+    "UART_TX_MCU": [
+      "U1:10"
+    ],
+    "UART_RX_MCU": [
+      "U1:11"
+    ],
+    "TARGET_GPIO2_MCU": [
+      "U1:12"
+    ],
+    "TARGET_GPIO3_MCU": [
+      "U1:17"
+    ],
+    "SPI_CS_MCU": [
+      "U1:18"
+    ],
+    "SPI_MOSI_MCU": [
+      "U1:19"
+    ],
+    "SPI_SCLK_MCU": [
+      "U1:20"
+    ],
+    "SPI_MISO_MCU": [
+      "U1:21"
+    ],
+    "PORT_OE_N": [
+      "U1:22"
+    ],
+    "I2C_ISOLATE": [
+      "U1:23"
+    ],
+    "SPI_DIR_MAIN": [
+      "U1:24"
+    ],
+    "SPI_MISO_OE_N": [
+      "U1:25"
+    ],
+    "UART_OE_N": [
+      "U1:31"
+    ],
+    "GPIO_DIR0": [
+      "U1:32"
+    ],
+    "GPIO_DIR1": [
+      "U1:33"
+    ],
+    "GPIO_DIR2": [
+      "U1:34"
+    ],
+    "GPIO_DIR3": [
+      "U1:35"
+    ],
+    "TARGET_GPIO1_MCU": [
+      "U1:38"
+    ],
+    "VTREF_ADC": [
+      "U1:39"
+    ]
+  },
+  "no_connect_pins": {
+    "U1:15": "GPIO3 (strapping reserved)",
+    "U1:16": "GPIO46 (strapping reserved, input-only)",
+    "U1:26": "GPIO45 (VDD_SPI strapping reserved)",
+    "U1:28": "GPIO35 (dedicated to internal octal PSRAM)",
+    "U1:29": "GPIO36 (dedicated to internal octal PSRAM)",
+    "U1:30": "GPIO37 (dedicated to internal octal PSRAM)",
+    "J1:A8": "SBU1 (unused in USB 2.0)",
+    "J1:B8": "SBU2 (unused in USB 2.0)"
+  }
+}

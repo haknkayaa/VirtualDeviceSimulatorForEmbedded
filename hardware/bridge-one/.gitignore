@@ -1,0 +1,23 @@
+# KiCad per-user and generated state
+*.kicad_prl
+*-backups/
+fp-info-cache
+*.lck
+~*.kicad_*
+# Raw supplier page snapshots (metadata is kept in supplier-evidence.json)
+research/sourcing/evidence/*.html
+# Generated assemblies (regenerate with cad/enclosure/generate_enclosure.py)
+cad/enclosure/bridge-one-assembly*.step
+__pycache__/
+# Regenerable CAD outputs (cad/preview/generate_preview.py, cad/enclosure/generate_enclosure.py)
+cad/preview/*.step
+cad/enclosure/*.step
+cad/enclosure/*.stl
+# Legacy model copies from the rev A preview; boards now use KiCad libs + cad/footprints
+cad/preview/3dmodels/
+cad/poc/.venv/
+# Project-authored 3D models (not a cache)
+!cad/footprints/BridgeOne.3dshapes/
+# Autorouter preview outputs (cad/schematic/autoroute.py)
+cad/schematic/autoroute/
+cad/schematic/bridge-one-autorouted.kicad_*
