@@ -18,3 +18,6 @@ cad/preview/3dmodels/
 cad/poc/.venv/
 # Project-authored 3D models (not a cache)
 !cad/footprints/BridgeOne.3dshapes/
+# Autorouter preview outputs (cad/schematic/autoroute.py)
+cad/schematic/autoroute/
+cad/schematic/bridge-one-autorouted.kicad_pcb
