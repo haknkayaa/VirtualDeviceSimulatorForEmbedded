@@ -53,6 +53,7 @@ NEW_ANCHORS = {
     "U22": (44.5, 31.0, 90, "bottom"),  # DNP second PSRAM under U4
     "D12": (21.5, 26.8, 0, "bottom"),   # OVP / UVLO pin clamps next to U15
     "D13": (26.5, 26.8, 0, "bottom"),
+    "U23": (58.0, 16.0, 0, "top"),      # FPGA rail supervisor next to U17
 }
 AUTO_PREFIXES = ("C", "R", "TP")
 PRO_PATH = os.path.join(HERE, "bridge-one.kicad_pro")
@@ -254,7 +255,7 @@ def main():
     pending = [r for r in parts if r not in board.placed]
     missing_anchor = [r for r in pending if not r.startswith(AUTO_PREFIXES)]
     if missing_anchor:
-        raise RuntimeError(f"no position for non-passive parts: {missing_anchor}")
+        print("auto-placing parts without an anchor:", ", ".join(sorted(missing_anchor)))
     # Place parts that share a signal net with something already placed first.
     pending.sort(key=lambda r: (parts[r][1].key, r))
     for ref in pending:

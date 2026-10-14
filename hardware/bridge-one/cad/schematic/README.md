@@ -25,14 +25,15 @@ pad nets, links footprints to schematic symbols (deterministic UUIDs), restores
 the JLCPCB 4-layer rules in bridge-one.kicad_pro, and writes the STEP and
 placement.json used by ../enclosure/generate_enclosure.py.
 
-Status (sch0.3, 2026-10-14): PCA9306 replaced by PCA9617ADP (research/i2c-translator-replacement.md); review fixes applied (research/review-codex-sch0.1.md,
+Status (sch0.4, 2026-10-14): TPS3808G01 FPGA rail supervisor and VTREF overvoltage
+disconnect added (research/vtref-ovp-and-fpga-supervisor.md); PCA9306 replaced by
+PCA9617ADP (research/i2c-translator-replacement.md); review fixes applied (research/review-codex-sch0.1.md,
 research/review-kicad-happy-sch0.1.md, research/footprint-verification.md).
 ERC: only intentional warnings (unused translator inputs tied to GND, TPS22917 QOD
-tied to VOUT). Netlist matches design.py exactly. PCB: 204 footprints, unrouted;
+tied to VOUT). Netlist matches design.py exactly. PCB: 215 footprints, unrouted;
 DRC errors are only unrouted nets, H2/H4 inside the module's conservative antenna
 keepout (symmetric holes by request) and a GCT USB-C library footprint hole note.
 
-Open: FPGA rail supervisor for U17 ON,
-VTREF overvoltage protection, power budget vs F1 hold with aux outputs, OLED FPC
-pin-1 mapping check on samples, 32 MB PSRAM option, KLS USB-C footprint swap,
-routing and bottom silkscreen cleanup.
+Open: power budget vs F1 hold with aux outputs enabled, ESP32 open-drain low <= 0.4 V
+for the PCA9617A B side (bench), OLED FPC pin-1 mapping check on samples, 32 MB PSRAM
+option, KLS USB-C footprint swap, routing and bottom silkscreen cleanup.
