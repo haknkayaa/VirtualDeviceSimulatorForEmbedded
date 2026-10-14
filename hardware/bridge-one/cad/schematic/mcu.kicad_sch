@@ -1459,7 +1459,7 @@
 	)
 	(rectangle
 		(start 15.24 20.32)
-		(end 400.05 161.29)
+		(end 400.05 166.37)
 		(stroke
 			(width 0.35)
 			(type dash)
@@ -1649,6 +1649,16 @@
 	)
 	(wire
 		(pts
+			(xy 58.42 142.24) (xy 58.42 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2d27018c-37c8-51d8-8b47-56d274274310")
+	)
+	(wire
+		(pts
 			(xy 38.1 104.14) (xy 35.56 104.14)
 		)
 		(stroke
@@ -1676,6 +1686,16 @@
 			(type default)
 		)
 		(uuid "3610ed52-5bc2-52db-8f02-197033192254")
+	)
+	(wire
+		(pts
+			(xy 107.95 142.24) (xy 107.95 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3612ac7b-10b6-5455-88ef-466d42b8b84e")
 	)
 	(wire
 		(pts
@@ -1889,6 +1909,16 @@
 	)
 	(wire
 		(pts
+			(xy 124.46 142.24) (xy 124.46 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "77df4b5a-ac7f-5c84-9f81-4d6f4dd52f74")
+	)
+	(wire
+		(pts
 			(xy 68.58 101.6) (xy 71.12 101.6)
 		)
 		(stroke
@@ -2009,6 +2039,16 @@
 	)
 	(wire
 		(pts
+			(xy 140.97 142.24) (xy 140.97 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "afdd7b34-2fdd-5c1f-b696-ba66f04c1123")
+	)
+	(wire
+		(pts
 			(xy 168.91 57.15) (xy 166.37 57.15)
 		)
 		(stroke
@@ -2046,6 +2086,26 @@
 			(type default)
 		)
 		(uuid "b238eb7a-5c88-5587-adf1-aa443b2d0d79")
+	)
+	(wire
+		(pts
+			(xy 91.44 142.24) (xy 91.44 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c38d9c70-8c9a-5c02-89f9-b4987c2d2bf9")
+	)
+	(wire
+		(pts
+			(xy 74.93 142.24) (xy 74.93 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c3f3684d-41c6-5b03-9b77-d7020a5764df")
 	)
 	(wire
 		(pts
@@ -2531,6 +2591,28 @@
 			)
 		)
 	)
+	(global_label "+3V3"
+		(shape passive)
+		(at 74.93 144.78 270)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "23c597ce-5819-58bd-a7e5-ec5037341c30")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 74.93 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
 	(global_label "I2C0_OFF"
 		(shape passive)
 		(at 318.77 71.12 270)
@@ -2883,6 +2965,28 @@
 			)
 		)
 	)
+	(global_label "VTREF_IO"
+		(shape passive)
+		(at 140.97 144.78 270)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "7488d98f-c24e-5e78-8252-8fd1288cbc8d")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 140.97 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
 	(global_label "GND"
 		(shape passive)
 		(at 95.25 71.12 270)
@@ -3005,6 +3109,28 @@
 		(uuid "86ade1e9-8983-59f4-803e-097341cdb646")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 71.12 91.44 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "FPGA_3V3"
+		(shape passive)
+		(at 124.46 144.78 270)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "87cb9aa6-c9ce-506b-b1b5-2645dc4333eb")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 124.46 144.78 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3169,6 +3295,28 @@
 			)
 		)
 	)
+	(global_label "FPGA_1V2"
+		(shape passive)
+		(at 91.44 144.78 270)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "a6acb513-fdfd-57a1-bba6-f978c251034c")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 91.44 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
 	(global_label "USB_DP"
 		(shape passive)
 		(at 71.12 78.74 0)
@@ -3225,6 +3373,28 @@
 		(uuid "bce1a38a-ac3a-5fb8-b0bf-7c8c12504e12")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 40.64 144.78 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "VBUS"
+		(shape passive)
+		(at 58.42 144.78 270)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "c2bb94cc-1732-5329-a4cf-06bc8b183f09")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 58.42 144.78 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3313,6 +3483,28 @@
 		(uuid "d993b1f9-1ef4-568b-b5b9-dd7dec590705")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 35.56 106.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+	)
+	(global_label "FPGA_VCCPLL"
+		(shape passive)
+		(at 107.95 144.78 270)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "dbf35104-d42e-5f2f-ab93-51cfdab82054")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 107.95 144.78 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3500,6 +3692,156 @@
 		)
 	)
 	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 140.97 142.24 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "019d2a6f-6648-5374-b7ed-2d3e634c18b5")
+		(property "Reference" "TP11"
+			(at 140.97 138.43 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "VTREF_IO"
+			(at 140.97 146.05 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 140.97 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 140.97 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 140.97 142.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "9a9cff77-0aa0-5c98-8a2a-ee4867a522fa")
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c/acedfb89-e2ef-5400-badc-08b203c376f7"
+					(reference "TP11")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 74.93 142.24 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "0850003f-bf59-5fce-9524-17b27fa0d421")
+		(property "Reference" "TP7"
+			(at 74.93 138.43 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3V3"
+			(at 74.93 146.05 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 74.93 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 74.93 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 74.93 142.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "40758c89-f155-5bce-8698-abf2c6d9077d")
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c/acedfb89-e2ef-5400-badc-08b203c376f7"
+					(reference "TP7")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Switch:SW_Push")
 		(at 173.99 57.15 0)
 		(unit 1)
@@ -3583,6 +3925,81 @@
 			(project "bridge-one"
 				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c/acedfb89-e2ef-5400-badc-08b203c376f7"
 					(reference "SW1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 124.46 142.24 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "322373d5-38ee-5a7b-8227-b31b6b8f4de9")
+		(property "Reference" "TP10"
+			(at 124.46 138.43 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "FPGA_3V3"
+			(at 124.46 146.05 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 124.46 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 124.46 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 124.46 142.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "661d27cc-729f-5e15-ae5a-e8a3b4f0331c")
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c/acedfb89-e2ef-5400-badc-08b203c376f7"
+					(reference "TP10")
 					(unit 1)
 				)
 			)
@@ -4051,6 +4468,81 @@
 			(project "bridge-one"
 				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c/acedfb89-e2ef-5400-badc-08b203c376f7"
 					(reference "C6")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 107.95 142.24 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "66001ea8-cc9c-5e91-bffd-5966d1f604e1")
+		(property "Reference" "TP9"
+			(at 107.95 138.43 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "FPGA_VCCPLL"
+			(at 107.95 146.05 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 107.95 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 107.95 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 107.95 142.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "3e76cadd-a46b-59fc-bc63-1f378cc47a8d")
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c/acedfb89-e2ef-5400-badc-08b203c376f7"
+					(reference "TP9")
 					(unit 1)
 				)
 			)
@@ -4752,6 +5244,156 @@
 			(project "bridge-one"
 				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c/acedfb89-e2ef-5400-badc-08b203c376f7"
 					(reference "R4")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 91.44 142.24 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "d317c079-78ca-589f-b04f-ca158eec6447")
+		(property "Reference" "TP8"
+			(at 91.44 138.43 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "FPGA_1V2"
+			(at 91.44 146.05 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 91.44 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 91.44 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 91.44 142.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "72b0f880-a0d7-593b-a078-b333af361d95")
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c/acedfb89-e2ef-5400-badc-08b203c376f7"
+					(reference "TP8")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Connector:TestPoint")
+		(at 58.42 142.24 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "e68068b7-26e4-5c3d-8a9d-6491f41dfb51")
+		(property "Reference" "TP6"
+			(at 58.42 138.43 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "VBUS"
+			(at 58.42 146.05 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
+			(at 58.42 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 58.42 142.24 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 58.42 142.24 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "efe96a6b-94ce-5756-a763-7cbb4f9d5870")
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c/acedfb89-e2ef-5400-badc-08b203c376f7"
+					(reference "TP6")
 					(unit 1)
 				)
 			)

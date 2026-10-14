@@ -51,6 +51,10 @@ class Part:
     fields: dict = field(default_factory=dict)
 
     def __post_init__(self):
+        if "(candidate)" in self.mpn:
+            # Keep the MPN field machine-readable; record the selection status separately.
+            self.mpn = self.mpn.replace("(candidate)", "").strip()
+            self.fields = {"Status": "candidate - verify before release", **self.fields}
         if self.mpn:
             self.fields = {"MPN": self.mpn, **self.fields}
 
@@ -63,12 +67,12 @@ class Group:
     parts: list
 
 
-def R(ref, value, a, b, fp=R0402, mpn=""):
-    return Part(ref, "Device:R", value, fp, {"1": a, "2": b}, mpn=mpn)
+def R(ref, value, a, b, fp=R0402, mpn="", dnp=False):
+    return Part(ref, "Device:R", value, fp, {"1": a, "2": b}, mpn=mpn, dnp=dnp)
 
 
-def C(ref, value, a, b=GND, fp=C0402, mpn=""):
-    return Part(ref, "Device:C", value, fp, {"1": a, "2": b}, mpn=mpn)
+def C(ref, value, a, b=GND, fp=C0402, mpn="", dnp=False):
+    return Part(ref, "Device:C", value, fp, {"1": a, "2": b}, mpn=mpn, dnp=dnp)
 
 
 def TP(ref, net):
@@ -107,14 +111,17 @@ power_in = Group("power_in", "USB-C universal power input", [
 
 # --- 2. 3V3 buck -----------------------------------------------------------
 buck = Group("buck", "3V3 buck (3.8-32 V in)", [
-    "AP63203: fixed 3.3 V, 2 A, 1.1 MHz, PFM at light load; EN tied to VIN (always on).",
+    "AP63203: fixed 3.3 V, 2 A, 1.1 MHz, PFM at light load.",
+    "EN from 100k/47k divider: EN <= 12.4 V at the 38.9 V TVS clamp (EN abs max 35 V); starts at ~3.7 V VIN.",
     "Board load ~100 mA typ, ~225 mA worst with FPGA; 3V3_OUT adds up to 300 mA.",
-    "Cin must be >= 35 V rated; place C1/C5 next to IN-GND, L1 and Cout close to SW.",
+    "Cin rated 50 V (VBUS may sit at 24 V below the SMAJ24A clamp); C1/C5 at IN-GND, L1/Cout close to SW.",
 ], [
     Part("U14", "Regulator_Switching:AP63203WU", "AP63203WU-7", "Package_TO_SOT_SMD:TSOT-23-6",
-         {"1": V3, "2": "VBUS", "3": "VBUS", "4": GND, "5": "BUCK_SW", "6": "BUCK_BST"},
+         {"1": V3, "2": "BUCK_EN", "3": "VBUS", "4": GND, "5": "BUCK_SW", "6": "BUCK_BST"},
          mpn="AP63203WU-7"),
-    C("C1", "10u 35V", "VBUS", fp=C1206),
+    R("R93", "100k 1%", "VBUS", "BUCK_EN"),
+    R("R94", "47k 1%", "BUCK_EN", GND),
+    C("C1", "10u 50V", "VBUS", fp=C1206),
     C("C5", "100n 50V", "VBUS", fp=C0603),
     C("C4", "100n", "BUCK_BST", "BUCK_SW", fp=C0603),
     Part("L1", "Device:L", "4.7uH Isat>=1A", "Inductor_SMD:L_Taiyo-Yuden_NR-30xx",
@@ -164,12 +171,19 @@ mcu = Group("mcu", "ESP32-S3 control plane", [
     TP("TP3", "SPARE0"),
     TP("TP4", "SPARE1"),
     TP("TP5", GND),
+    TP("TP6", "VBUS"),
+    TP("TP7", V3),
+    TP("TP8", "FPGA_1V2"),
+    TP("TP9", "FPGA_VCCPLL"),
+    TP("TP10", "FPGA_3V3"),
+    TP("TP11", "VTREF_IO"),
 ])
 
 # --- 4. Auxiliary outputs on J10 --------------------------------------------
 aux_out = Group("aux_out", "Aux power outputs (J10 5V_OUT / 3V3_OUT)", [
     "Off at reset (pull-downs on SHDN/EN); firmware enables per user request.",
     "5V_OUT: TPS26600 opens above ~6.0 V VBUS (OVP 100k/24.9k), UVLO ~4.4 V, ILIM 0.3 A (39k).",
+    "D12/D13 3.6 V zeners keep OVP/UVLO pins below their 5 V abs max at 24 V and during TVS clamping.",
     "3V3_OUT: TPS2553 limited to ~300 mA (88.7k), blocks reverse current from the user device.",
     "Never tied to VREF or the Raspberry Pi 5 V / 3.3 V pins (no back-powering).",
     "Ref: research/aux-power-outputs.md",
@@ -184,12 +198,14 @@ aux_out = Group("aux_out", "Aux power outputs (J10 5V_OUT / 3V3_OUT)", [
     R("R17", "37.4k 1%", "AUX5_UVLO", GND),
     R("R18", "100k 1%", "VBUS", "AUX5_OVP"),
     R("R19", "24.9k 1%", "AUX5_OVP", GND),
+    Part("D12", "Device:D_Zener", "BZT52C3V6", "Diode_SMD:D_SOD-123", {"1": "AUX5_OVP", "2": GND}, mpn="BZT52C3V6"),
+    Part("D13", "Device:D_Zener", "BZT52C3V6", "Diode_SMD:D_SOD-123", {"1": "AUX5_UVLO", "2": GND}, mpn="BZT52C3V6"),
     R("R21", "39k 1%", "AUX5_ILIM", GND),
     R("R22", "10k", "AUX5V_EN", GND),
     R("R23", "10k", "AUX5_IMON", GND),
     R("R24", "100k", V3, "AUX5_FLT_N"),
     C("C23", "10n", "AUX5_DVDT"),
-    R("R25", "0R DNP", "AUX5_MODE", GND),
+    R("R25", "0R", "AUX5_MODE", GND, dnp=True),
     C("C24", "1u 50V", "VBUS", fp=C0603),
     C("C25", "10u 16V", "5V_OUT", fp=C0805),
     Part("U16", "bridge_one:TPS2553DBV", "TPS2553DBVR", "Package_TO_SOT_SMD:SOT-23-6",
@@ -215,7 +231,7 @@ status = Group("status", "Status LEDs", [
 F3, F12 = "FPGA_3V3", "FPGA_1V2"
 fpga = Group("fpga", "iCE40UP5K SPI/GPIO bus engine", [
     "Configured by the S3 over SPI (slave mode, no config flash); same 4 wires become the data link.",
-    "Sequence: TPS22917 turns FPGA_3V3 on from FPGA_1V2 (VIH 1.0 V); CT 1 nF -> ~1.8 V/ms ramp (iCE40 max 10 V/ms).",
+    "Sequence: TPS22917 ON senses FPGA_VCCPLL (lags the core); CT 1 nF -> ~1.8 V/ms ramp. OPEN: supervisor for a hard threshold.",
     "Pins per research/ice40-pin-plan.md: CLK on G0/PLL pin 35, target SCK on G1 pin 37.",
     "RGB0-2 current sinks drive the FPGA / LINK / VTREF LEDs (anodes on +3V3, no series R).",
     "PSRAM: 8 MB fitted, second 8 MB footprint DNP (pin 20). 32 MB needs 2 more CS pins (open).",
@@ -245,9 +261,13 @@ fpga = Group("fpga", "iCE40UP5K SPI/GPIO bus engine", [
     C("C34", "4u7", "FPGA_VCCPLL", fp=C0603),
     C("C35", "100n", "FPGA_VCCPLL"),
     Part("U17", "Power_Management:TPS22917DBV", "TPS22917DBV", "Package_TO_SOT_SMD:SOT-23-6",
-         {"1": V3, "2": GND, "3": F12, "4": "FPGA_3V3_CT", "5": F3, "6": F3}, mpn="TPS22917DBVR"),
+         {"1": V3, "2": GND, "3": "FPGA_VCCPLL", "4": "FPGA_3V3_CT", "5": F3, "6": F3}, mpn="TPS22917DBVR"),
+    C("C70", "1u", V3),
     C("C64", "1n 25V C0G", "FPGA_3V3_CT", V3),
     C("C36", "4u7", F3, fp=C0603),
+    C("C71", "4u7", F3, fp=C0603),
+    C("C72", "4u7", F3, fp=C0603),
+    C("C73", "4u7", F12, fp=C0603),
     C("C37", "100n", F3),
     C("C38", "100n", F3),
     C("C39", "100n", F3),
@@ -255,13 +275,14 @@ fpga = Group("fpga", "iCE40UP5K SPI/GPIO bus engine", [
     R("R13", "2k2", F3, "FPGA_CDONE"),
     R("R32", "10k", "FPGA_SS_N", GND),
     R("R33", "10k", F3, "FPGA_SCK"),
-    Part("Y1", "Oscillator:ASE-xxxMHz", "12MHz 3V3", "Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_2.0x1.6mm",
-         {"1": F3, "2": GND, "3": "CLK_12M", "4": F3}, mpn="OT201612MJBA4SL (candidate)", fields={"Note": "Footprint pads oversize vs YXC land pattern; review"}),
+    Part("Y1", "Oscillator:ASE-xxxMHz", "12MHz 3V3", "BridgeOne:Oscillator_SMD_YXC_2016-4Pin_2.0x1.6mm",
+         {"1": F3, "2": GND, "3": "CLK_12M", "4": F3}, mpn="OT201612MJBA4SL (candidate)"),
     C("C41", "100n", F3),
     Part("U4", "Memory_RAM:APS6404L-3SQRx-SN", "APS6404L 8MB", "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
          {"1": "PSRAM_CS_N", "2": "PSRAM_IO1", "3": "PSRAM_IO2", "4": GND, "5": "PSRAM_IO0",
           "6": "PSRAM_SCK", "7": "PSRAM_IO3", "8": F3}, mpn="APS6404L-3SQR-SN (candidate)"),
     R("R34", "10k", F3, "PSRAM_CS_N"),
+    C("C68", "1u", F3),
     C("C42", "100n", F3),
     Part("D4", "Device:LED", "FPGA", "LED_SMD:LED_0603_1608Metric", {"2": V3, "1": "LED_FPGA_K"}),
     Part("D3", "Device:LED", "LINK", "LED_SMD:LED_0603_1608Metric", {"2": V3, "1": "LED_LINK_K"}),
@@ -271,14 +292,15 @@ fpga = Group("fpga", "iCE40UP5K SPI/GPIO bus engine", [
          {"1": "PSRAM_CS1_N", "2": "PSRAM_IO1", "3": "PSRAM_IO2", "4": GND, "5": "PSRAM_IO0",
           "6": "PSRAM_SCK", "7": "PSRAM_IO3", "8": F3}, mpn="APS6404L-3SQR-SN", dnp=True),
     R("R86", "10k", F3, "PSRAM_CS1_N"),
-    C("C63", "100n", F3),
+    C("C63", "100n", F3, dnp=True),
+    C("C69", "1u", F3, dnp=True),
 ])
 
 # --- 7. Isolation logic and VTREF sense ---------------------------------------
 gating = Group("gating", "Target isolation logic + VTREF sense", [
     "Global wins: PORT_GATE_N = PORT_OE_N OR VTREF_BAD; every port enable is gated by it in hardware.",
     "Reset default = isolated (pull-ups on *_OE_N / *_OFF, FPGA outputs Hi-Z until configured).",
-    "VTREF_BAD when VTREF < ~1.5 V (TLV7011 vs 0.76 V ref); comparator runs from +3V3, not VTREF.",
+    "VTREF_BAD when VTREF < ~1.5 V (TLV7011 vs 0.76 V ref, own unfiltered 47k/47k divider: fast); runs from +3V3.",
     "VTREF is an input reference only: 470k/470k divider keeps backfeed ~3 uA.",
     "Ref: research/target-interface-spec.md, research/pinouts-and-gates.md",
 ], [
@@ -299,8 +321,8 @@ gating = Group("gating", "Target isolation logic + VTREF sense", [
     R("R36", "100k", V3, "GPIO_OE_HW_N"),
     R("R37", "100k", V3, "MISO_OE_HW_N"),
     R("R38", "100k", V3, "PORT_GATE_N"),
-    R("R39", "10k", V3, "GPIO_OE_N"),
-    R("R40", "10k", V3, "T_MISO_OE_N"),
+    R("R39", "10k", "FPGA_3V3", "GPIO_OE_N"),
+    R("R40", "10k", "FPGA_3V3", "T_MISO_OE_N"),
     R("R41", "10R", "VTREF", "VTREF_IO"),
     C("C46", "1u", "VTREF_IO"),
     R("R42", "470k 1%", "VTREF", "VTREF_DIV"),
@@ -310,7 +332,9 @@ gating = Group("gating", "Target isolation logic + VTREF sense", [
     R("R45", "100k 1%", V3, "VREF_LOW"),
     R("R46", "30k 1%", "VREF_LOW", GND),
     Part("U21", "Comparator:TLV7031DBV", "TLV7011DBV", "Package_TO_SOT_SMD:SOT-23-5",
-         {"1": "VTREF_BAD", "2": GND, "3": "VREF_LOW", "4": "VTREF_DIV", "5": V3}, mpn="TLV7011DBVR"),
+         {"1": "VTREF_BAD", "2": GND, "3": "VREF_LOW", "4": "VTREF_CMP", "5": V3}, mpn="TLV7011DBVR"),
+    R("R91", "47k 1%", "VTREF", "VTREF_CMP"),
+    R("R92", "47k 1%", "VTREF_CMP", GND),
     C("C48", "100n", V3),
     FLAG("#FLG6", "VTREF"),
     FLAG("#FLG7", "VTREF_IO"),
@@ -319,8 +343,10 @@ gating = Group("gating", "Target isolation logic + VTREF sense", [
 ])
 
 # --- 8. Translators -----------------------------------------------------------
-def i2c_port(n, u, r_en, r_pd, c_en, c_v):
+def i2c_port(n, u, r_en, r_pd, c_en, c_v, r_tgt):
     return [
+        R(r_tgt[0], "4k7 DNP", "VTREF_IO", f"I2C{n}_SDA_TGT", dnp=True),
+        R(r_tgt[1], "4k7 DNP", "VTREF_IO", f"I2C{n}_SCL_TGT", dnp=True),
         Part(u, "Interface:PCA9306DC", "PCA9306DCU", "Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
              {"1": GND, "2": "VTREF_IO", "3": f"I2C{n}_SCL_TGT", "4": f"I2C{n}_SDA_TGT",
               "5": f"I2C{n}_SDA_MCU", "6": f"I2C{n}_SCL_MCU", "7": f"I2C{n}_EN_NODE", "8": f"I2C{n}_EN_NODE"},
@@ -341,8 +367,8 @@ translators = Group("translators", "Target level translators (A = +3V3 side, B =
     "PCA9306 EN/VREF2 driven from gated I2Cn_EN_DRV via 200k (no backfeed into an unpowered target).",
     "UART: bank 1 bridge->target, bank 2 target->bridge, fixed. SPI: U6 target->FPGA, U7 MISO only.",
     "GPIO: per-bit DIR from FPGA (10k pull-down = B->A input default), common OE gated.",
-    "MCU-side I2C pull-ups 4k7; target-side pull-ups DNP (target boards normally have their own).",
-], i2c_port(0, "U8", "R47", "R48", "C49", "C50") + i2c_port(1, "U9", "R49", "R50", "C51", "C52") + [
+    "MCU-side I2C pull-ups 4k7 fitted; target-side 4k7 to VTREF_IO DNP (R87-R90): targets usually have their own.",
+], i2c_port(0, "U8", "R47", "R48", "C49", "C50", ("R87", "R88")) + i2c_port(1, "U9", "R49", "R50", "C51", "C52", ("R89", "R90")) + [
     R("R51", "4k7", V3, "I2C0_SDA_MCU"), R("R52", "4k7", V3, "I2C0_SCL_MCU"),
     R("R53", "4k7", V3, "I2C1_SDA_MCU"), R("R54", "4k7", V3, "I2C1_SCL_MCU"),
     Part("U10", AVC, "SN74AVC4T245RSV", QFN,
@@ -393,7 +419,7 @@ DIRECT = ["VTREF", GND, "I2C0_SDA_TGT", "I2C0_SCL_TGT", "I2C1_SDA_TGT", "I2C1_SC
 
 
 def esd(ref, lines):
-    return Part(ref, "Power_Protection:TPD4E05U06DQA", "TPD4E05U06", "Package_SON:USON-10_2.5x1.0mm_P0.5mm",
+    return Part(ref, "Power_Protection:TPD4E05U06DQA", "TPD4E05U06", "BridgeOne:USON-10_2.5x1.0mm_P0.5mm_TI_DQA",
                 {"1": lines[0], "2": lines[1], "4": lines[2], "5": lines[3], "3": GND, "8": GND},
                 nc=("6", "7", "9", "10"), mpn="TPD4E05U06DQAR")
 

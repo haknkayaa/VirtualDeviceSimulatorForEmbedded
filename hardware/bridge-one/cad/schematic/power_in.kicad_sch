@@ -3013,7 +3013,18 @@
 				)
 			)
 		)
-		(property "MPN" "USB4105-GF-A-120 (candidate)"
+		(property "MPN" "USB4105-GF-A-120"
+			(at 31.75 68.58 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Status" "candidate - verify before release"
 			(at 31.75 68.58 0)
 			(hide yes)
 			(show_name no)

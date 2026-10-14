@@ -163,7 +163,7 @@ SILK = [
     ("1", PI_PIN1[0] - 2.6, PI_PIN1[1], 0.8, "F", "center", 0),
 ] + [
     (name, direct_pin_xy(pin)[0],
-     direct_pin_xy(pin)[1] + (3.25 if pin % 2 else -3.25), 0.55, "F", "center", 90)
+     direct_pin_xy(pin)[1] + (3.25 if pin % 2 else -3.25), 0.6, "F", "center", 90)
     for pin, name in enumerate(DIRECT_PINS, start=1)
 ]
 
