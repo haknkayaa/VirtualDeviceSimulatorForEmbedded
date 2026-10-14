@@ -24,7 +24,8 @@ fixtures, rather than replacing the V1 virtual-peripheral objective.
 | [`docs/pi-header-pinout.md`](docs/pi-header-pinout.md) | Raspberry Pi 40-pin compatible target header |
 | [`docs/history/`](docs/history/) | Dated handoffs, delegation log, MCP audit, superseded reviews |
 | [`research/`](research/) | Technical research; `sourcing/` holds the candidate BOM and supplier evidence |
-| [`cad/core/`](cad/core/) | Core schematic (USB-C, power, MCU), its generator and net manifest |
+| [`cad/schematic/`](cad/schematic/) | KiCad 10 project: schematic + PCB generated from `design.py` ([PDF](cad/schematic/bridge-one-schematic.pdf)) |
+| [`cad/core/`](cad/core/) | Superseded rev A core schematic (history) |
 | [`cad/preview/`](cad/preview/) | Placement-only PCB preview and STEP ([3D](docs/images/bridge-one-revF-3d.png), [top](docs/images/bridge-one-revF-top.png)) |
 | [`cad/enclosure/`](cad/enclosure/) | Parametric 3D-printable enclosure and board+enclosure STEP assemblies ([exploded](docs/images/bridge-one-enclosure-exploded.png)) |
 | [`cad/footprints/`](cad/footprints/) | Project footprints and 3D models (KLS USB-C, OLED panel) |

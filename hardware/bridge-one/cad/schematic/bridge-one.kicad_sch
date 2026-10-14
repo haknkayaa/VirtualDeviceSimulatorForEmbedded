@@ -46,7 +46,7 @@
 		)
 		(uuid "25ea13de-25d5-5701-a0cb-662a5145cb77")
 	)
-	(text "A3 - 8 parts"
+	(text "A3 - 10 parts"
 		(exclude_from_sim no)
 		(at 116.84 72.39 0)
 		(effects
@@ -90,7 +90,7 @@
 		)
 		(uuid "7977e828-1a3d-54a6-b2df-9f9f8027a743")
 	)
-	(text "A3 - 19 parts"
+	(text "A3 - 21 parts"
 		(exclude_from_sim no)
 		(at 307.34 72.39 0)
 		(effects
@@ -123,7 +123,7 @@
 		)
 		(uuid "add4bea5-e515-5b9b-b6b8-b0efc7661ec2")
 	)
-	(text "A3 - 19 parts"
+	(text "A3 - 25 parts"
 		(exclude_from_sim no)
 		(at 212.09 72.39 0)
 		(effects
@@ -145,7 +145,7 @@
 		)
 		(uuid "c10e49a6-a685-5fae-8d64-997c78d6dfbe")
 	)
-	(text "A3 - 30 parts"
+	(text "A3 - 36 parts"
 		(exclude_from_sim no)
 		(at 116.84 120.65 0)
 		(effects
@@ -156,7 +156,7 @@
 		)
 		(uuid "c3eb8ec8-8472-56b3-9a29-7900a0204d82")
 	)
-	(text "A2 - 55 parts"
+	(text "A2 - 59 parts"
 		(exclude_from_sim no)
 		(at 307.34 120.65 0)
 		(effects
@@ -167,7 +167,7 @@
 		)
 		(uuid "cd708332-9e10-5f56-b097-0a7135a6c898")
 	)
-	(text "A3 - 26 parts"
+	(text "A3 - 28 parts"
 		(exclude_from_sim no)
 		(at 212.09 120.65 0)
 		(effects

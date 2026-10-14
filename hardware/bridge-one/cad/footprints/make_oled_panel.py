@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Generate the approximate 0.96in 128x64 OLED panel footprint and 3D model.
 
-Dimensions follow the common UG-2864/SSD1306 0.96in bare-panel class and are
-placeholders until an exact panel is chosen: glass 26.70 x 19.26 x 1.45 mm,
-active area 21.74 x 10.86 mm. The panel sits on 0.3 mm foam tape; its FPC tail
+Model: Wisevision X096-2864KSWPG17-C30 (SSD1315): glass 24.70 x 16.60 x 1.30 mm,
+active 21.74 x 11.175 mm, 1.48 mm below the glass top edge (research/oled-panel.md).
+The courtyard is sized for the larger second source (ER-OLED0.96-1.3W, 26.70 x
+19.26 mm glass) so either panel fits the same footprint. The panel sits on 0.3 mm foam tape; its FPC tail
 leaves the bottom edge toward a 30-pin 0.5 mm ZIF connector.
 Run with CadQuery (e.g. ~/.venvs/cad/bin/python).
 """
@@ -14,11 +15,12 @@ import cadquery as cq
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NAME = "OLED_0.96in_128x64_Panel"
-GLASS_W, GLASS_H, GLASS_T = 26.70, 19.26, 1.45
-ACTIVE_W, ACTIVE_H = 21.74, 10.86
-ACTIVE_TOP = 1.90       # active-area offset from the glass top edge
+GLASS_W, GLASS_H, GLASS_T = 24.70, 16.60, 1.30
+ACTIVE_W, ACTIVE_H = 21.74, 11.175
+ACTIVE_TOP = 1.48       # active-area offset from the glass top edge
+ALT_GLASS_W, ALT_GLASS_H = 26.70, 19.26   # second source outline (courtyard)
 TAPE = 0.30
-TAIL_W, TAIL_L = 12.0, 3.0
+TAIL_W, TAIL_L = 15.5, 3.0
 
 
 def model():
@@ -51,11 +53,11 @@ def footprint():
 \t(version 20241229)
 \t(generator "make_oled_panel.py")
 \t(layer "F.Cu")
-\t(descr "0.96in 128x64 OLED bare panel outline (approximate, UG-2864 class); mounted on foam tape, FPC to a separate ZIF connector")
+\t(descr "0.96in 128x64 OLED: Wisevision X096-2864KSWPG17-C30 outline; courtyard fits ER-OLED0.96-1.3W; foam tape mount, FPC to ZIF")
 \t(attr board_only exclude_from_pos_files exclude_from_bom)
 \t(property "Reference" "REF**" (at 0 {-GLASS_H / 2 - 1.2:.2f} 0) (layer "F.SilkS") (effects (font (size 0.8 0.8) (thickness 0.12))))
 \t(property "Value" "{NAME}" (at 0 {ay:.2f} 0) (layer "F.Fab") (effects (font (size 0.8 0.8) (thickness 0.12))))
-{rect_lines("F.SilkS", GLASS_W + 0.3, GLASS_H + 0.3, 0.12)}{rect_lines("F.Fab", GLASS_W, GLASS_H, 0.1)}{rect_lines("F.CrtYd", GLASS_W + 0.5, GLASS_H + 0.5, 0.05)}\t(model "${{KIPRJMOD}}/../footprints/BridgeOne.3dshapes/{NAME}.step" (offset (xyz 0 0 0)) (scale (xyz 1 1 1)) (rotate (xyz 0 0 0)))
+{rect_lines("F.SilkS", GLASS_W + 0.3, GLASS_H + 0.3, 0.12)}{rect_lines("F.Fab", GLASS_W, GLASS_H, 0.1)}{rect_lines("F.CrtYd", ALT_GLASS_W + 0.5, ALT_GLASS_H + 0.5, 0.05)}\t(model "${{KIPRJMOD}}/../footprints/BridgeOne.3dshapes/{NAME}.step" (offset (xyz 0 0 0)) (scale (xyz 1 1 1)) (rotate (xyz 0 0 0)))
 )
 '''
     with open(os.path.join(HERE, "BridgeOne.pretty", NAME + ".kicad_mod"), "w", encoding="utf-8") as f:

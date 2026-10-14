@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "BridgeOne")(type "KiCad")(uri "${KIPRJMOD}/../footprints/BridgeOne.pretty")(options "")(descr "Bridge One project footprints"))
+)
