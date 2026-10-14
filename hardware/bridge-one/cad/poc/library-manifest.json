@@ -1,0 +1,14 @@
+{
+  "/usr/share/kicad/symbols/Connector.kicad_sym": {
+    "sha256": "50b42bf755009d3d459c310182dca1c37e1ff1a01fa6ae23846b416fafffc914"
+  },
+  "/usr/share/kicad/symbols/Device.kicad_sym": {
+    "sha256": "d8cd2847723eef0397104b8647872c80147795358312230604a502750f87023d"
+  },
+  "/usr/share/kicad/symbols/Regulator_Linear.kicad_sym": {
+    "sha256": "09d0d95dbe5040452c683015077fcdff881b87112c1610008347f5be0df1eaea"
+  },
+  "/usr/share/kicad/symbols/power.kicad_sym": {
+    "sha256": "dfd086b4029e347d7a0041744b684ba8dda351ba8d8f7838cc0cbaeb06c87b54"
+  }
+}
