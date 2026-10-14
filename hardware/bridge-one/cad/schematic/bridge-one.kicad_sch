@@ -156,7 +156,7 @@
 		)
 		(uuid "c3eb8ec8-8472-56b3-9a29-7900a0204d82")
 	)
-	(text "A2 - 59 parts"
+	(text "A3 - 57 parts"
 		(exclude_from_sim no)
 		(at 307.34 120.65 0)
 		(effects
@@ -167,7 +167,7 @@
 		)
 		(uuid "cd708332-9e10-5f56-b097-0a7135a6c898")
 	)
-	(text "A3 - 28 parts"
+	(text "A3 - 26 parts"
 		(exclude_from_sim no)
 		(at 212.09 120.65 0)
 		(effects
@@ -545,7 +545,7 @@
 			(color 230 240 255 1)
 		)
 		(uuid "d3c6fef7-3c6e-5553-ad27-3e87f03d5330")
-		(property "Sheetname" "Target level translators (A = +3V3 side, B = VTREF side)"
+		(property "Sheetname" "Target level translators and I2C repeaters"
 			(at 304.8 114.87 0)
 			(show_name no)
 			(do_not_autoplace no)

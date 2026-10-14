@@ -338,22 +338,20 @@ gating = Group("gating", "Target isolation logic + VTREF sense", [
     C("C48", "100n", V3),
     FLAG("#FLG6", "VTREF"),
     FLAG("#FLG7", "VTREF_IO"),
-    FLAG("#FLG8", "I2C0_EN_NODE"),
-    FLAG("#FLG9", "I2C1_EN_NODE"),
 ])
 
 # --- 8. Translators -----------------------------------------------------------
-def i2c_port(n, u, r_en, r_pd, c_en, c_v, r_tgt):
+def i2c_port(n, u, r_pd, c_b, c_v, r_tgt):
+    # PCA9617ADP repeater: port A = target (VTREF_IO), port B = MCU (+3V3); research/i2c-translator-replacement.md.
     return [
         R(r_tgt[0], "4k7 DNP", "VTREF_IO", f"I2C{n}_SDA_TGT", dnp=True),
         R(r_tgt[1], "4k7 DNP", "VTREF_IO", f"I2C{n}_SCL_TGT", dnp=True),
-        Part(u, "Interface:PCA9306DC", "PCA9306DCU", "Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
-             {"1": GND, "2": "VTREF_IO", "3": f"I2C{n}_SCL_TGT", "4": f"I2C{n}_SDA_TGT",
-              "5": f"I2C{n}_SDA_MCU", "6": f"I2C{n}_SCL_MCU", "7": f"I2C{n}_EN_NODE", "8": f"I2C{n}_EN_NODE"},
-             mpn="PCA9306DCUR"),
-        R(r_en, "200k", f"I2C{n}_EN_DRV", f"I2C{n}_EN_NODE"),
-        R(r_pd, "2.2M", f"I2C{n}_EN_NODE", GND),
-        C(c_en, "10n", f"I2C{n}_EN_NODE"),
+        Part(u, "bridge_one:PCA9617ADP", "PCA9617ADP", "Package_SO:TSSOP-8_3x3mm_P0.65mm",
+             {"1": "VTREF_IO", "2": f"I2C{n}_SCL_TGT", "3": f"I2C{n}_SDA_TGT", "4": GND,
+              "5": f"I2C{n}_EN_DRV", "6": f"I2C{n}_SDA_MCU", "7": f"I2C{n}_SCL_MCU", "8": V3},
+             mpn="PCA9617ADP,118", datasheet="https://www.nxp.com/docs/en/data-sheet/PCA9617A.pdf"),
+        R(r_pd, "10k", f"I2C{n}_EN_DRV", GND),
+        C(c_b, "100n", V3),
         C(c_v, "100n", "VTREF_IO"),
     ]
 
@@ -362,13 +360,15 @@ AVC = "bridge_one:SN74AVC4T245RSV"
 AXC = "bridge_one:SN74AXC4T774RSV"
 QFN = "Package_DFN_QFN:UQFN-16_1.8x2.6mm_P0.4mm"
 
-translators = Group("translators", "Target level translators (A = +3V3 side, B = VTREF side)", [
-    "VCCA = +3V3, VCCB = VTREF_IO (1.65-3.6 V); DIR/OE referenced to VCCA; Ioff isolates when unpowered.",
-    "PCA9306 EN/VREF2 driven from gated I2Cn_EN_DRV via 200k (no backfeed into an unpowered target).",
+translators = Group("translators", "Target level translators and I2C repeaters", [
+    "AVC/AXC: VCCA = +3V3, VCCB = VTREF_IO (1.65-3.6 V); DIR/OE referenced to VCCA; Ioff isolates when unpowered.",
+    "I2C: PCA9617A repeaters, port A = target (VTREF_IO 0.8-5.5 V), port B = MCU 3.3 V; equal rails supported.",
+    "EN = gated I2Cn_EN_DRV (10k pull-down); no bias path from +3V3 into VTREF. B side has <=0.6 V static offset.",
+    "BENCH: ESP32 open-drain low <= 0.4 V under load (B-side requirement); 1.65 V targets have ~12 mV VIL margin.",
     "UART: bank 1 bridge->target, bank 2 target->bridge, fixed. SPI: U6 target->FPGA, U7 MISO only.",
     "GPIO: per-bit DIR from FPGA (10k pull-down = B->A input default), common OE gated.",
     "MCU-side I2C pull-ups 4k7 fitted; target-side 4k7 to VTREF_IO DNP (R87-R90): targets usually have their own.",
-], i2c_port(0, "U8", "R47", "R48", "C49", "C50", ("R87", "R88")) + i2c_port(1, "U9", "R49", "R50", "C51", "C52", ("R89", "R90")) + [
+], i2c_port(0, "U8", "R48", "C49", "C50", ("R87", "R88")) + i2c_port(1, "U9", "R50", "C51", "C52", ("R89", "R90")) + [
     R("R51", "4k7", V3, "I2C0_SDA_MCU"), R("R52", "4k7", V3, "I2C0_SCL_MCU"),
     R("R53", "4k7", V3, "I2C1_SDA_MCU"), R("R54", "4k7", V3, "I2C1_SCL_MCU"),
     Part("U10", AVC, "SN74AVC4T245RSV", QFN,

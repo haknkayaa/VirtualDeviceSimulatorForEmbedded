@@ -22,6 +22,14 @@ SYMBOLS = {
                    [("1", "IN", "power_in"), ("3", "EN", "input"), ("5", "ILIM", "passive"),
                     ("2", "GND", "power_in")],
                    [("6", "OUT", "power_out"), ("4", "~{FAULT}", "open_collector")]),
+    # NXP PCA9617A data sheet section 5 Table 3, TSSOP8/MSOP8 (DP); HWSON (TP) differs.
+    "PCA9617ADP": ("U", "Package_SO:TSSOP-8_3x3mm_P0.65mm",
+                   "https://www.nxp.com/docs/en/data-sheet/PCA9617A.pdf",
+                   "Level-translating Fm+ I2C-bus repeater, A = 0.8-5.5 V, B = 2.2-5.5 V, active-high EN",
+                   [("1", "VCC(A)", "power_in"), ("2", "SCLA", "bidirectional"), ("3", "SDAA", "bidirectional"),
+                    ("4", "GND", "power_in")],
+                   [("8", "VCC(B)", "power_in"), ("7", "SCLB", "bidirectional"), ("6", "SDAB", "bidirectional"),
+                    ("5", "EN", "input")]),
     # TI SCES576I Table 4-1 "Pin Functions", RSV column (research/pinouts-and-gates.md).
     "SN74AVC4T245RSV": ("U", "Package_DFN_QFN:UQFN-16_1.8x2.6mm_P0.4mm",
                         "https://www.ti.com/lit/ds/symlink/sn74avc4t245.pdf",
