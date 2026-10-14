@@ -1,0 +1,350 @@
+[
+  {
+    "mpn": "ESP32-S3-WROOM-1-N8R8",
+    "requested_url": "https://www.ozdisan.com/p/wifi-modulleri-652/espressif-systems-esp32-s3-wroom-1-n8r8-1060517",
+    "checked_at_utc": "2026-10-14T12:10:40.606644+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/wifi-modulleri-652/espressif-systems-esp32-s3-wroom-1-n8r8-1060517",
+    "sha256": "464630a9440a0eceb5926480166166508a06ea10979b3590f1f237610eb235bc",
+    "page_mpn": "ESP32-S3-WROOM-1-N8R8",
+    "page_name": "ESP32-S3-WROOM-1-N8R8",
+    "offers": [],
+    "status": "verified listing; stock unknown"
+  },
+  {
+    "mpn": "L-KLS1-5416-L1-01-R",
+    "requested_url": "https://www.ozdisan.com/p/usb-konnektorler-357/kls-electronic-l-kls1-5416-l1-01-r-1564461",
+    "checked_at_utc": "2026-10-14T12:10:40.607956+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/usb-konnektorler-357/kls-electronic-l-kls1-5416-l1-01-r-1564461",
+    "sha256": "0b59162f35aee97f0a06a20240f965efc4116becaddc48e8a4552cdc1d52da8a",
+    "page_mpn": "L-KLS1-5416-L1-01-R",
+    "page_name": "L-KLS1-5416-L1-01-R",
+    "offers": [
+      {
+        "availability": "https://schema.org/InStock",
+        "inventoryLevel": {
+          "@type": "QuantitativeValue",
+          "value": 665
+        },
+        "eligibleQuantity": {
+          "@type": "QuantitativeValue",
+          "minValue": 1
+        }
+      }
+    ],
+    "status": "verified listing; reported in-stock"
+  },
+  {
+    "mpn": "LD1117AS33TR",
+    "requested_url": "https://www.ozdisan.com/p/lineer-voltaj-regulatorleri-279/stm-ld1117as33tr-535478",
+    "checked_at_utc": "2026-10-14T12:10:40.608346+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/lineer-voltaj-regulatorleri-279/stm-ld1117as33tr-535478",
+    "sha256": "ca302d32d7fc7daf586eaa68042521c97065b0f0447318435d7c2b3dd8ae01b7",
+    "page_mpn": "LD1117AS33TR",
+    "page_name": "LD1117AS33TR",
+    "offers": [
+      {
+        "availability": "https://schema.org/InStock",
+        "inventoryLevel": {
+          "@type": "QuantitativeValue",
+          "value": 8229
+        },
+        "eligibleQuantity": {
+          "@type": "QuantitativeValue",
+          "minValue": 1
+        }
+      }
+    ],
+    "status": "verified listing; reported in-stock"
+  },
+  {
+    "mpn": "LD1117AS18TR",
+    "requested_url": "https://www.ozdisan.com/p/lineer-voltaj-regulatorleri-279/stm-ld1117as18tr-490212",
+    "checked_at_utc": "2026-10-14T12:10:40.608673+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/lineer-voltaj-regulatorleri-279/stm-ld1117as18tr-490212",
+    "sha256": "e9ff1235ff8e9067fa1094582cbba49e191ed97b0fa58d5ace2a78ad2c6eac14",
+    "page_mpn": "LD1117AS18TR",
+    "page_name": "LD1117AS18TR",
+    "offers": [
+      {
+        "availability": "https://schema.org/InStock",
+        "inventoryLevel": {
+          "@type": "QuantitativeValue",
+          "value": 41058
+        },
+        "eligibleQuantity": {
+          "@type": "QuantitativeValue",
+          "minValue": 2
+        }
+      }
+    ],
+    "status": "verified listing; reported in-stock"
+  },
+  {
+    "mpn": "SN74AVC4T245PWR",
+    "requested_url": "https://www.ozdisan.com/p/translator-entegreleri-254/texas-sn74avc4t245pwr-433526",
+    "checked_at_utc": "2026-10-14T12:10:40.609004+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/translator-entegreleri-254/texas-sn74avc4t245pwr-433526",
+    "sha256": "c1f8cff36fc3a1f70caa2f6a4bf9fffa760650ab65dc28393b6f65d1aa7224a2",
+    "page_mpn": "SN74AVC4T245PWR",
+    "page_name": "SN74AVC4T245PWR",
+    "offers": [
+      {
+        "availability": "https://schema.org/InStock",
+        "inventoryLevel": {
+          "@type": "QuantitativeValue",
+          "value": 7708
+        },
+        "eligibleQuantity": {
+          "@type": "QuantitativeValue",
+          "minValue": 1
+        }
+      }
+    ],
+    "status": "verified listing; reported in-stock"
+  },
+  {
+    "mpn": "SN74AXC4T774RSVR",
+    "requested_url": "https://www.ozdisan.com/p/translator-entegreleri-254/texas-sn74axc4t774rsvr-626987",
+    "checked_at_utc": "2026-10-14T12:10:40.609235+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/translator-entegreleri-254/texas-sn74axc4t774rsvr-626987",
+    "sha256": "a3feab6668662cdf03dbe9b497e9498c5a95860514e1867983f7e1676eb7d452",
+    "page_mpn": "SN74AXC4T774RSVR",
+    "page_name": "SN74AXC4T774RSVR",
+    "offers": [
+      {
+        "availability": "https://schema.org/InStock",
+        "inventoryLevel": {
+          "@type": "QuantitativeValue",
+          "value": 10019
+        },
+        "eligibleQuantity": {
+          "@type": "QuantitativeValue",
+          "minValue": 1
+        }
+      }
+    ],
+    "status": "verified listing; reported in-stock"
+  },
+  {
+    "mpn": "PCA9306DCTR",
+    "requested_url": "https://www.ozdisan.com/p/translator-entegreleri-254/texas-pca9306dctr-738498",
+    "checked_at_utc": "2026-10-14T12:10:41.460148+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/translator-entegreleri-254/texas-pca9306dctr-738498",
+    "sha256": "1a3af27629d32c4f67f10f4fc113b4df44d29dae913ab58804ddabfd3e4f71c9",
+    "page_mpn": "PCA9306DCTR",
+    "page_name": "PCA9306DCTR",
+    "offers": [
+      {
+        "availability": "https://schema.org/InStock",
+        "inventoryLevel": {
+          "@type": "QuantitativeValue",
+          "value": 6936
+        },
+        "eligibleQuantity": {
+          "@type": "QuantitativeValue",
+          "minValue": 1
+        }
+      }
+    ],
+    "status": "verified listing; reported in-stock"
+  },
+  {
+    "mpn": "PCA9306DCUR",
+    "requested_url": "https://www.ozdisan.com/p/translator-entegreleri-254/texas-pca9306dcur-527329",
+    "checked_at_utc": "2026-10-14T12:10:41.551036+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/translator-entegreleri-254/texas-pca9306dcur-527329",
+    "sha256": "0b4289965ac4c41b143b4d978df317d13d09941aaf402622590759af01892c15",
+    "page_mpn": "PCA9306DCUR",
+    "page_name": "PCA9306DCUR",
+    "offers": [
+      {
+        "availability": "https://schema.org/InStock",
+        "inventoryLevel": {
+          "@type": "QuantitativeValue",
+          "value": 2163
+        },
+        "eligibleQuantity": {
+          "@type": "QuantitativeValue",
+          "minValue": 1
+        }
+      }
+    ],
+    "status": "verified listing; reported in-stock"
+  },
+  {
+    "mpn": "PESD5V0U1UT,215",
+    "requested_url": "https://www.ozdisan.com/p/tvs-diyotlar-386/nexperia-pesd5v0u1ut-215-1202289",
+    "checked_at_utc": "2026-10-14T12:10:41.579045+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/tvs-diyotlar-386/nexperia-pesd5v0u1ut-215-1202289",
+    "sha256": "af8ac5b10c0f44c6721b3f1e580aa8e8110644bcfdca01ec522ae064b890f3fc",
+    "page_mpn": "PESD5V0U1UT,215",
+    "page_name": "PESD5V0U1UT,215",
+    "offers": [
+      {
+        "availability": "https://schema.org/InStock",
+        "inventoryLevel": {
+          "@type": "QuantitativeValue",
+          "value": 848
+        },
+        "eligibleQuantity": {
+          "@type": "QuantitativeValue",
+          "minValue": 1
+        }
+      }
+    ],
+    "status": "verified listing; reported in-stock"
+  },
+  {
+    "mpn": "USBLC6-2SC6",
+    "requested_url": "https://www.ozdisan.com/p/tvs-diyotlar-386/stm-usblc6-2sc6-1049280",
+    "checked_at_utc": "2026-10-14T12:10:41.730679+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/tvs-diyotlar-386/stm-usblc6-2sc6-1049280",
+    "sha256": "f8eb902c2914908aa71b4c1e1af2ff4148aa116c3319d9902579c309d8d1a27f",
+    "status": "unknown: no exact Product evidence"
+  },
+  {
+    "mpn": "PESD3V3L4UW,115",
+    "requested_url": "https://www.ozdisan.com/p/tvs-diyotlar-386/nexperia-pesd3v3l4uw-115-702370",
+    "checked_at_utc": "2026-10-14T12:10:41.740404+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/tvs-diyotlar-386/nexperia-pesd3v3l4uw-115-702370",
+    "sha256": "dd1cb0ef2b2b808421b0b18bad51bcb35baff5f294173e5f7b5292329ee495c3",
+    "page_mpn": "PESD3V3L4UW,115",
+    "page_name": "PESD3V3L4UW,115",
+    "offers": [
+      {
+        "availability": "https://schema.org/InStock",
+        "inventoryLevel": {
+          "@type": "QuantitativeValue",
+          "value": 37
+        },
+        "eligibleQuantity": {
+          "@type": "QuantitativeValue",
+          "minValue": 1
+        }
+      }
+    ],
+    "status": "verified listing; reported in-stock"
+  },
+  {
+    "mpn": "ESDA6V1SC6",
+    "requested_url": "https://www.ozdisan.com/p/tvs-diyotlar-386/stm-esda6v1sc6-357346",
+    "checked_at_utc": "2026-10-14T12:10:42.219367+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/tvs-diyotlar-386/stm-esda6v1sc6-357346",
+    "sha256": "e39e35a95a67c5701b8163fbee1ffa8035ec1477d352b5a50a177fc800b9487f",
+    "page_mpn": "ESDA6V1SC6",
+    "page_name": "ESDA6V1SC6",
+    "offers": [
+      {
+        "availability": "https://schema.org/InStock",
+        "inventoryLevel": {
+          "@type": "QuantitativeValue",
+          "value": 1046
+        },
+        "eligibleQuantity": {
+          "@type": "QuantitativeValue",
+          "minValue": 1
+        }
+      }
+    ],
+    "status": "verified listing; reported in-stock"
+  },
+  {
+    "mpn": "RC0603FR-075K1L",
+    "requested_url": "https://www.ozdisan.com/p/smt-smd-ve-cip-direncler-194/yageo-rc0603fr-075k1l-427375",
+    "checked_at_utc": "2026-10-14T12:10:42.322586+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/smt-smd-ve-cip-direncler-194/yageo-rc0603fr-075k1l-427375",
+    "sha256": "c44508ef0679f26a8f064772ba7cb5e9d1905fde7d1c5fd9b636c90992f93b4c",
+    "page_mpn": "RC0603FR-075K1L",
+    "page_name": "RC0603FR-075K1L",
+    "offers": [
+      {
+        "availability": "https://schema.org/OutOfStock",
+        "inventoryLevel": {
+          "@type": "QuantitativeValue",
+          "value": 0
+        },
+        "eligibleQuantity": {
+          "@type": "QuantitativeValue",
+          "minValue": 100
+        }
+      }
+    ],
+    "status": "verified listing; unavailable"
+  },
+  {
+    "mpn": "RC0603FR-07200KL",
+    "requested_url": "https://www.ozdisan.com/p/smd-direncler-282/yageo-rc0603fr-07200kl-137976",
+    "checked_at_utc": "2026-10-14T12:10:42.362399+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/smd-direncler-282/yageo-rc0603fr-07200kl-137976",
+    "sha256": "932df4bcb786a572807312488df337cbcd5f8fc7fced65151ec17dbeb0a26450",
+    "status": "unknown: no exact Product evidence"
+  },
+  {
+    "mpn": "RC0603FR-074K7L",
+    "requested_url": "https://www.ozdisan.com/p/smd-direncler-282/yageo-rc0603fr-074k7l-138014",
+    "checked_at_utc": "2026-10-14T12:10:42.446015+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/smd-direncler-282/yageo-rc0603fr-074k7l-138014",
+    "sha256": "fa6a2ab9fac31f3431c223d1063e70acec73f2e9252707f7388a514246826870",
+    "status": "unknown: no exact Product evidence"
+  },
+  {
+    "mpn": "RC0603FR-0710KL",
+    "requested_url": "https://www.ozdisan.com/p/smd-direncler-282/yageo-rc0603fr-0710kl-137930",
+    "checked_at_utc": "2026-10-14T12:10:42.474523+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/smd-direncler-282/yageo-rc0603fr-0710kl-137930",
+    "sha256": "9c4d3537875eb392d63521a9ecfccb9ea969875a33ae66222109e0d2be2b8f70",
+    "status": "unknown: no exact Product evidence"
+  },
+  {
+    "mpn": "CC0603KRX7R9BB104",
+    "requested_url": "https://www.ozdisan.com/p/smd-kondansatorler-283/yageo-cc0603krx7r9bb104-144458",
+    "checked_at_utc": "2026-10-14T12:10:42.780627+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/smd-kondansatorler-283/yageo-cc0603krx7r9bb104-144458",
+    "sha256": "7459f12d2aa8a08954708d7aee8a9e25c92dbd5e71b27cf1d0d91bd85372f8aa",
+    "status": "unknown: no exact Product evidence"
+  },
+  {
+    "mpn": "CC0805KKX5R6BB106",
+    "requested_url": "https://www.ozdisan.com/p/smd-kondansatorler-283/yageo-cc0805kkx5r6bb106-144722",
+    "checked_at_utc": "2026-10-14T12:10:42.878955+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/smd-kondansatorler-283/yageo-cc0805kkx5r6bb106-144722",
+    "sha256": "784c77257e35d994354c3773bceb74a1e1499c16f35f76ed3c8d84953d480eff",
+    "status": "unknown: no exact Product evidence"
+  },
+  {
+    "mpn": "PTS526SM15SMTR2LFS",
+    "requested_url": "https://www.ozdisan.com/p/butonlar-ve-anahtarlar-313/ck-pts526sm15smtr2lfs-1048600",
+    "checked_at_utc": "2026-10-14T12:10:42.885485+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/butonlar-ve-anahtarlar-313/ck-pts526sm15smtr2lfs-1048600",
+    "sha256": "188727f9cbeca74ff51087cee2ab26ef09af11abe51ac1a52f9528727fa5cd24",
+    "status": "unknown: no exact Product evidence"
+  },
+  {
+    "mpn": "M20-9991045",
+    "requested_url": "https://www.ozdisan.com/p/pin-header-konnektorler-354/harwin-m20-9991045-350284",
+    "checked_at_utc": "2026-10-14T12:10:42.931330+00:00",
+    "http_status": 200,
+    "final_url": "https://www.ozdisan.com/p/pin-header-konnektorler-354/harwin-m20-9991045-350284",
+    "sha256": "01ebcfe609901d8fed2e398cb87597f8635775fc493bba465bf0d3e94950e073",
+    "status": "unknown: no exact Product evidence"
+  }
+]

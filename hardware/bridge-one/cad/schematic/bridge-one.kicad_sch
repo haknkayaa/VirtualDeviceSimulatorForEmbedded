@@ -1,0 +1,678 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "a130d8c7-1e1e-5739-bc2b-5203c1ccc22c")
+	(paper "A3")
+	(title_block
+		(title "VDS4E Bridge One - Overview")
+		(date "2026-10-14")
+		(rev "F-sch0.1")
+		(company "VDS4E")
+		(comment 1 "Generated from cad/schematic/design.py - do not edit the .kicad_sch by hand")
+	)
+	(lib_symbols)
+	(text "USB-C (any source, 5-24 V tolerated) -> PTC + TVS -> AP63203 buck -> +3V3 for the whole board."
+		(exclude_from_sim no)
+		(at 20 30 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left bottom)
+		)
+		(uuid "0525e34f-8702-55c8-aef8-b33d2d0d3514")
+	)
+	(text "iCE40UP5K: target SPI engine (same-CS decode) + 8-channel GPIO bank + QSPI PSRAM flash image."
+		(exclude_from_sim no)
+		(at 20 39 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left bottom)
+		)
+		(uuid "0728aa21-80b0-5de0-b452-94857fcdabd8")
+	)
+	(text "VDS4E BRIDGE ONE - SCHEMATIC OVERVIEW"
+		(exclude_from_sim no)
+		(at 20 22 0)
+		(effects
+			(font
+				(size 4 4)
+				(bold yes)
+			)
+			(justify left bottom)
+		)
+		(uuid "25ea13de-25d5-5701-a0cb-662a5145cb77")
+	)
+	(text "A3 - 8 parts"
+		(exclude_from_sim no)
+		(at 116.84 72.39 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left bottom)
+		)
+		(uuid "2b6db6e5-0096-5f9f-9736-9649da09d3e4")
+	)
+	(text "A3 - 8 parts"
+		(exclude_from_sim no)
+		(at 21.59 72.39 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left bottom)
+		)
+		(uuid "2fe7b050-7bf2-541f-a0c8-6c57cbe64a00")
+	)
+	(text "A3 - 7 parts"
+		(exclude_from_sim no)
+		(at 21.59 168.91 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left bottom)
+		)
+		(uuid "55f63825-5431-540d-b249-26184b7b5377")
+	)
+	(text "TARGET I/O: Raspberry Pi 40-pin header + labelled direct header with 5V_OUT/3V3_OUT accessories."
+		(exclude_from_sim no)
+		(at 20 48 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left bottom)
+		)
+		(uuid "7977e828-1a3d-54a6-b2df-9f9f8027a743")
+	)
+	(text "A3 - 19 parts"
+		(exclude_from_sim no)
+		(at 307.34 72.39 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left bottom)
+		)
+		(uuid "85909a18-9069-5aec-bf88-000b35daba2a")
+	)
+	(text "All target signals pass level translators (A = +3V3, B = VTREF) and ESD; isolated by default."
+		(exclude_from_sim no)
+		(at 20 43.5 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left bottom)
+		)
+		(uuid "8fb986a8-71a2-5e86-9eb2-5cd96d68405c")
+	)
+	(text "A3 - 2 parts"
+		(exclude_from_sim no)
+		(at 21.59 120.65 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left bottom)
+		)
+		(uuid "add4bea5-e515-5b9b-b6b8-b0efc7661ec2")
+	)
+	(text "A3 - 19 parts"
+		(exclude_from_sim no)
+		(at 212.09 72.39 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left bottom)
+		)
+		(uuid "bd54407b-e268-5dbb-a658-0e1d9bfbf57b")
+	)
+	(text "Generated from cad/schematic/design.py; verify with tools/verify_netlist.py after every change."
+		(exclude_from_sim no)
+		(at 20 52.5 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left bottom)
+		)
+		(uuid "c10e49a6-a685-5fae-8d64-997c78d6dfbe")
+	)
+	(text "A3 - 30 parts"
+		(exclude_from_sim no)
+		(at 116.84 120.65 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left bottom)
+		)
+		(uuid "c3eb8ec8-8472-56b3-9a29-7900a0204d82")
+	)
+	(text "A2 - 55 parts"
+		(exclude_from_sim no)
+		(at 307.34 120.65 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left bottom)
+		)
+		(uuid "cd708332-9e10-5f56-b097-0a7135a6c898")
+	)
+	(text "A3 - 26 parts"
+		(exclude_from_sim no)
+		(at 212.09 120.65 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left bottom)
+		)
+		(uuid "ce672ea3-cce8-5618-868e-861dd0df614c")
+	)
+	(text "A3 - 10 parts"
+		(exclude_from_sim no)
+		(at 116.84 168.91 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left bottom)
+		)
+		(uuid "d26afa66-fb58-5015-a602-7cf4d2f50e2c")
+	)
+	(text "ESP32-S3: USB to the PC, I2C0/I2C1 + UART target ports, OLED, FPGA configuration and control."
+		(exclude_from_sim no)
+		(at 20 34.5 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left bottom)
+		)
+		(uuid "f081aa7e-776b-52cc-b80b-9a080150c999")
+	)
+	(sheet
+		(at 304.8 67.31)
+		(size 85 30)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 230 240 255 1)
+		)
+		(uuid "0d1b2c7e-ffd0-5ff2-829f-917e2696401c")
+		(property "Sheetname" "Aux power outputs (J10 5V_OUT / 3V3_OUT)"
+			(at 304.8 66.61 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.6 1.6)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "aux_out.kicad_sch"
+			(at 304.8 97.12 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 20.32 115.57)
+		(size 85 30)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 230 240 255 1)
+		)
+		(uuid "33bae529-d6e5-59a4-ba4b-e0a910d9f453")
+		(property "Sheetname" "Status LEDs"
+			(at 20.32 114.87 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.6 1.6)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "status.kicad_sch"
+			(at 20.32 145.38 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c"
+					(page "6")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 115.57 67.31)
+		(size 85 30)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 230 240 255 1)
+		)
+		(uuid "49c656a3-6e2a-5c46-a580-d41a6b75280f")
+		(property "Sheetname" "3V3 buck (3.8-32 V in)"
+			(at 115.57 66.61 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.6 1.6)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "buck.kicad_sch"
+			(at 115.57 97.12 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 20.32 67.31)
+		(size 85 30)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 230 240 255 1)
+		)
+		(uuid "6a02ee25-9570-5b35-979d-848fe0de201a")
+		(property "Sheetname" "USB-C universal power input"
+			(at 20.32 66.61 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.6 1.6)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "power_in.kicad_sch"
+			(at 20.32 97.12 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 115.57 162.56)
+		(size 85 30)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 230 240 255 1)
+		)
+		(uuid "9144e9e5-75eb-5d49-8c8d-687f8e6b00ad")
+		(property "Sheetname" "Status OLED 0.96in 128x64 (SSD1315, I2C 0x3C)"
+			(at 115.57 161.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.6 1.6)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "oled.kicad_sch"
+			(at 115.57 193.64 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c"
+					(page "11")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 20.32 162.56)
+		(size 85 30)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 230 240 255 1)
+		)
+		(uuid "97858bf7-ceb8-50bc-99a1-9c6679730bfb")
+		(property "Sheetname" "TARGET I/O (back edge)"
+			(at 20.32 161.86 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.6 1.6)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "target_io.kicad_sch"
+			(at 20.32 193.64 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c"
+					(page "10")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 209.55 67.31)
+		(size 85 30)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 230 240 255 1)
+		)
+		(uuid "acedfb89-e2ef-5400-badc-08b203c376f7")
+		(property "Sheetname" "ESP32-S3 control plane"
+			(at 209.55 66.61 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.6 1.6)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "mcu.kicad_sch"
+			(at 209.55 97.12 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 304.8 115.57)
+		(size 85 30)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 230 240 255 1)
+		)
+		(uuid "d3c6fef7-3c6e-5553-ad27-3e87f03d5330")
+		(property "Sheetname" "Target level translators (A = +3V3 side, B = VTREF side)"
+			(at 304.8 114.87 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.6 1.6)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "translators.kicad_sch"
+			(at 304.8 145.38 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c"
+					(page "9")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 115.57 115.57)
+		(size 85 30)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 230 240 255 1)
+		)
+		(uuid "f3a90d0f-f87b-5cbd-b89b-5da613e9dc19")
+		(property "Sheetname" "iCE40UP5K SPI/GPIO bus engine"
+			(at 115.57 114.87 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.6 1.6)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "fpga.kicad_sch"
+			(at 115.57 145.38 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c"
+					(page "7")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 209.55 115.57)
+		(size 85 30)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 230 240 255 1)
+		)
+		(uuid "f5c8c318-87fc-5196-be3a-327169836af3")
+		(property "Sheetname" "Target isolation logic + VTREF sense"
+			(at 209.55 114.87 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.6 1.6)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "gating.kicad_sch"
+			(at 209.55 145.38 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "bridge-one"
+				(path "/a130d8c7-1e1e-5739-bc2b-5203c1ccc22c"
+					(page "8")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+)

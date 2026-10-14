@@ -1,0 +1,2 @@
+# Final direct generator only. API trial used kicad-sch-api==0.5.6 separately.
+sexpdata==1.0.2

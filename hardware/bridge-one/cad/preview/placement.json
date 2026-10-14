@@ -1,0 +1,904 @@
+{
+ "board_mm": [
+  76.0,
+  50.0
+ ],
+ "parts": [
+  {
+   "ref": "U1",
+   "value": "ESP32-S3-WROOM-1-N8R8",
+   "footprint": "RF_Module:ESP32-S3-WROOM-1",
+   "x": 63.25,
+   "y": 30.0,
+   "rot": 270,
+   "role": "MCU, USB device, control plane",
+   "side": "top",
+   "courtyard": [
+    49.755,
+    5.955,
+    91.045,
+    54.045
+   ]
+  },
+  {
+   "ref": "J1",
+   "value": "USB-C 16P (candidate, KLS pending)",
+   "footprint": "Connector_USB:USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal",
+   "x": 3.1,
+   "y": 24.0,
+   "rot": 270,
+   "role": "USB2 device + power",
+   "side": "top",
+   "courtyard": [
+    -1.125,
+    18.635,
+    7.905,
+    29.365
+   ]
+  },
+  {
+   "ref": "U14",
+   "value": "AP63203WU-7",
+   "footprint": "Package_TO_SOT_SMD:TSOT-23-6",
+   "x": 4.3,
+   "y": 32.6,
+   "rot": 0,
+   "role": "3.8-32 V buck, fixed 3V3",
+   "side": "top",
+   "courtyard": [
+    2.205,
+    30.855,
+    6.395,
+    34.345
+   ]
+  },
+  {
+   "ref": "L1",
+   "value": "4u7 NR3015",
+   "footprint": "Inductor_SMD:L_Taiyo-Yuden_NR-30xx",
+   "x": 4.3,
+   "y": 37.0,
+   "rot": 0,
+   "role": "Buck inductor",
+   "side": "top",
+   "courtyard": [
+    2.455,
+    35.155,
+    6.145,
+    38.845
+   ]
+  },
+  {
+   "ref": "F1",
+   "value": "PTC 30 V 0.5 A",
+   "footprint": "Fuse:Fuse_1812_4532Metric",
+   "x": 10.5,
+   "y": 25.0,
+   "rot": 90,
+   "role": "VBUS overcurrent",
+   "side": "bottom",
+   "courtyard": [
+    8.505,
+    22.005,
+    12.495,
+    27.995
+   ]
+  },
+  {
+   "ref": "D11",
+   "value": "SMAJ24A",
+   "footprint": "Diode_SMD:D_SMA",
+   "x": 15.5,
+   "y": 25.0,
+   "rot": 90,
+   "role": "VBUS surge clamp",
+   "side": "bottom",
+   "courtyard": [
+    13.705,
+    21.455,
+    17.295,
+    28.545
+   ]
+  },
+  {
+   "ref": "C1",
+   "value": "10u 35V",
+   "footprint": "Capacitor_SMD:C_1206_3216Metric",
+   "x": 4.3,
+   "y": 31.5,
+   "rot": 0,
+   "role": "Buck input",
+   "side": "bottom",
+   "courtyard": [
+    1.955,
+    30.305,
+    6.645,
+    32.695
+   ]
+  },
+  {
+   "ref": "C5",
+   "value": "100n 50V",
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "x": 7.6,
+   "y": 31.2,
+   "rot": 90,
+   "role": "Buck input HF",
+   "side": "bottom",
+   "courtyard": [
+    6.825,
+    29.675,
+    8.375,
+    32.725
+   ]
+  },
+  {
+   "ref": "C2",
+   "value": "22u",
+   "footprint": "Capacitor_SMD:C_0805_2012Metric",
+   "x": 4.3,
+   "y": 36.0,
+   "rot": 0,
+   "role": "Buck output",
+   "side": "bottom",
+   "courtyard": [
+    2.555,
+    34.975,
+    6.045,
+    37.025
+   ]
+  },
+  {
+   "ref": "C3",
+   "value": "22u",
+   "footprint": "Capacitor_SMD:C_0805_2012Metric",
+   "x": 4.3,
+   "y": 38.6,
+   "rot": 0,
+   "role": "Buck output",
+   "side": "bottom",
+   "courtyard": [
+    2.555,
+    37.575,
+    6.045,
+    39.625
+   ]
+  },
+  {
+   "ref": "C4",
+   "value": "100n",
+   "footprint": "Capacitor_SMD:C_0603_1608Metric",
+   "x": 7.6,
+   "y": 34.4,
+   "rot": 90,
+   "role": "Buck bootstrap",
+   "side": "bottom",
+   "courtyard": [
+    6.825,
+    32.875,
+    8.375,
+    35.925
+   ]
+  },
+  {
+   "ref": "D1",
+   "value": "TPD2E2U06",
+   "footprint": "Package_TO_SOT_SMD:SOT-553",
+   "x": 10.0,
+   "y": 20.5,
+   "rot": 0,
+   "role": "USB D+/D- ESD",
+   "side": "bottom",
+   "courtyard": [
+    8.755,
+    19.505,
+    11.245,
+    21.495
+   ]
+  },
+  {
+   "ref": "R1",
+   "value": "5k1",
+   "footprint": "Resistor_SMD:R_0402_1005Metric",
+   "x": 10.0,
+   "y": 17.6,
+   "rot": 0,
+   "role": "CC1 Rd",
+   "side": "bottom",
+   "courtyard": [
+    9.025,
+    17.085,
+    10.975,
+    18.115
+   ]
+  },
+  {
+   "ref": "R2",
+   "value": "5k1",
+   "footprint": "Resistor_SMD:R_0402_1005Metric",
+   "x": 10.0,
+   "y": 29.0,
+   "rot": 0,
+   "role": "CC2 Rd",
+   "side": "bottom",
+   "courtyard": [
+    9.025,
+    28.485,
+    10.975,
+    29.515
+   ]
+  },
+  {
+   "ref": "U15",
+   "value": "5V_OUT OVP switch (candidate)",
+   "footprint": "Package_TO_SOT_SMD:SOT-23-6",
+   "x": 36.5,
+   "y": 21.5,
+   "rot": 0,
+   "role": "5V_OUT, opens above ~6 V VBUS",
+   "side": "bottom",
+   "courtyard": [
+    34.405,
+    19.755,
+    38.595,
+    23.245
+   ]
+  },
+  {
+   "ref": "U16",
+   "value": "3V3_OUT limit switch (candidate)",
+   "footprint": "Package_TO_SOT_SMD:SOT-23-5",
+   "x": 36.5,
+   "y": 26.0,
+   "rot": 0,
+   "role": "3V3_OUT, ~300 mA limit",
+   "side": "bottom",
+   "courtyard": [
+    34.405,
+    24.255,
+    38.595,
+    27.745
+   ]
+  },
+  {
+   "ref": "U3",
+   "value": "iCE40UP5K-SG48",
+   "footprint": "Package_DFN_QFN:QFN-48-1EP_7x7mm_P0.5mm_EP5.6x5.6mm",
+   "x": 44.5,
+   "y": 21.5,
+   "rot": 0,
+   "role": "SPI/GPIO bus engine",
+   "side": "top",
+   "courtyard": [
+    40.325,
+    17.325,
+    48.675,
+    25.675
+   ]
+  },
+  {
+   "ref": "U4",
+   "value": "QSPI PSRAM (candidate)",
+   "footprint": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+   "x": 44.5,
+   "y": 31.0,
+   "rot": 90,
+   "role": "Flash-image backing store",
+   "side": "top",
+   "courtyard": [
+    41.755,
+    27.255,
+    47.245,
+    34.745
+   ]
+  },
+  {
+   "ref": "U5",
+   "value": "TLV75712P",
+   "footprint": "Package_TO_SOT_SMD:SOT-23-5",
+   "x": 41.8,
+   "y": 15.0,
+   "rot": 0,
+   "role": "FPGA 1V2 core rail",
+   "side": "top",
+   "courtyard": [
+    39.705,
+    13.255,
+    43.895,
+    16.745
+   ]
+  },
+  {
+   "ref": "Y1",
+   "value": "12 MHz",
+   "footprint": "Oscillator:Oscillator_SMD_SiT_PQFN-4Pin_2.0x1.6mm",
+   "x": 47.5,
+   "y": 15.0,
+   "rot": 0,
+   "role": "FPGA/timestamp clock",
+   "side": "top",
+   "courtyard": [
+    45.955,
+    13.655,
+    49.045,
+    16.345
+   ]
+  },
+  {
+   "ref": "C10",
+   "value": "100n",
+   "footprint": "Capacitor_SMD:C_0402_1005Metric",
+   "x": 39.2,
+   "y": 19.0,
+   "rot": 90,
+   "role": "FPGA decoupling",
+   "side": "bottom",
+   "courtyard": [
+    38.695,
+    18.045,
+    39.705,
+    19.955
+   ]
+  },
+  {
+   "ref": "C11",
+   "value": "100n",
+   "footprint": "Capacitor_SMD:C_0402_1005Metric",
+   "x": 39.2,
+   "y": 22.0,
+   "rot": 90,
+   "role": "FPGA decoupling",
+   "side": "bottom",
+   "courtyard": [
+    38.695,
+    21.045,
+    39.705,
+    22.955
+   ]
+  },
+  {
+   "ref": "C12",
+   "value": "100n",
+   "footprint": "Capacitor_SMD:C_0402_1005Metric",
+   "x": 39.2,
+   "y": 25.0,
+   "rot": 90,
+   "role": "FPGA decoupling",
+   "side": "bottom",
+   "courtyard": [
+    38.695,
+    24.045,
+    39.705,
+    25.955
+   ]
+  },
+  {
+   "ref": "C13",
+   "value": "100n",
+   "footprint": "Capacitor_SMD:C_0402_1005Metric",
+   "x": 49.8,
+   "y": 19.0,
+   "rot": 90,
+   "role": "FPGA decoupling",
+   "side": "bottom",
+   "courtyard": [
+    49.295,
+    18.045,
+    50.305,
+    19.955
+   ]
+  },
+  {
+   "ref": "C14",
+   "value": "100n",
+   "footprint": "Capacitor_SMD:C_0402_1005Metric",
+   "x": 49.8,
+   "y": 25.0,
+   "rot": 90,
+   "role": "FPGA decoupling",
+   "side": "bottom",
+   "courtyard": [
+    49.295,
+    24.045,
+    50.305,
+    25.955
+   ]
+  },
+  {
+   "ref": "U12",
+   "value": "74LVC1G08",
+   "footprint": "Package_TO_SOT_SMD:SOT-23-5",
+   "x": 65.5,
+   "y": 10.5,
+   "rot": 0,
+   "role": "Global isolate gate",
+   "side": "top",
+   "courtyard": [
+    63.405,
+    8.755,
+    67.595,
+    12.245
+   ]
+  },
+  {
+   "ref": "DS1",
+   "value": "OLED 128x64 0.96in (candidate)",
+   "footprint": "BridgeOne:OLED_0.96in_128x64_Panel",
+   "x": 22.35,
+   "y": 39.77,
+   "rot": 180,
+   "role": "Status display, rotated in firmware",
+   "side": "top",
+   "courtyard": [
+    8.705,
+    29.845,
+    35.995,
+    49.695
+   ]
+  },
+  {
+   "ref": "J6",
+   "value": "FH12-30S-0.5SH",
+   "footprint": "Connector_FFC-FPC:Hirose_FH12-30S-0.5SH_1x30-1MP_P0.50mm_Horizontal",
+   "x": 22.35,
+   "y": 24.8,
+   "rot": 0,
+   "role": "OLED FPC (pitch/pinout per panel TBD)",
+   "side": "top",
+   "courtyard": [
+    11.755,
+    21.755,
+    32.945,
+    29.745
+   ]
+  },
+  {
+   "ref": "C20",
+   "value": "1u",
+   "footprint": "Capacitor_SMD:C_0402_1005Metric",
+   "x": 26.0,
+   "y": 24.0,
+   "rot": 90,
+   "role": "OLED charge pump",
+   "side": "bottom",
+   "courtyard": [
+    25.495,
+    23.045,
+    26.505,
+    24.955
+   ]
+  },
+  {
+   "ref": "C21",
+   "value": "1u",
+   "footprint": "Capacitor_SMD:C_0402_1005Metric",
+   "x": 28.0,
+   "y": 24.0,
+   "rot": 90,
+   "role": "OLED charge pump",
+   "side": "bottom",
+   "courtyard": [
+    27.495,
+    23.045,
+    28.505,
+    24.955
+   ]
+  },
+  {
+   "ref": "C22",
+   "value": "2u2",
+   "footprint": "Capacitor_SMD:C_0402_1005Metric",
+   "x": 30.0,
+   "y": 24.0,
+   "rot": 90,
+   "role": "OLED VCOMH",
+   "side": "bottom",
+   "courtyard": [
+    29.495,
+    23.045,
+    30.505,
+    24.955
+   ]
+  },
+  {
+   "ref": "R20",
+   "value": "910k",
+   "footprint": "Resistor_SMD:R_0402_1005Metric",
+   "x": 32.0,
+   "y": 24.0,
+   "rot": 90,
+   "role": "OLED IREF",
+   "side": "bottom",
+   "courtyard": [
+    31.485,
+    23.025,
+    32.515,
+    24.975
+   ]
+  },
+  {
+   "ref": "D2",
+   "value": "PWR",
+   "footprint": "LED_SMD:LED_0603_1608Metric",
+   "x": 52.0,
+   "y": 42.0,
+   "rot": 0,
+   "role": "Power LED",
+   "side": "top",
+   "courtyard": [
+    50.475,
+    41.225,
+    53.525,
+    42.775
+   ]
+  },
+  {
+   "ref": "D3",
+   "value": "LINK",
+   "footprint": "LED_SMD:LED_0603_1608Metric",
+   "x": 55.5,
+   "y": 42.0,
+   "rot": 0,
+   "role": "USB/host link",
+   "side": "top",
+   "courtyard": [
+    53.975,
+    41.225,
+    57.025,
+    42.775
+   ]
+  },
+  {
+   "ref": "D4",
+   "value": "FPGA",
+   "footprint": "LED_SMD:LED_0603_1608Metric",
+   "x": 59.0,
+   "y": 42.0,
+   "rot": 0,
+   "role": "FPGA CDONE",
+   "side": "top",
+   "courtyard": [
+    57.475,
+    41.225,
+    60.525,
+    42.775
+   ]
+  },
+  {
+   "ref": "D5",
+   "value": "VTREF",
+   "footprint": "LED_SMD:LED_0603_1608Metric",
+   "x": 62.5,
+   "y": 42.0,
+   "rot": 0,
+   "role": "Target reference present",
+   "side": "top",
+   "courtyard": [
+    60.975,
+    41.225,
+    64.025,
+    42.775
+   ]
+  },
+  {
+   "ref": "SW1",
+   "value": "RESET",
+   "footprint": "Button_Switch_SMD:SW_SPST_EVQP7A",
+   "x": 44.0,
+   "y": 48.2,
+   "rot": 0,
+   "role": "EN reset, side-actuated",
+   "side": "top",
+   "courtyard": [
+    41.205,
+    46.455,
+    46.795,
+    50.595
+   ]
+  },
+  {
+   "ref": "SW2",
+   "value": "BOOT",
+   "footprint": "Button_Switch_SMD:SW_SPST_EVQP7A",
+   "x": 64.0,
+   "y": 48.2,
+   "rot": 0,
+   "role": "GPIO0 strap, side-actuated",
+   "side": "top",
+   "courtyard": [
+    61.205,
+    46.455,
+    66.795,
+    50.595
+   ]
+  },
+  {
+   "ref": "U8",
+   "value": "PCA9306DCU",
+   "footprint": "Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
+   "x": 40.8,
+   "y": 10.5,
+   "rot": 90,
+   "role": "I2C0",
+   "side": "top",
+   "courtyard": [
+    39.505,
+    8.175,
+    42.095,
+    12.825
+   ]
+  },
+  {
+   "ref": "U9",
+   "value": "PCA9306DCU",
+   "footprint": "Package_SO:VSSOP-8_2.3x2mm_P0.5mm",
+   "x": 44.0,
+   "y": 10.5,
+   "rot": 90,
+   "role": "I2C1",
+   "side": "top",
+   "courtyard": [
+    42.705,
+    8.175,
+    45.295,
+    12.825
+   ]
+  },
+  {
+   "ref": "U10",
+   "value": "SN74AVC4T245RSV",
+   "footprint": "Package_DFN_QFN:UQFN-16_1.8x2.6mm_P0.4mm",
+   "x": 47.199999999999996,
+   "y": 10.5,
+   "rot": 0,
+   "role": "UART",
+   "side": "top",
+   "courtyard": [
+    45.655,
+    8.555,
+    48.745,
+    12.445
+   ]
+  },
+  {
+   "ref": "U6",
+   "value": "SN74AVC4T245RSV",
+   "footprint": "Package_DFN_QFN:UQFN-16_1.8x2.6mm_P0.4mm",
+   "x": 50.4,
+   "y": 10.5,
+   "rot": 0,
+   "role": "SPI in (SCK/MOSI/CS0/CS1)",
+   "side": "top",
+   "courtyard": [
+    48.855,
+    8.555,
+    51.945,
+    12.445
+   ]
+  },
+  {
+   "ref": "U7",
+   "value": "SN74AVC4T245RSV",
+   "footprint": "Package_DFN_QFN:UQFN-16_1.8x2.6mm_P0.4mm",
+   "x": 53.599999999999994,
+   "y": 10.5,
+   "rot": 0,
+   "role": "SPI out (MISO)",
+   "side": "top",
+   "courtyard": [
+    52.055,
+    8.555,
+    55.145,
+    12.445
+   ]
+  },
+  {
+   "ref": "U11",
+   "value": "SN74AXC4T774RSV",
+   "footprint": "Package_DFN_QFN:UQFN-16_1.8x2.6mm_P0.4mm",
+   "x": 56.8,
+   "y": 10.5,
+   "rot": 0,
+   "role": "GPIO0-3",
+   "side": "top",
+   "courtyard": [
+    55.255,
+    8.555,
+    58.345,
+    12.445
+   ]
+  },
+  {
+   "ref": "U13",
+   "value": "SN74AXC4T774RSV",
+   "footprint": "Package_DFN_QFN:UQFN-16_1.8x2.6mm_P0.4mm",
+   "x": 60.0,
+   "y": 10.5,
+   "rot": 0,
+   "role": "GPIO4-7",
+   "side": "top",
+   "courtyard": [
+    58.455,
+    8.555,
+    61.545,
+    12.445
+   ]
+  },
+  {
+   "ref": "D6",
+   "value": "TPD4E05U06",
+   "footprint": "Package_SON:USON-10_2.5x1.0mm_P0.5mm",
+   "x": 41.0,
+   "y": 8.0,
+   "rot": 0,
+   "role": "Target ESD",
+   "side": "bottom",
+   "courtyard": [
+    40.045,
+    6.455,
+    41.955,
+    9.545
+   ]
+  },
+  {
+   "ref": "D7",
+   "value": "TPD4E05U06",
+   "footprint": "Package_SON:USON-10_2.5x1.0mm_P0.5mm",
+   "x": 47.0,
+   "y": 8.0,
+   "rot": 0,
+   "role": "Target ESD",
+   "side": "bottom",
+   "courtyard": [
+    46.045,
+    6.455,
+    47.955,
+    9.545
+   ]
+  },
+  {
+   "ref": "D8",
+   "value": "TPD4E05U06",
+   "footprint": "Package_SON:USON-10_2.5x1.0mm_P0.5mm",
+   "x": 53.0,
+   "y": 8.0,
+   "rot": 0,
+   "role": "Target ESD",
+   "side": "bottom",
+   "courtyard": [
+    52.045,
+    6.455,
+    53.955,
+    9.545
+   ]
+  },
+  {
+   "ref": "D9",
+   "value": "TPD4E05U06",
+   "footprint": "Package_SON:USON-10_2.5x1.0mm_P0.5mm",
+   "x": 59.0,
+   "y": 8.0,
+   "rot": 0,
+   "role": "Target ESD",
+   "side": "bottom",
+   "courtyard": [
+    58.045,
+    6.455,
+    59.955,
+    9.545
+   ]
+  },
+  {
+   "ref": "D10",
+   "value": "TPD4E05U06",
+   "footprint": "Package_SON:USON-10_2.5x1.0mm_P0.5mm",
+   "x": 65.0,
+   "y": 8.0,
+   "rot": 0,
+   "role": "Target ESD",
+   "side": "bottom",
+   "courtyard": [
+    64.045,
+    6.455,
+    65.955,
+    9.545
+   ]
+  },
+  {
+   "ref": "J3",
+   "value": "TARGET RPi 40-pin",
+   "footprint": "Connector_PinHeader_2.54mm:PinHeader_2x20_P2.54mm_Vertical",
+   "x": 8.81,
+   "y": 4.77,
+   "rot": 90,
+   "role": "Raspberry Pi GPIO-compatible target header",
+   "side": "top",
+   "courtyard": [
+    6.985,
+    0.405,
+    58.885,
+    6.585
+   ]
+  },
+  {
+   "ref": "J10",
+   "value": "TARGET DIRECT",
+   "footprint": "Connector_PinHeader_2.54mm:PinHeader_2x12_P2.54mm_Vertical",
+   "x": 8.81,
+   "y": 15.0,
+   "rot": 90,
+   "role": "Direct I2C/SPI/GPIO + power header",
+   "side": "top",
+   "courtyard": [
+    6.995,
+    10.635,
+    38.565,
+    16.815
+   ]
+  },
+  {
+   "ref": "H1",
+   "value": "M2.5",
+   "footprint": "MountingHole:MountingHole_2.7mm_M2.5_Pad_Via",
+   "x": 3.5,
+   "y": 3.5,
+   "rot": 0,
+   "role": "Mounting",
+   "side": "top",
+   "courtyard": [
+    0.507,
+    0.503,
+    6.495,
+    6.497
+   ]
+  },
+  {
+   "ref": "H2",
+   "value": "M2.5",
+   "footprint": "MountingHole:MountingHole_2.7mm_M2.5_Pad_Via",
+   "x": 72.5,
+   "y": 3.5,
+   "rot": 0,
+   "role": "Mounting",
+   "side": "top",
+   "courtyard": [
+    69.507,
+    0.503,
+    75.495,
+    6.497
+   ]
+  },
+  {
+   "ref": "H3",
+   "value": "M2.5",
+   "footprint": "MountingHole:MountingHole_2.7mm_M2.5_Pad_Via",
+   "x": 3.5,
+   "y": 46.5,
+   "rot": 0,
+   "role": "Mounting",
+   "side": "top",
+   "courtyard": [
+    0.507,
+    43.503,
+    6.495,
+    49.497
+   ]
+  },
+  {
+   "ref": "H4",
+   "value": "M2.5",
+   "footprint": "MountingHole:MountingHole_2.7mm_M2.5_Pad_Via",
+   "x": 72.5,
+   "y": 46.5,
+   "rot": 0,
+   "role": "Mounting",
+   "side": "top",
+   "courtyard": [
+    69.507,
+    43.503,
+    75.495,
+    49.497
+   ]
+  }
+ ]
+}
