@@ -20,4 +20,4 @@ cad/poc/.venv/
 !cad/footprints/BridgeOne.3dshapes/
 # Autorouter preview outputs (cad/schematic/autoroute.py)
 cad/schematic/autoroute/
-cad/schematic/bridge-one-autorouted.kicad_pcb
+cad/schematic/bridge-one-autorouted.kicad_*
