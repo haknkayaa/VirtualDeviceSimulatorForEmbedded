@@ -145,7 +145,7 @@
 		)
 		(uuid "c10e49a6-a685-5fae-8d64-997c78d6dfbe")
 	)
-	(text "A3 - 36 parts"
+	(text "A3 - 41 parts"
 		(exclude_from_sim no)
 		(at 116.84 120.65 0)
 		(effects
@@ -167,7 +167,7 @@
 		)
 		(uuid "cd708332-9e10-5f56-b097-0a7135a6c898")
 	)
-	(text "A3 - 26 parts"
+	(text "A3 - 34 parts"
 		(exclude_from_sim no)
 		(at 212.09 120.65 0)
 		(effects
