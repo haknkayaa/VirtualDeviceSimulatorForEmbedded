@@ -1,0 +1,27 @@
+{
+  "placed_instances": 18,
+  "instance_references": [
+    "U1",
+    "J1",
+    "U3",
+    "R3",
+    "R4",
+    "R1",
+    "R2",
+    "U2",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "R5",
+    "C1",
+    "SW1",
+    "R6",
+    "SW2",
+    "J2"
+  ],
+  "wire_count": 83,
+  "manifest_issues": [],
+  "multiple_named_nets": [],
+  "NC_not_at_pin": []
+}

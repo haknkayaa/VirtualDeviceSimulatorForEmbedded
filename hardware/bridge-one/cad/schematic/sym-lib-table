@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "bridge_one")(type "KiCad")(uri "${KIPRJMOD}/symbols/bridge_one.kicad_sym")(options "")(descr "Bridge One project symbols"))
+)
