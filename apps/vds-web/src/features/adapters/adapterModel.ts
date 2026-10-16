@@ -1,7 +1,7 @@
 import { formatEndpoint } from '../../utils/endpoints'
 import type { Adapter, AdapterBinding } from '../../types/api'
 
-export type AdapterBus = 'spi' | 'i2c' | 'gpio' | 'uart'
+export type AdapterBus = 'spi' | 'i2c' | 'gpio' | 'uart' | 'ethernet'
 
 export interface AdapterBusSpec {
   bus: AdapterBus
@@ -18,6 +18,7 @@ export const adapterBusSpecs: Record<AdapterBus, AdapterBusSpec> = {
   i2c: { bus: 'i2c', label: 'I2C', driver: 'CUSE', nodePattern: '/dev/i2c-N', kernelModule: 'cuse', defaultMaxFrequencyHz: 400_000 },
   gpio: { bus: 'gpio', label: 'GPIO', driver: 'gpio-sim', nodePattern: '/dev/gpiochipN', kernelModule: 'gpio-sim' },
   uart: { bus: 'uart', label: 'UART', driver: 'PTY', nodePattern: '/dev/pts/N' },
+  ethernet: { bus: 'ethernet', label: 'Ethernet', driver: 'TAP', nodePattern: 'vdsN', kernelModule: 'tun' },
 }
 
 export const adapterBuses = Object.keys(adapterBusSpecs) as AdapterBus[]
@@ -37,12 +38,13 @@ export function kernelModuleFor(adapter: Pick<Adapter, 'driver' | 'bus_type'>) {
 /** Endpoint column text for a binding; GPIO shows the exposed line count. */
 export function bindingEndpointLabel(adapter: Adapter, binding: AdapterBinding) {
   if (adapter.bus_type === 'gpio') return `${binding.line_names?.length ?? adapter.line_count ?? 0} lines`
+  if (adapter.bus_type === 'ethernet') return 'TAP'
   return formatEndpoint(adapter.bus_type, binding.endpoint)
 }
 
 /** The Linux node a binding is reachable at. GPIO chips are numbered by the kernel at load. */
 export function bindingNodePath(adapter: Adapter, binding: AdapterBinding) {
-  if (adapter.bus_type === 'gpio' || adapter.bus_type === 'uart') return adapter.device_path ?? binding.device_path
+  if (adapter.bus_type === 'gpio' || adapter.bus_type === 'uart' || adapter.bus_type === 'ethernet') return adapter.device_path ?? binding.device_path
   return binding.device_path
 }
 
@@ -52,6 +54,7 @@ export function adapterNodePath(adapter: Adapter) {
   if (adapter.bus_type === 'gpio') return '/dev/gpiochipX'
   if (adapter.bus_type === 'i2c') return `/dev/i2c-${adapter.bus_number}`
   if (adapter.bus_type === 'uart') return '/dev/pts/X'
+  if (adapter.bus_type === 'ethernet') return `vds${adapter.bus_number}`
   return `/dev/spidev${adapter.bus_number}.*`
 }
 
@@ -60,6 +63,7 @@ export function expectedNodePath(adapter: Adapter, endpoint: number | null) {
   if (adapter.bus_type === 'spi') return `/dev/spidev${adapter.bus_number}.${endpoint ?? 'C'}`
   if (adapter.bus_type === 'i2c') return `/dev/i2c-${adapter.bus_number}`
   if (adapter.bus_type === 'uart') return adapter.device_path ?? '/dev/pts/N after load'
+  if (adapter.bus_type === 'ethernet') return adapter.device_path ?? `vds${adapter.bus_number}`
   return adapter.device_path ?? '/dev/gpiochipX'
 }
 
@@ -72,6 +76,7 @@ export function parseEndpoint(busType: string, raw: string): number | null {
   if (!value) return null
   const parsed = /^0x[0-9a-f]+$/i.test(value) ? Number.parseInt(value.slice(2), 16) : /^\d+$/.test(value) ? Number(value) : Number.NaN
   if (!Number.isInteger(parsed) || parsed < 0) return null
+  if (busType === 'ethernet' && parsed !== 0) return null
   if (busType === 'i2c' && parsed > 0x7f) return null
   return parsed
 }

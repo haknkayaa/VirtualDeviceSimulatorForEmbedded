@@ -135,6 +135,14 @@ impl AdapterSnapshot {
             error: None,
         }
     }
+    fn ethernet(id: String, name: String, number: u16) -> Self {
+        Self {
+            id, name, bus_type: "ethernet".to_owned(), driver: "tap".to_owned(),
+            state: AdapterState::Unloaded, readiness: DriverReadiness::Unavailable,
+            bus_number: number, line_count: None, max_frequency_hz: None,
+            device_path: None, bindings: Vec::new(), daemon_pids: Vec::new(), error: None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -213,6 +221,7 @@ pub struct SystemAdapterDriver {
     i2c: SystemI2cCuseDriver,
     gpio: SystemGpioSimDriver,
     uart: SystemUartPtyDriver,
+    ethernet: SystemEthernetTapDriver,
 }
 
 impl SystemAdapterDriver {
@@ -222,6 +231,7 @@ impl SystemAdapterDriver {
             i2c: SystemI2cCuseDriver::from_config(config),
             gpio: SystemGpioSimDriver::from_config(config),
             uart: SystemUartPtyDriver::from_config(config),
+            ethernet: SystemEthernetTapDriver::from_config(config),
         }
     }
 
@@ -231,6 +241,7 @@ impl SystemAdapterDriver {
             "i2c" => Ok(&self.i2c),
             "gpio" => Ok(&self.gpio),
             "uart" => Ok(&self.uart),
+            "ethernet" => Ok(&self.ethernet),
             bus => Err(AdapterError::DriverUnavailable(format!(
                 "no host adapter driver is registered for bus '{bus}'"
             ))),
@@ -242,6 +253,135 @@ pub struct SystemUartPtyDriver {
     executable: PathBuf,
     socket_path: PathBuf,
     children: Mutex<HashMap<String, ManagedUartPty>>,
+}
+
+/// Owns TAP daemons and their interface names. Kernel CAP_NET_ADMIN checks occur in the helper.
+pub struct SystemEthernetTapDriver {
+    executable: PathBuf,
+    socket_path: PathBuf,
+    children: Mutex<HashMap<String, ManagedEthernetTap>>,
+}
+
+struct ManagedEthernetTap {
+    child: Child,
+    device_path: String,
+    privileged: bool,
+}
+
+impl SystemEthernetTapDriver {
+    fn from_config(config: &ServerConfig) -> Self {
+        let executable = std::env::var_os("VDS4E_ETHERNET_TAP_EXECUTABLE").map_or_else(
+            || [
+                PathBuf::from("build/adapters/ethernet-tap/vds4e-ethernet-tap"),
+                PathBuf::from("/usr/local/bin/vds4e-ethernet-tap"),
+                PathBuf::from("/usr/bin/vds4e-ethernet-tap"),
+            ].into_iter().find(|path| path.is_file()).unwrap_or_else(
+                || PathBuf::from("build/adapters/ethernet-tap/vds4e-ethernet-tap")
+            ), PathBuf::from,
+        );
+        Self { executable, socket_path: config.data_plane.unix_socket.clone(), children: Mutex::new(HashMap::new()) }
+    }
+}
+
+impl AdapterDriver for SystemEthernetTapDriver {
+    fn readiness(&self) -> DriverReadiness {
+        if !self.executable.is_file() {
+            DriverReadiness::Unavailable
+        } else if fs::read_to_string("/proc/self/status")
+            .ok()
+            .and_then(|status| status.lines().find(|line| line.starts_with("CapEff:"))
+                .and_then(|line| line.split_whitespace().nth(1))
+                .and_then(|value| u64::from_str_radix(value, 16).ok()))
+            .is_some_and(|bits| bits & (1 << 12) != 0)
+        {
+            DriverReadiness::Ready
+        } else {
+            DriverReadiness::AuthorizationRequired
+        }
+    }
+    fn loaded_device_path(&self, adapter: &AdapterSnapshot) -> Option<String> {
+        self.children.lock().ok()?.get(&adapter.id).map(|child| child.device_path.clone())
+    }
+    fn load(&self, adapter: &AdapterSnapshot) -> Result<Vec<u32>, AdapterError> {
+        if !self.executable.is_file() {
+            return Err(AdapterError::DriverUnavailable(format!(
+                "Ethernet TAP executable '{}' is unavailable", self.executable.display()
+            )));
+        }
+        let binding = adapter.bindings.first().ok_or_else(|| AdapterError::Conflict(
+            "attach an Ethernet device before loading its TAP adapter".to_owned()
+        ))?;
+        let privileged = self.readiness() == DriverReadiness::AuthorizationRequired;
+        let executable = self.executable.canonicalize()
+            .map_err(|error| AdapterError::DriverUnavailable(error.to_string()))?;
+        let mut command = if privileged {
+            SystemCuseDriver::elevated_command(&executable)?
+        } else {
+            Command::new(&executable)
+        };
+        let mut child = command
+            .arg("--device-id").arg(&binding.device_id)
+            .arg("--socket").arg(&self.socket_path)
+            .arg("--ifname").arg(format!("vds{}", adapter.bus_number))
+            .arg("--parent-pid").arg(std::process::id().to_string())
+            .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped())
+            .spawn().map_err(|error| AdapterError::Process(format!("failed to start Ethernet TAP helper: {error}")))?;
+        let mut name = String::new();
+        let result = child.stdout.take().ok_or_else(|| AdapterError::Process(
+            "Ethernet TAP helper has no stdout".to_owned()
+        ))?;
+        BufReader::new(result).read_line(&mut name).map_err(|error|
+            AdapterError::Process(format!("cannot read TAP interface name: {error}")))?;
+        let name = name.trim().to_owned();
+        if name != format!("vds{}", adapter.bus_number) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(AdapterError::AuthorizationRequired(
+                "Ethernet TAP interface was not created; check /dev/net/tun and CAP_NET_ADMIN".to_owned(),
+            ));
+        }
+        if let Some(stderr) = child.stderr.take() {
+            let adapter_id = adapter.id.clone();
+            let _ = thread::Builder::new().name(format!("vds4e-ethernet-log-{adapter_id}"))
+                .spawn(move || {
+                    for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                        tracing::warn!(adapter_id = %adapter_id, message = %line, "Ethernet TAP adapter message");
+                    }
+                });
+        }
+        let pid = child.id();
+        self.children.lock().map_err(|_| AdapterError::Process("Ethernet adapter lock poisoned".to_owned()))?
+            .insert(adapter.id.clone(), ManagedEthernetTap { child, device_path: name, privileged });
+        Ok(vec![pid])
+    }
+    fn attach_endpoint(&self, _adapter: &AdapterSnapshot, _binding: &AdapterBinding) -> Result<u32, AdapterError> {
+        Err(AdapterError::Conflict("unload Ethernet TAP before changing its binding".to_owned()))
+    }
+    fn detach_endpoint(&self, _adapter: &AdapterSnapshot, _binding: &AdapterBinding) -> Result<u32, AdapterError> {
+        Err(AdapterError::Conflict("unload Ethernet TAP before changing its binding".to_owned()))
+    }
+    fn unload(&self, adapter: &AdapterSnapshot) -> Result<(), AdapterError> {
+        if let Some(mut managed) = self.children.lock()
+            .map_err(|_| AdapterError::Process("Ethernet adapter lock poisoned".to_owned()))?
+            .remove(&adapter.id) {
+            if managed.child.try_wait().map_err(|e| AdapterError::Process(e.to_string()))?.is_none() {
+                if managed.privileged {
+                    let success = SystemCuseDriver::elevated_command("/bin/kill")?
+                        .arg("-TERM").arg(managed.child.id().to_string())
+                        .status().map_err(|e| AdapterError::Process(e.to_string()))?.success();
+                    if !success {
+                        return Err(AdapterError::AuthorizationRequired(
+                            "Ethernet helper shutdown authorization failed".to_owned()
+                        ));
+                    }
+                } else {
+                    managed.child.kill().map_err(|e| AdapterError::Process(e.to_string()))?;
+                }
+            }
+            let _ = managed.child.wait();
+        }
+        Ok(())
+    }
 }
 
 struct ManagedUartPty {
@@ -1378,7 +1518,7 @@ impl AdapterManager {
                     persisted.id
                 )));
             }
-            if matches!(persisted.bus_type.as_str(), "spi" | "i2c" | "uart")
+            if matches!(persisted.bus_type.as_str(), "spi" | "i2c" | "uart" | "ethernet")
                 && !assigned_buses.insert((persisted.bus_type.clone(), persisted.bus_number))
             {
                 return Err(AdapterError::Persistence(format!(
@@ -1414,6 +1554,9 @@ impl AdapterManager {
                     persisted.id.clone(),
                     persisted.name,
                     persisted.bus_number,
+                ),
+                "ethernet" => AdapterSnapshot::ethernet(
+                    persisted.id.clone(), persisted.name, persisted.bus_number,
                 ),
                 bus => {
                     return Err(AdapterError::Persistence(format!(
@@ -1464,7 +1607,7 @@ impl AdapterManager {
                     persisted.id
                 )));
             }
-            if persisted.bus_type == "uart"
+            if matches!(persisted.bus_type.as_str(), "uart" | "ethernet")
                 && (persisted.bindings.len() > 1
                     || persisted
                         .bindings
@@ -1472,7 +1615,7 @@ impl AdapterManager {
                         .any(|binding| binding.endpoint != 0))
             {
                 return Err(AdapterError::Persistence(format!(
-                    "persisted UART adapter '{}' must have at most one binding at endpoint zero",
+                    "persisted UART/Ethernet adapter '{}' must have at most one binding at endpoint zero",
                     persisted.id
                 )));
             }
@@ -1484,6 +1627,7 @@ impl AdapterManager {
                         "gpio" => "/dev/gpiochipX".to_owned(),
                         "i2c" => format!("/dev/i2c-{}", adapter.bus_number),
                         "uart" => "/dev/pts/X".to_owned(),
+                        "ethernet" => format!("vds{}", adapter.bus_number),
                         _ => format!("/dev/spidev{}.{}", adapter.bus_number, binding.endpoint),
                     },
                     device_id: binding.device_id,
@@ -1785,6 +1929,34 @@ impl AdapterManager {
         Ok(adapter)
     }
 
+    /// Creates an Ethernet TAP adapter that binds one virtual host.
+    pub fn create_ethernet(
+        &self, id: String, name: String, bus_number: u16,
+    ) -> Result<AdapterSnapshot, AdapterError> {
+        if !valid_id(&id) {
+            return Err(AdapterError::Invalid("invalid Ethernet adapter id".to_owned()));
+        }
+        if bus_number > 9999 {
+            return Err(AdapterError::Invalid("Ethernet bus number must be 0..9999".to_owned()));
+        }
+        let snapshot = {
+            let mut adapters = self.adapters.lock()
+                .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
+            if adapters.contains_key(&id) {
+                return Err(AdapterError::Duplicate(format!("adapter '{id}' already exists")));
+            }
+            if adapters.values().any(|item| item.bus_type == "ethernet" && item.bus_number == bus_number) {
+                return Err(AdapterError::Conflict(format!("Ethernet TAP vds{bus_number} is already assigned")));
+            }
+            let mut snapshot = AdapterSnapshot::ethernet(id.clone(), name, bus_number);
+            snapshot.readiness = self.driver.readiness_for(&snapshot);
+            adapters.insert(id, snapshot.clone());
+            snapshot
+        };
+        self.persist()?;
+        Ok(snapshot)
+    }
+
     /// Attaches one runtime device to a unique adapter endpoint.
     ///
     /// # Errors
@@ -1861,6 +2033,7 @@ impl AdapterManager {
                         "gpio" => "/dev/gpiochipX".to_owned(),
                         "i2c" => format!("/dev/i2c-{}", adapter.bus_number),
                         "uart" => "/dev/pts/X".to_owned(),
+                        "ethernet" => format!("vds{}", adapter.bus_number),
                         _ => format!("/dev/spidev{}.{}", adapter.bus_number, endpoint),
                     },
                     line_names,
@@ -1922,9 +2095,9 @@ impl AdapterManager {
                     "unload the GPIO adapter before changing its runtime binding".to_owned(),
                 ));
             }
-            if adapter.bus_type == "uart" && adapter.state == AdapterState::Loaded {
+            if matches!(adapter.bus_type.as_str(), "uart" | "ethernet") && adapter.state == AdapterState::Loaded {
                 return Err(AdapterError::Conflict(
-                    "unload the UART adapter before changing its runtime binding".to_owned(),
+                    "unload the UART or Ethernet adapter before changing its runtime binding".to_owned(),
                 ));
             }
             let binding = adapter
@@ -2036,7 +2209,7 @@ impl AdapterManager {
         } else {
             None
         };
-        if matches!(adapter.bus_type.as_str(), "gpio" | "uart")
+        if matches!(adapter.bus_type.as_str(), "gpio" | "uart" | "ethernet")
             && let (Some(binding), Some(device_path)) =
                 (adapter.bindings.first_mut(), adapter.device_path.as_ref())
         {
@@ -2180,6 +2353,7 @@ fn validate_new_binding(adapter: &AdapterSnapshot, endpoint: u16) -> Result<(), 
             "i2c" => Some("unload the I2C adapter before changing address bindings"),
             "gpio" => Some("unload the GPIO adapter before changing its runtime binding"),
             "uart" => Some("unload the UART adapter before changing its runtime binding"),
+            "ethernet" => Some("unload the Ethernet TAP adapter before changing its binding"),
             _ => None,
         };
         if let Some(message) = message {
@@ -2210,9 +2384,9 @@ fn validate_new_binding(adapter: &AdapterSnapshot, endpoint: u16) -> Result<(), 
             "a GPIO adapter can bind exactly one GPIO bank device".to_owned(),
         ));
     }
-    if adapter.bus_type == "uart" && (endpoint != 0 || !adapter.bindings.is_empty()) {
+    if matches!(adapter.bus_type.as_str(), "uart" | "ethernet") && (endpoint != 0 || !adapter.bindings.is_empty()) {
         return Err(AdapterError::Conflict(
-            "a UART adapter binds exactly one device at endpoint zero".to_owned(),
+            "UART and Ethernet adapters bind one device at endpoint zero".to_owned(),
         ));
     }
     Ok(())

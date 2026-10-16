@@ -72,6 +72,10 @@ echo "Building UART PTY adapter..."
 configure_adapter "$ROOT_DIR/adapters/uart-pty" "$ADAPTER_BUILD_DIR/uart-pty"
 cmake --build "$ADAPTER_BUILD_DIR/uart-pty" --config Release --parallel
 
+echo "Building Ethernet TAP adapter..."
+configure_adapter "$ROOT_DIR/adapters/ethernet-tap" "$ADAPTER_BUILD_DIR/ethernet-tap"
+cmake --build "$ADAPTER_BUILD_DIR/ethernet-tap" --config Release --parallel
+
 echo "Building Micron MT25QL256 Embedded Linux tool..."
 "${CC:-cc}" \
   -O2 -g -Wall -Wextra -Wpedantic -Werror -std=c11 \

@@ -69,6 +69,14 @@ pub(super) async fn create_adapter(
                 )
             })?,
         ),
+        "ethernet" => state.adapters.create_ethernet(
+            request.id,
+            request.name,
+            request.bus_number.ok_or_else(|| ApiError::bad_request(
+                "adapter_bus_number_required",
+                "Ethernet adapters require bus_number".to_owned(),
+            ))?,
+        ),
         _ => {
             return Err(ApiError::bad_request(
                 "adapter_bus_unsupported",

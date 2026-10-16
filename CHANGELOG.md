@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Ethernet TAP adapter with Protobuf frame transport, a declarative ARP/IPv4
+  ICMP Echo host runtime, a bundled example package and adapter UI support.
 - `GET /api/v1/topology` lists the attached board topology's signal connections
   with their delay, last sampled source level and in-flight delayed deliveries.
 - The Web UI shows *Signal connections* on the Overview and, scoped to the

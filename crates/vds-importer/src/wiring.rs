@@ -130,6 +130,7 @@ impl VirtualBoardDraft {
                 i2c: None,
                 gpio: Some(GpioBusDefinition { lines }),
                 uart: None,
+                ethernet: None,
                 commands: vec![],
                 memory: None,
                 registers,

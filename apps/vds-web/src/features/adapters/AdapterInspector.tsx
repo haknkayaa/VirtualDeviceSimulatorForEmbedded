@@ -230,13 +230,14 @@ function AttachSection({ adapter, availableDevices, attachDraft, busy, onAttach,
   const busName = busLabel(adapter.bus_type)
   const isGpio = adapter.bus_type === 'gpio'
   const isUart = adapter.bus_type === 'uart'
+  const isEthernet = adapter.bus_type === 'ethernet'
   const topologyLocked = loaded && adapter.bus_type !== 'spi'
-  const portFull = (isUart || isGpio) && adapter.bindings.length > 0
-  const endpoint = isGpio || isUart ? 0 : parseEndpoint(adapter.bus_type, attachDraft.endpoint)
-  const conflict = endpoint === null || isGpio || isUart
+  const portFull = (isUart || isGpio || isEthernet) && adapter.bindings.length > 0
+  const endpoint = isGpio || isUart || isEthernet ? 0 : parseEndpoint(adapter.bus_type, attachDraft.endpoint)
+  const conflict = endpoint === null || isGpio || isUart || isEthernet
     ? undefined
     : adapter.bindings.find((binding) => binding.endpoint === endpoint)
-  const endpointError = !isGpio && !isUart && attachDraft.endpoint.trim() !== '' && endpoint === null
+  const endpointError = !isGpio && !isUart && !isEthernet && attachDraft.endpoint.trim() !== '' && endpoint === null
     ? adapter.bus_type === 'i2c' ? 'Use a 7-bit address, e.g. 0x50.' : 'Use a non-negative chip-select index.'
     : conflict
       ? `${formatEndpoint(adapter.bus_type, conflict.endpoint)} is used by ${conflict.device_id}.`
@@ -244,7 +245,9 @@ function AttachSection({ adapter, availableDevices, attachDraft, busy, onAttach,
   const canAttach = !busy && Boolean(attachDraft.deviceId) && endpoint !== null && !conflict
 
   let body: ReactNode
-  if (portFull && isUart) {
+  if (portFull && isEthernet) {
+    body = <Guidance title="This TAP interface is assigned.">Unload the Ethernet adapter before changing its virtual host binding.</Guidance>
+  } else if (portFull && isUart) {
     body = <Guidance title="This UART port is fully assigned.">Create another UART adapter when you need a second independent serial device.</Guidance>
   } else if (portFull) {
     body = <Guidance title="This GPIO controller is assigned.">One GPIO bank maps onto the controller lines. Detach {adapter.bindings[0].device_id}{loaded ? ' after unloading' : ''} to connect a different bank.</Guidance>
@@ -267,7 +270,7 @@ function AttachSection({ adapter, availableDevices, attachDraft, busy, onAttach,
             {availableDevices.map((device) => <option key={device.id} value={device.id}>{device.id}</option>)}
           </select>
         </label>
-        {!isGpio && !isUart && (
+        {!isGpio && !isUart && !isEthernet && (
           <label className="field adp-endpoint-field">
             <span>{adapter.bus_type === 'i2c' ? 'Slave address' : 'Chip select'}</span>
             <input

@@ -112,6 +112,9 @@ pub(super) async fn create_device(
     let bus = model.device.bus.clone();
     let driver = model.device.model.clone();
     let runtime = match (bus.as_str(), driver.as_str()) {
+        ("ethernet", _) => model
+            .into_ethernet_device()
+            .map(|device| Arc::new(device) as Arc<dyn Device>),
         ("gpio", _) => model
             .into_gpio_device()
             .map(|device| Arc::new(device) as Arc<dyn Device>),

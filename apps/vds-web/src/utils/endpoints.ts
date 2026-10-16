@@ -8,5 +8,6 @@ export function formatEndpoint(busType: string, endpoint: number) {
   if (bus === 'spi' || bus === 'qspi') return `CS${endpoint}`
   if (bus === 'i2c') return `0x${endpoint.toString(16).toUpperCase().padStart(2, '0')}`
   if (bus === 'uart') return 'PTY'
+  if (bus === 'ethernet') return 'TAP'
   return `#${endpoint}`
 }

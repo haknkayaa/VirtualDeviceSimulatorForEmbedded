@@ -33,6 +33,8 @@ pub struct DeviceDefinition {
     pub gpio: Option<GpioBusDefinition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uart: Option<UartBusDefinition>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ethernet: Option<EthernetHostDefinition>,
     #[serde(default)]
     pub commands: Vec<SpiCommandDefinition>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -49,6 +51,15 @@ pub struct DeviceDefinition {
     pub signals: Option<SignalsDefinition>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub signal_bindings: Vec<SignalBindingDefinition>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EthernetHostDefinition {
+    /// Colon-delimited unicast MAC address.
+    pub mac: String,
+    /// IPv4 host address (dotted decimal).
+    pub ipv4: String,
 }
 
 /// Public signal ports exposed to board topology. Internals stay private.

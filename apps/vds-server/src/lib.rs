@@ -61,6 +61,7 @@ pub fn load_registry_with_clock(
         let model = load_package_runtime_model(&package)?;
         validate_device_package_model(&package, &model).map_err(ServerError::PackageContract)?;
         let device: Arc<dyn vds_core::device::Device> = match model.device.bus.as_str() {
+            "ethernet" => Arc::new(model.into_ethernet_device()?),
             "gpio" => Arc::new(model.into_gpio_device()?),
             "i2c" if model.device.model == "at24c-eeprom" => {
                 Arc::new(model.into_at24c_device_with_clock(Arc::clone(&clock))?)
@@ -455,6 +456,21 @@ fn handle_request(
         }
         Some(client_request::Payload::UartTransfer(uart)) => {
             handle_uart_request(request_id, uart, registry, transaction_ids, events)
+        }
+        Some(client_request::Payload::EthernetFrame(ethernet)) => {
+            let result = registry.transfer_ethernet(&ethernet.device_id, &ethernet.frame);
+            match result {
+                Ok(frames) => ServerResponse {
+                    request_id,
+                    result: Some(server_response::Result::EthernetFrame(
+                        vds_protocol::v1::EthernetFrameResponse { frames },
+                    )),
+                },
+                Err(error) => {
+                    let (code, _) = protocol_error_code(&error);
+                    error_response(request_id, code, error.to_string())
+                }
+            }
         }
         None => error_response(
             request_id,

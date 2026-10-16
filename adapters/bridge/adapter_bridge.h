@@ -156,6 +156,26 @@ vds_status_t vds_uart_transfer(vds_adapter_bridge_t *client,
                                size_t *rx_length,
                                vds_error_t *error);
 
+/// @brief Maximum supported complete Ethernet L2 frame, without an FCS.
+/// This covers the standard 1500-byte MTU, including VLAN headers.
+#define VDS_ETHERNET_MAX_FRAME_SIZE 2048U
+
+/// @brief Send one Ethernet frame to a virtual endpoint over the data plane.
+/// The initial TAP adapter supports zero or one outbound frame per request.
+/// A successful exchange with no outbound frame sets *response_length to zero.
+/// @param response_frame Caller-owned output buffer for one complete L2 frame.
+/// @param response_capacity Capacity of response_frame in bytes.
+/// @param response_length Output frame length, or required size when too small.
+/// @param error Typed runtime error when VDS_ERR_SERVER is returned.
+vds_status_t vds_ethernet_exchange(vds_adapter_bridge_t *client,
+                                   const char *device_id,
+                                   const uint8_t *frame,
+                                   size_t frame_length,
+                                   uint8_t *response_frame,
+                                   size_t response_capacity,
+                                   size_t *response_length,
+                                   vds_error_t *error);
+
 #ifdef __cplusplus
 }
 #endif

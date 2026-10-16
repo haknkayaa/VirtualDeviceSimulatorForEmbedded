@@ -361,7 +361,8 @@ async fn transfer(arguments: SpiTransferArguments) -> Result<Vec<u8>, String> {
         Some(
             server_response::Result::GpioExchange(_)
             | server_response::Result::I2cTransfer(_)
-            | server_response::Result::UartTransfer(_),
+            | server_response::Result::UartTransfer(_)
+            | server_response::Result::EthernetFrame(_),
         ) => Err("server returned a response for a different bus".to_owned()),
         None => Err("server response has no result".to_owned()),
     }

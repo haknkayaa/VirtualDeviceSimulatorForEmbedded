@@ -40,18 +40,22 @@ export function CreateAdapterForm({ adapters, errorMessage, isPending, onCancel,
     (adapter) => adapter.bus_type === busType && adapter.bus_number === busNumberValue,
   )
   const needsFrequency = busType === 'spi' || busType === 'i2c'
-  const invalid = isPending || !trimmedId || !name.trim() || idTaken || (needsFrequency && !maxFrequency)
+  const invalid = isPending || !trimmedId || !name.trim() || idTaken || Boolean(busNumberTaken) ||
+    (busType !== 'gpio' && (!Number.isInteger(busNumberValue) || busNumberValue < 0 || (busType === 'ethernet' && busNumberValue > 9999))) ||
+    (needsFrequency && !maxFrequency)
   const nodePreview = busType === 'spi'
     ? `/dev/spidev${busNumber || 'B'}.C`
     : busType === 'i2c'
       ? `/dev/i2c-${busNumber || 'N'}`
+      : busType === 'ethernet'
+        ? `vds${busNumber || '0'}`
       : spec.nodePattern
 
   const submit = () => {
     if (invalid) return
     onCreate(busType === 'gpio'
       ? { id: trimmedId, name, bus_type: busType, line_count: Number(lineCount) }
-      : { id: trimmedId, name, bus_type: busType, bus_number: busNumberValue, ...(busType === 'uart' ? {} : { max_frequency_hz: Number(maxFrequency) }) })
+      : { id: trimmedId, name, bus_type: busType, bus_number: busNumberValue, ...(needsFrequency ? { max_frequency_hz: Number(maxFrequency) } : {}) })
   }
 
   return (
@@ -139,6 +143,7 @@ export function CreateAdapterForm({ adapters, errorMessage, isPending, onCancel,
           </div>
         </section>
 
+        {busType === 'ethernet' && <p className="adp-note">This creates a Linux TAP interface. Attach one virtual Ethernet host at endpoint 0. Loading requires access to <code>/dev/net/tun</code> and CAP_NET_ADMIN. Configure the host interface with <code>ip address</code> and <code>ip link</code>.</p>}
         <p className="adp-note">
           Created unloaded. Attach a virtual device, then load the adapter to expose <code>{nodePreview}</code>
           {spec.kernelModule ? <> (requires the <code>{spec.kernelModule}</code> kernel module)</> : null}.

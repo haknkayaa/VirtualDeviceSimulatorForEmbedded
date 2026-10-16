@@ -3,7 +3,7 @@
 [![Build and Test](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/ci.yml)
 [![Debian Release](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/release.yml/badge.svg)](https://github.com/haknkayaa/VirtualDeviceSimulatorForEmbedded/actions/workflows/release.yml)
 
-**Run Embedded Linux applications against virtual SPI, I²C, GPIO and UART devices without the physical target board.**
+**Run Embedded Linux applications against virtual SPI, I²C, GPIO, UART and Ethernet devices without the physical target board.**
 
 VDS4E is a hardwareless integration-testing environment for Embedded Linux software. It exposes virtual peripherals through normal Linux userspace interfaces such as `/dev/spidevX.Y`, `/dev/i2c-N`, `/dev/gpiochipN` and PTYs, allowing native x86_64 builds of production applications and standard Linux tools to exercise stateful device models on a development workstation.
 
@@ -192,7 +192,7 @@ vds-cli device-package new ./my-sensor \
 vds-cli device-package validate ./my-sensor
 ```
 
-The bundled examples include generic SPI/I²C/GPIO/UART devices, AT24C EEPROM models and a Micron MT25QL256 flash model.
+The bundled examples include generic SPI/I²C/GPIO/UART devices, an Ethernet ARP/ICMP host, AT24C EEPROM models and a Micron MT25QL256 flash model.
 
 ### Example applications
 
@@ -205,6 +205,7 @@ same interfaces as ordinary production applications:
 | [Atmel AT24C256](examples/atmel-at24c256-embedded/) | I²C `/dev/i2c-N` | EEPROM address and data transactions |
 | [Generic GPIO tool](examples/generic-gpio-embedded/) | libgpiod `/dev/gpiochipN` | line inspection, input/output and edge monitoring |
 | [UART ping](examples/generic-uart-embedded/) | PTY `/dev/pts/N` | serial request/response |
+| [Ethernet TAP](docs/guides/ethernet.md) | TAP `vdsN` | ARP resolution and IPv4 ICMP Echo from normal Linux tools |
 
 From a source checkout with prerequisites installed:
 
@@ -381,6 +382,7 @@ A real Linux ABI E2E harness is available under `tests/e2e/` for privileged inte
 | [Releases](docs/guides/releases.md) | version/tag rules and Debian release workflow |
 | [Troubleshooting](docs/guides/troubleshooting.md) | common CUSE, gpio-sim, permissions, PTY and configuration issues |
 | [SPI / I²C / GPIO / UART](docs/guides/) | Linux host-interface guides and examples |
+| [Ethernet TAP](docs/guides/ethernet.md) | Linux TAP adapter, ARP/ICMP host model and configuration |
 | [Topology guide](docs/guides/topology.md) | cross-device signal routing |
 | [Device Package SDK](docs/development/device-package-sdk.md) | package contract and author workflow |
 | [Scenario coverage](docs/development/scenario-coverage.md) | coverage accounting for commands, registers, states, transitions and faults |

@@ -13,6 +13,8 @@ I2C_CUSE_BUILD_DIR="$ROOT_DIR/build/adapters/i2c-cuse"
 I2C_CUSE_EXECUTABLE="$I2C_CUSE_BUILD_DIR/vds4e-i2c-cuse"
 UART_PTY_BUILD_DIR="$ROOT_DIR/build/adapters/uart-pty"
 UART_PTY_EXECUTABLE="$UART_PTY_BUILD_DIR/vds4e-uart-pty"
+ETHERNET_TAP_BUILD_DIR="$ROOT_DIR/build/adapters/ethernet-tap"
+ETHERNET_TAP_EXECUTABLE="$ETHERNET_TAP_BUILD_DIR/vds4e-ethernet-tap"
 GPIO_SIM_BUILD_DIR="$ROOT_DIR/build/adapters/gpio-sim"
 GPIO_SIM_EXECUTABLE="$GPIO_SIM_BUILD_DIR/vds4e-gpio-sim"
 LOCK_FILE="${TMPDIR:-/tmp}/vds4e-dev-${UID}.lock"
@@ -142,6 +144,11 @@ cmake \
   -DCMAKE_BUILD_TYPE=Debug
 cmake --build "$UART_PTY_BUILD_DIR" --parallel
 
+echo "Configuring and building Ethernet TAP adapter..."
+prepare_cmake_build_dir "$ROOT_DIR/adapters/ethernet-tap" "$ETHERNET_TAP_BUILD_DIR"
+cmake -S "$ROOT_DIR/adapters/ethernet-tap" -B "$ETHERNET_TAP_BUILD_DIR" -DCMAKE_BUILD_TYPE=Debug
+cmake --build "$ETHERNET_TAP_BUILD_DIR" --parallel
+
 echo "Configuring and building the GPIO simulator adapter..."
 prepare_cmake_build_dir "$ROOT_DIR/adapters/gpio-sim" "$GPIO_SIM_BUILD_DIR"
 cmake \
@@ -159,6 +166,7 @@ if [[ "${VDS4E_ADAPTER_AUTH:-pkexec}" == "sudo" ]]; then
     VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
     VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
     VDS4E_UART_PTY_EXECUTABLE="$UART_PTY_EXECUTABLE" \
+    VDS4E_ETHERNET_TAP_EXECUTABLE="$ETHERNET_TAP_EXECUTABLE" \
     VDS4E_GPIO_SIM_EXECUTABLE="$GPIO_SIM_EXECUTABLE" \
     "$ROOT_DIR/build/rust/debug/vds-server" --config config/vds-server.yaml &
   SERVER_PID=$!
@@ -167,6 +175,7 @@ else
     VDS4E_SPI_CUSE_EXECUTABLE="$SPI_CUSE_EXECUTABLE" \
     VDS4E_I2C_CUSE_EXECUTABLE="$I2C_CUSE_EXECUTABLE" \
     VDS4E_UART_PTY_EXECUTABLE="$UART_PTY_EXECUTABLE" \
+    VDS4E_ETHERNET_TAP_EXECUTABLE="$ETHERNET_TAP_EXECUTABLE" \
     VDS4E_GPIO_SIM_EXECUTABLE="$GPIO_SIM_EXECUTABLE" \
     cargo run -p vds-server -- --config config/vds-server.yaml &
   SERVER_PID=$!

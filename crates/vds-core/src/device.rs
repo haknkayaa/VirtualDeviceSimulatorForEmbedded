@@ -11,6 +11,7 @@ pub enum BusType {
     I2c,
     Gpio,
     Uart,
+    Ethernet,
 }
 
 /// Maximum SPI payload (TX or requested RX) accepted for one transfer.
@@ -131,6 +132,7 @@ impl fmt::Display for BusType {
             Self::I2c => formatter.write_str("i2c"),
             Self::Gpio => formatter.write_str("gpio"),
             Self::Uart => formatter.write_str("uart"),
+            Self::Ethernet => formatter.write_str("ethernet"),
         }
     }
 }
@@ -308,6 +310,14 @@ pub trait Device: Send + Sync {
     fn transfer_uart(&self, _request: &[u8]) -> Result<DeviceTransfer, DeviceError> {
         Err(DeviceError::InvalidRequest(format!(
             "device '{}' does not support UART transfers",
+            self.id()
+        )))
+    }
+
+    /// Processes one complete Ethernet frame and returns zero or more outbound frames.
+    fn transfer_ethernet(&self, _frame: &[u8]) -> Result<Vec<Vec<u8>>, DeviceError> {
+        Err(DeviceError::InvalidRequest(format!(
+            "device '{}' does not support Ethernet frames",
             self.id()
         )))
     }

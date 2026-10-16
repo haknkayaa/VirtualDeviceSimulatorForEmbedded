@@ -86,6 +86,13 @@ cmake \
   -B "$ADAPTER_BUILD_DIR/uart-pty" \
   -DCMAKE_BUILD_TYPE=Release
 
+echo "Configuring Ethernet TAP adapter..."
+prepare_cmake_build_dir "$ROOT_DIR/adapters/ethernet-tap" "$ADAPTER_BUILD_DIR/ethernet-tap"
+cmake \
+  -S "$ROOT_DIR/adapters/ethernet-tap" \
+  -B "$ADAPTER_BUILD_DIR/ethernet-tap" \
+  -DCMAKE_BUILD_TYPE=Release
+
 printf 'configured_at=%(%Y-%m-%dT%H:%M:%S%z)T\n' -1 \
   >"$STATE_DIR/configuration"
 touch "$STATE_DIR/.configured"

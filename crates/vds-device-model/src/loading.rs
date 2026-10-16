@@ -14,6 +14,15 @@ use std::collections::BTreeSet;
 use crate::{DEVICE_MODEL_SCHEMA, SignalOutputs, behavior_flow};
 
 impl DeviceModel {
+    /// Converts a validated Ethernet host model to the runtime device.
+    pub fn into_ethernet_device(self) -> Result<crate::GenericEthernetHost, ModelError> {
+        if self.device.bus != "ethernet" || self.device.model != "generic-ethernet-host" {
+            return Err(ModelError::Validation("expected generic-ethernet-host model".to_owned()));
+        }
+        let host = self.device.ethernet.ok_or_else(|| ModelError::Validation("missing ethernet settings".to_owned()))?;
+        crate::GenericEthernetHost::new(self.device.id, &host.mac, &host.ipv4)
+            .map_err(ModelError::Validation)
+    }
     /// Compiles an authoritative behavior flow into this runtime model.
     ///
     /// # Errors
@@ -70,6 +79,15 @@ impl DeviceModel {
         }
 
         let model: Self = serde_json::from_value(instance)?;
+        if model.device.bus == "ethernet" {
+            if model.device.model != "generic-ethernet-host" || model.device.ethernet.is_none() {
+                return Err(ModelError::Validation("Ethernet requires generic-ethernet-host and ethernet settings".to_owned()));
+            }
+            let config = model.device.ethernet.as_ref().unwrap();
+            crate::GenericEthernetHost::new(model.device.id.clone(), &config.mac, &config.ipv4)
+                .map_err(ModelError::Validation)?;
+            return Ok(model);
+        }
         let has_signals =
             model.device.signals.is_some() || !model.device.signal_bindings.is_empty();
         if has_signals

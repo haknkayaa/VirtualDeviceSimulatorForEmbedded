@@ -32,6 +32,10 @@ pub struct DeviceRegistry {
 pub type ScheduleListener = Arc<dyn Fn() + Send + Sync>;
 
 impl DeviceRegistry {
+    /// Dispatches a raw Ethernet frame to one virtual L2 host.
+    pub fn transfer_ethernet(&self, id: &str, frame: &[u8]) -> Result<Vec<Vec<u8>>, DeviceError> {
+        self.device(id)?.transfer_ethernet(frame)
+    }
     #[must_use]
     pub fn new() -> Self {
         Self::default()

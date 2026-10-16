@@ -66,6 +66,7 @@ The repository currently implements:
 - a Linux I²C CUSE adapter
 - kernel `gpio-sim` integration exposing real `/dev/gpiochipX` devices
 - an unprivileged UART PTY adapter exposing a standard `/dev/pts/N` TTY
+- an Ethernet TAP adapter and a declarative IPv4 ARP/ICMP Echo host model
 - a device-scoped Web workspace for configuration, behavior, and scenarios
 - bounded in-memory events with optional SQLite persistence and retention
 
@@ -155,6 +156,7 @@ and documentation together.
   I2C CUSE adapter ------------------------------> |             |
   GPIO sync helper ------------------------------> +------+------+
   UART PTY adapter ------------------------------> |             |
+  Ethernet TAP adapter --------------------------> |             |
                                                           |
                                                           v
                                              Declarative device packages
@@ -725,7 +727,17 @@ device semantics do not live in the helper.
 PTY integration does not model electrical bit timing, parity/framing errors,
 break signaling, modem-control lines, or a physical UART controller.
 
-### 12.6 Compatibility rule
+### 12.6 Ethernet through Linux TAP
+
+An Ethernet host adapter creates a Linux TAP L2 interface `vdsN` and exchanges
+complete Ethernet frames over the Unix-socket data plane. Its virtual host
+currently answers ARP for its configured IPv4 address and valid IPv4 ICMP Echo
+requests. It does not implement TCP, UDP, DHCP, IPv6, or physical NIC behavior.
+Creating the TAP device requires CAP_NET_ADMIN; interface addresses and state
+are configured through normal Linux `ip` tools. The interface is removed when
+the TAP helper exits.
+
+### 12.7 Compatibility rule
 
 VDS4E does not maintain replacements for distribution tools. Adapter
 acceptance is measured with unmodified host tools:
@@ -734,6 +746,7 @@ acceptance is measured with unmodified host tools:
 - I²C: `i2cdetect`, `i2cget`, `i2cset`, `i2ctransfer`
 - GPIO: `gpiodetect`, `gpioinfo`, `gpioget`, `gpioset`, `gpiomon`
 - UART: normal TTY applications using `open`, `read`, `write`, and termios
+- Ethernet: normal Linux `ip`, `ping` and `tcpdump` against the TAP interface
 
 Passing these tests establishes Linux userspace ABI compatibility only. It does
 not validate physical controllers, DMA, interrupts, or electrical behavior.

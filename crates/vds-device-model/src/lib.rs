@@ -13,6 +13,8 @@ mod runtime;
 mod signal_graph;
 mod signals;
 mod uart;
+mod ethernet;
+pub use ethernet::GenericEthernetHost;
 mod validation;
 pub use at24c::At24cEepromDevice;
 use command::{SpiCommand, SpiCommandBehavior};

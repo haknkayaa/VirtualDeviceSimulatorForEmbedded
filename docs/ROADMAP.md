@@ -25,7 +25,8 @@ Out of scope for version 1 and candidates for follow-up ADRs:
 
 ## Additional host adapters and buses
 
-- Ethernet TAP or socket endpoints and PCAP export.
+- Expand the initial Ethernet TAP ARP/ICMP host with socket endpoints,
+  declarative UDP/TCP behavior and PCAP export.
 - QSPI multi-lane/DTR host integration beyond the current SPI subset.
 - Optional QEMU and full-system integration after functional adapters mature.
 

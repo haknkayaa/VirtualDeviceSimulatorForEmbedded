@@ -27,7 +27,7 @@ export function buildPackageInstances(packageIds: string[], devices: Device[] = 
     const bound = bindings.get(id)
     if (!device && !bound) continue
     const nodePath = bound
-      ? (bound.adapter.bus_type === 'gpio' || bound.adapter.bus_type === 'uart') && bound.adapter.device_path
+      ? (bound.adapter.bus_type === 'gpio' || bound.adapter.bus_type === 'uart' || bound.adapter.bus_type === 'ethernet') && bound.adapter.device_path
         ? bound.adapter.device_path
         : bound.binding.device_path
       : undefined

@@ -23,10 +23,10 @@
           "minLength": 1
         },
         "bus": {
-          "enum": ["spi", "i2c", "gpio", "uart"]
+          "enum": ["spi", "i2c", "gpio", "uart", "ethernet"]
         },
         "model": {
-          "enum": ["generic-spi-command", "generic-i2c-register", "at24c-eeprom", "generic-gpio-bank", "generic-uart-responder"]
+          "enum": ["generic-spi-command", "generic-i2c-register", "at24c-eeprom", "generic-gpio-bank", "generic-uart-responder", "generic-ethernet-host"]
         },
         "spi": {
           "type": "object",
@@ -105,6 +105,15 @@
                 }
               }
             }
+          }
+        },
+        "ethernet": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mac", "ipv4"],
+          "properties": {
+            "mac": { "type": "string", "pattern": "^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$" },
+            "ipv4": { "type": "string", "minLength": 7, "maxLength": 15 }
           }
         },
         "commands": {

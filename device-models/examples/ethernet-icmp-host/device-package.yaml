@@ -1,0 +1,17 @@
+api_version: vds4e.dev/v1alpha1
+kind: DevicePackage
+metadata:
+  id: ethernet-icmp-host
+  display_name: Ethernet ICMP Host
+  version: 0.1.0
+  description: Virtual Ethernet endpoint supporting ARP and IPv4 ICMP Echo.
+  license: Apache-2.0
+  authors: [VDS4E Contributors]
+  tags: [ethernet, arp, ipv4, icmp, tap]
+spec:
+  bus:
+    type: ethernet
+    profile: ethernet.ii
+  runtime:
+    driver: generic-ethernet-host
+    model: model/device.yaml
