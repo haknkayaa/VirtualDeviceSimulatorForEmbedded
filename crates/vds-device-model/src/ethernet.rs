@@ -9,6 +9,11 @@ pub struct GenericEthernetHost {
 }
 
 impl GenericEthernetHost {
+    /// Creates a host that answers ARP and ICMP Echo for one MAC/IPv4 pair.
+    ///
+    /// # Errors
+    /// Returns a message when the MAC is not a nonzero unicast address in
+    /// `xx:xx:xx:xx:xx:xx` form or the IPv4 address does not parse.
     pub fn new(id: String, mac: &str, ipv4: &str) -> Result<Self, String> {
         let parts = mac.split(':').collect::<Vec<_>>();
         if parts.len() != 6 {
@@ -25,9 +30,15 @@ impl GenericEthernetHost {
         if address[0] & 1 != 0 || address == [0; 6] {
             return Err("MAC must be a nonzero unicast address".to_owned());
         }
-        let ip = ipv4.parse::<Ipv4Addr>()
-            .map_err(|_| "invalid Ethernet IPv4 address".to_owned())?.octets();
-        Ok(Self { id, mac: address, ip })
+        let ip = ipv4
+            .parse::<Ipv4Addr>()
+            .map_err(|_| "invalid Ethernet IPv4 address".to_owned())?
+            .octets();
+        Ok(Self {
+            id,
+            mac: address,
+            ip,
+        })
     }
 }
 
@@ -39,23 +50,41 @@ fn checksum(data: &[u8]) -> u16 {
     while sum >> 16 != 0 {
         sum = (sum & 0xffff) + (sum >> 16);
     }
-    !(sum as u16)
+    // The fold above leaves at most 16 significant bits.
+    !u16::try_from(sum).unwrap_or(u16::MAX)
 }
 
 impl Device for GenericEthernetHost {
-    fn id(&self) -> &str { &self.id }
-    fn bus_type(&self) -> BusType { BusType::Ethernet }
-    fn transfer(&self, _request: &[u8]) -> Result<DeviceTransfer, DeviceError> {
-        Err(DeviceError::InvalidRequest("use Ethernet frame transfer".to_owned()))
+    fn id(&self) -> &str {
+        &self.id
     }
-    fn transfer_spi(&self, _request: &[u8], _len: usize, _wire: SpiWireConfig) -> Result<DeviceTransfer, DeviceError> {
-        Err(DeviceError::InvalidRequest("Ethernet host does not support SPI".to_owned()))
+    fn bus_type(&self) -> BusType {
+        BusType::Ethernet
+    }
+    fn transfer(&self, _request: &[u8]) -> Result<DeviceTransfer, DeviceError> {
+        Err(DeviceError::InvalidRequest(
+            "use Ethernet frame transfer".to_owned(),
+        ))
+    }
+    fn transfer_spi(
+        &self,
+        _request: &[u8],
+        _len: usize,
+        _wire: SpiWireConfig,
+    ) -> Result<DeviceTransfer, DeviceError> {
+        Err(DeviceError::InvalidRequest(
+            "Ethernet host does not support SPI".to_owned(),
+        ))
     }
     fn transfer_ethernet(&self, frame: &[u8]) -> Result<Vec<Vec<u8>>, DeviceError> {
         if frame.len() > 1518 {
-            return Err(DeviceError::InvalidRequest("Ethernet frame exceeds 1518 bytes".to_owned()));
+            return Err(DeviceError::InvalidRequest(
+                "Ethernet frame exceeds 1518 bytes".to_owned(),
+            ));
         }
-        if frame.len() < 14 { return Ok(vec![]); }
+        if frame.len() < 14 {
+            return Ok(vec![]);
+        }
         let ethertype = u16::from_be_bytes([frame[12], frame[13]]);
         if ethertype == 0x0806 && frame.len() >= 42 {
             let arp = &frame[14..42];
@@ -73,14 +102,19 @@ impl Device for GenericEthernetHost {
             reply[38..42].copy_from_slice(&arp[14..18]);
             return Ok(vec![reply]);
         }
-        if ethertype != 0x0800 || frame.len() < 14 + 20 { return Ok(vec![]); }
+        if ethertype != 0x0800 || frame.len() < 14 + 20 {
+            return Ok(vec![]);
+        }
         let packet = &frame[14..];
         if packet[0] != 0x45 || packet[9] != 1 || packet[16..20] != self.ip {
             return Ok(vec![]);
         }
         let length = usize::from(u16::from_be_bytes([packet[2], packet[3]]));
-        if length < 28 || length > packet.len() || checksum(&packet[..20]) != 0 ||
-            (u16::from_be_bytes([packet[6], packet[7]]) & 0x3fff) != 0 {
+        if length < 28
+            || length > packet.len()
+            || checksum(&packet[..20]) != 0
+            || (u16::from_be_bytes([packet[6], packet[7]]) & 0x3fff) != 0
+        {
             return Ok(vec![]);
         }
         if packet[20] != 8 || packet[21] != 0 || checksum(&packet[20..length]) != 0 {

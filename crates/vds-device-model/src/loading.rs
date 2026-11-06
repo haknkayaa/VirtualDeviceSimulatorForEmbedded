@@ -15,11 +15,20 @@ use crate::{DEVICE_MODEL_SCHEMA, SignalOutputs, behavior_flow};
 
 impl DeviceModel {
     /// Converts a validated Ethernet host model to the runtime device.
+    ///
+    /// # Errors
+    /// Returns an error when the model is not a `generic-ethernet-host`, its
+    /// Ethernet settings are missing, or its MAC/IPv4 address is invalid.
     pub fn into_ethernet_device(self) -> Result<crate::GenericEthernetHost, ModelError> {
         if self.device.bus != "ethernet" || self.device.model != "generic-ethernet-host" {
-            return Err(ModelError::Validation("expected generic-ethernet-host model".to_owned()));
+            return Err(ModelError::Validation(
+                "expected generic-ethernet-host model".to_owned(),
+            ));
         }
-        let host = self.device.ethernet.ok_or_else(|| ModelError::Validation("missing ethernet settings".to_owned()))?;
+        let host = self
+            .device
+            .ethernet
+            .ok_or_else(|| ModelError::Validation("missing ethernet settings".to_owned()))?;
         crate::GenericEthernetHost::new(self.device.id, &host.mac, &host.ipv4)
             .map_err(ModelError::Validation)
     }
@@ -80,10 +89,13 @@ impl DeviceModel {
 
         let model: Self = serde_json::from_value(instance)?;
         if model.device.bus == "ethernet" {
-            if model.device.model != "generic-ethernet-host" || model.device.ethernet.is_none() {
-                return Err(ModelError::Validation("Ethernet requires generic-ethernet-host and ethernet settings".to_owned()));
-            }
-            let config = model.device.ethernet.as_ref().unwrap();
+            let ("generic-ethernet-host", Some(config)) =
+                (model.device.model.as_str(), model.device.ethernet.as_ref())
+            else {
+                return Err(ModelError::Validation(
+                    "Ethernet requires generic-ethernet-host and ethernet settings".to_owned(),
+                ));
+            };
             crate::GenericEthernetHost::new(model.device.id.clone(), &config.mac, &config.ipv4)
                 .map_err(ModelError::Validation)?;
             return Ok(model);

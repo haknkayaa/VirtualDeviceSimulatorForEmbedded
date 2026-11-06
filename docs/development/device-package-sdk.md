@@ -103,7 +103,7 @@ folder layout:
 | I²C | `generic-i2c-register`, `at24c-eeprom` | CUSE `/dev/i2c-N` |
 | GPIO | `generic-gpio-bank` | kernel `gpio-sim` / `/dev/gpiochipX` |
 | UART | `generic-uart-responder` | PTY `/dev/pts/N` |
-| Ethernet | not implemented | not implemented |
+| Ethernet | `generic-ethernet-host` | TAP network interface `vdsN` |
 | CAN | not implemented | not implemented |
 | USB | not implemented | not implemented |
 | Custom | no generic runtime | depends on a future implementation |

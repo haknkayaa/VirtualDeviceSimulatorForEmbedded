@@ -33,6 +33,9 @@ pub type ScheduleListener = Arc<dyn Fn() + Send + Sync>;
 
 impl DeviceRegistry {
     /// Dispatches a raw Ethernet frame to one virtual L2 host.
+    ///
+    /// # Errors
+    /// Returns an error when the device is unknown or rejects the frame.
     pub fn transfer_ethernet(&self, id: &str, frame: &[u8]) -> Result<Vec<Vec<u8>>, DeviceError> {
         self.device(id)?.transfer_ethernet(frame)
     }

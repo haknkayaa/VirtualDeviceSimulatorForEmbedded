@@ -11,6 +11,7 @@ pub enum Operation {
     I2cTransfer,
     GpioExchange,
     UartTransfer,
+    EthernetFrame,
 }
 
 impl Operation {
@@ -21,6 +22,7 @@ impl Operation {
             Self::I2cTransfer => "i2c_transfer",
             Self::GpioExchange => "gpio_exchange",
             Self::UartTransfer => "uart_transfer",
+            Self::EthernetFrame => "ethernet_frame",
         }
     }
 }

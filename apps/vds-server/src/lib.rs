@@ -458,25 +458,87 @@ fn handle_request(
             handle_uart_request(request_id, uart, registry, transaction_ids, events)
         }
         Some(client_request::Payload::EthernetFrame(ethernet)) => {
-            let result = registry.transfer_ethernet(&ethernet.device_id, &ethernet.frame);
-            match result {
-                Ok(frames) => ServerResponse {
-                    request_id,
-                    result: Some(server_response::Result::EthernetFrame(
-                        vds_protocol::v1::EthernetFrameResponse { frames },
-                    )),
-                },
-                Err(error) => {
-                    let (code, _) = protocol_error_code(&error);
-                    error_response(request_id, code, error.to_string())
-                }
-            }
+            handle_ethernet_request(request_id, ethernet, registry, transaction_ids, events)
         }
         None => error_response(
             request_id,
             ErrorCode::InvalidRequest,
             "request payload is missing".to_owned(),
         ),
+    }
+}
+
+fn handle_ethernet_request(
+    request_id: u64,
+    ethernet: vds_protocol::v1::EthernetFrameRequest,
+    registry: &DeviceRegistry,
+    transaction_ids: &AtomicU64,
+    events: &EventBus,
+) -> ServerResponse {
+    let transaction_id = transaction_ids.fetch_add(1, Ordering::Relaxed);
+    let mut transaction = Transaction::now(
+        transaction_id,
+        "ethernet".to_owned(),
+        ethernet.device_id.clone(),
+        Operation::EthernetFrame,
+        ethernet.frame.clone(),
+    );
+    let virtual_time_ns = registry.virtual_time_ns(&ethernet.device_id).unwrap_or(0);
+    let _ = events.publish(EventDraft {
+        virtual_time_ns,
+        device_id: Some(ethernet.device_id.clone()),
+        scenario_run_id: None,
+        payload: EventPayload::TransactionStarted {
+            transaction_id: Some(transaction_id),
+            request: ethernet.frame.clone(),
+            gpio_output_lines: None,
+        },
+    });
+    match registry.transfer_ethernet(&ethernet.device_id, &ethernet.frame) {
+        Ok(frames) => {
+            // The first Ethernet host model produces zero or one reply frame.
+            // Keep the existing bus-neutral transaction/event schema unchanged.
+            let response = frames.first().cloned().unwrap_or_default();
+            transaction.response.clone_from(&response);
+            let _ = events.publish(EventDraft {
+                virtual_time_ns,
+                device_id: Some(ethernet.device_id),
+                scenario_run_id: None,
+                payload: EventPayload::TransactionCompleted {
+                    transaction_id: Some(transaction_id),
+                    response,
+                    result: "success".to_owned(),
+                    error_code: None,
+                },
+            });
+            log_transaction(&transaction);
+            ServerResponse {
+                request_id,
+                result: Some(server_response::Result::EthernetFrame(
+                    vds_protocol::v1::EthernetFrameResponse { frames },
+                )),
+            }
+        }
+        Err(error) => {
+            let (code, code_name) = protocol_error_code(&error);
+            transaction.result = TransactionResult::Error {
+                code: code_name,
+                message: error.to_string(),
+            };
+            let _ = events.publish(EventDraft {
+                virtual_time_ns,
+                device_id: Some(ethernet.device_id),
+                scenario_run_id: None,
+                payload: EventPayload::TransactionCompleted {
+                    transaction_id: Some(transaction_id),
+                    response: Vec::new(),
+                    result: "error".to_owned(),
+                    error_code: Some(code_name.to_owned()),
+                },
+            });
+            log_transaction(&transaction);
+            error_response(request_id, code, error.to_string())
+        }
     }
 }
 
@@ -1358,7 +1420,108 @@ pub enum ServerError {
 mod tests {
     use super::*;
     use vds_events::EventType;
-    use vds_protocol::v1::GpioExchangeRequest;
+    use vds_protocol::v1::{EthernetFrameRequest, GpioExchangeRequest};
+
+    #[test]
+    fn ethernet_frames_publish_bus_transactions_for_replies_and_errors() {
+        let model = DeviceModel::from_yaml(
+            r#"
+schema_version: 1
+device:
+  id: ethernet-icmp-host
+  name: Ethernet Host
+  bus: ethernet
+  model: generic-ethernet-host
+  ethernet: { mac: "02:56:44:53:00:01", ipv4: "192.0.2.2" }
+  commands: []
+"#,
+        )
+        .unwrap();
+        let registry = DeviceRegistry::new();
+        registry
+            .register(Arc::new(model.into_ethernet_device().unwrap()))
+            .unwrap();
+        let events = EventBus::default();
+        let ids = AtomicU64::new(1);
+        let gpio = GpioEventTracker::default();
+        let mut arp = vec![0u8; 42];
+        arp[0..6].fill(0xff); // Ethernet broadcast destination
+        arp[6..12].copy_from_slice(&[0x02, 0x11, 0x22, 0x33, 0x44, 0x55]);
+        arp[12..14].copy_from_slice(&[0x08, 0x06]);
+        arp[14..22].copy_from_slice(&[0, 1, 8, 0, 6, 4, 0, 1]);
+        arp[22..28].copy_from_slice(&[0x02, 0x11, 0x22, 0x33, 0x44, 0x55]);
+        arp[28..32].copy_from_slice(&[192, 0, 2, 1]);
+        arp[38..42].copy_from_slice(&[192, 0, 2, 2]);
+        let response = handle_request(
+            ClientRequest {
+                request_id: 41,
+                payload: Some(client_request::Payload::EthernetFrame(
+                    EthernetFrameRequest {
+                        device_id: "ethernet-icmp-host".to_owned(),
+                        frame: arp.clone(),
+                    },
+                )),
+            },
+            &registry,
+            &ids,
+            &events,
+            &gpio,
+        );
+        let Some(server_response::Result::EthernetFrame(result)) = response.result else {
+            panic!("Ethernet ARP response expected");
+        };
+        assert_eq!(result.frames.len(), 1);
+        assert_eq!(result.frames[0][20..22], [0, 2]); // ARP reply opcode
+        let published = events.events_after(0);
+        assert_eq!(published.len(), 2);
+        assert_eq!(published[0].event_type, EventType::TransactionStarted);
+        assert_eq!(
+            published[0].payload,
+            EventPayload::TransactionStarted {
+                transaction_id: Some(1),
+                request: arp,
+                gpio_output_lines: None,
+            }
+        );
+        assert_eq!(published[1].event_type, EventType::TransactionCompleted);
+        assert_eq!(
+            published[1].payload,
+            EventPayload::TransactionCompleted {
+                transaction_id: Some(1),
+                response: result.frames[0].clone(),
+                result: "success".to_owned(),
+                error_code: None,
+            }
+        );
+        let failure = handle_request(
+            ClientRequest {
+                request_id: 42,
+                payload: Some(client_request::Payload::EthernetFrame(
+                    EthernetFrameRequest {
+                        device_id: "not-present".to_owned(),
+                        frame: vec![0u8; 14],
+                    },
+                )),
+            },
+            &registry,
+            &ids,
+            &events,
+            &gpio,
+        );
+        assert!(matches!(
+            failure.result,
+            Some(server_response::Result::Error(_))
+        ));
+        let published = events.events_after(0);
+        assert_eq!(published.len(), 4);
+        assert_eq!(published[2].event_type, EventType::TransactionStarted);
+        assert_eq!(published[3].event_type, EventType::TransactionCompleted);
+        assert!(matches!(
+            &published[3].payload,
+            EventPayload::TransactionCompleted { transaction_id: Some(2), result, error_code: Some(_), .. }
+                if result == "error"
+        ));
+    }
 
     #[test]
     #[allow(clippy::too_many_lines)]

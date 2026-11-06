@@ -78,7 +78,7 @@ jobs:
               default) flags="" ;;
               asan-ubsan) flags="-fsanitize=address,undefined -fno-omit-frame-pointer -g" ;;
             esac
-            for adapter in spi-cuse i2c-cuse gpio-sim uart-pty; do
+            for adapter in spi-cuse i2c-cuse gpio-sim uart-pty ethernet-tap; do
               echo "::group::$variant / $adapter"
               build_dir="$RUNNER_TEMP/build-$variant-$adapter"
               cmake -S "adapters/$adapter" -B "$build_dir" \

@@ -16,6 +16,8 @@ The intended workflow is:
    - SPI: `/dev/spidevX.Y`
    - I2C: `/dev/i2c-X`
    - GPIO/libgpiod: `/dev/gpiochipX`
+   - UART: a kernel-assigned PTY, `/dev/pts/N`
+   - Ethernet: a TAP network interface, `vdsN`
    - Future buses must follow their normal Linux userspace ABI.
 5. Route those standard Linux operations through the adapter/data plane into
    declarative VDS4E device runtimes.
@@ -36,6 +38,10 @@ Treat real, unmodified Linux userspace tools as adapter conformance tests:
 - GPIO adapters are not complete until normal libgpiod tools such as
   `gpiodetect`, `gpioinfo`, `gpioget`, `gpioset`, and `gpiomon` work against
   `/dev/gpiochipN`.
+- UART adapters must work with `stty` and ordinary `open`/`read`/`write`
+  termios applications on the PTY.
+- Ethernet adapters must work with `ip`, `ping` and `tcpdump` on the TAP
+  interface.
 
 Implement the Linux ioctl semantics required by these tools in the adapter and
 the bus-neutral transaction semantics in the runtime/data plane. Never add
@@ -68,6 +74,14 @@ builds, browser verification, or other validation after every incremental
 change. Accumulate related changes and run the appropriate validation once
 immediately before a requested commit, or earlier only when the user explicitly
 asks for it.
+
+The pre-commit validation must match `.github/workflows/ci.yml`, not a subset
+of it: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D
+warnings`, `cargo test --workspace --locked`, the example configuration check,
+the Web UI lint/typecheck/test/build, and the CMake build and CTest suite of
+every adapter listed in the workflow. Clippy runs with pedantic lints: public
+items returning `Result` need an `# Errors` section, items that can panic need
+`# Panics`, and lossy casts or `unwrap()` in library code are rejected.
 
 ABI/conformance tests involving real Linux tools, device nodes, kernel modules,
 host adapters, or full control/data-plane integration are especially

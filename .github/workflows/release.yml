@@ -96,6 +96,7 @@ jobs:
           test -x /usr/bin/vds4e-i2c-cuse
           test -x /usr/bin/vds4e-gpio-sim
           test -x /usr/bin/vds4e-uart-pty
+          test -x /usr/bin/vds4e-ethernet-tap
           test -f /etc/vds4e/vds-server.yaml
           test -f /usr/share/vds4e/web/index.html
           test -f /lib/systemd/system/vds4e.service

@@ -315,6 +315,9 @@ pub trait Device: Send + Sync {
     }
 
     /// Processes one complete Ethernet frame and returns zero or more outbound frames.
+    ///
+    /// # Errors
+    /// Returns a device error when the device does not handle Ethernet or the frame is malformed.
     fn transfer_ethernet(&self, _frame: &[u8]) -> Result<Vec<Vec<u8>>, DeviceError> {
         Err(DeviceError::InvalidRequest(format!(
             "device '{}' does not support Ethernet frames",

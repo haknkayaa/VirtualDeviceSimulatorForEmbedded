@@ -14,3 +14,8 @@ target_compile_features(vds4e-ethernet-tap PRIVATE c_std_11)
 target_compile_definitions(vds4e-ethernet-tap PRIVATE _DEFAULT_SOURCE)
 target_compile_options(vds4e-ethernet-tap PRIVATE -Wall -Wextra -Wpedantic -Werror)
 target_link_libraries(vds4e-ethernet-tap PRIVATE vds4e_adapter_bridge)
+
+enable_testing()
+add_test(NAME ethernet-tap-requires-arguments COMMAND vds4e-ethernet-tap)
+set_tests_properties(ethernet-tap-requires-arguments PROPERTIES
+    PASS_REGULAR_EXPRESSION "usage:")

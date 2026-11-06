@@ -137,10 +137,19 @@ impl AdapterSnapshot {
     }
     fn ethernet(id: String, name: String, number: u16) -> Self {
         Self {
-            id, name, bus_type: "ethernet".to_owned(), driver: "tap".to_owned(),
-            state: AdapterState::Unloaded, readiness: DriverReadiness::Unavailable,
-            bus_number: number, line_count: None, max_frequency_hz: None,
-            device_path: None, bindings: Vec::new(), daemon_pids: Vec::new(), error: None,
+            id,
+            name,
+            bus_type: "ethernet".to_owned(),
+            driver: "tap".to_owned(),
+            state: AdapterState::Unloaded,
+            readiness: DriverReadiness::Unavailable,
+            bus_number: number,
+            line_count: None,
+            max_frequency_hz: None,
+            device_path: None,
+            bindings: Vec::new(),
+            daemon_pids: Vec::new(),
+            error: None,
         }
     }
 }
@@ -255,7 +264,7 @@ pub struct SystemUartPtyDriver {
     children: Mutex<HashMap<String, ManagedUartPty>>,
 }
 
-/// Owns TAP daemons and their interface names. Kernel CAP_NET_ADMIN checks occur in the helper.
+/// Owns TAP daemons and their interface names. Kernel `CAP_NET_ADMIN` checks occur in the helper.
 pub struct SystemEthernetTapDriver {
     executable: PathBuf,
     socket_path: PathBuf,
@@ -271,15 +280,23 @@ struct ManagedEthernetTap {
 impl SystemEthernetTapDriver {
     fn from_config(config: &ServerConfig) -> Self {
         let executable = std::env::var_os("VDS4E_ETHERNET_TAP_EXECUTABLE").map_or_else(
-            || [
-                PathBuf::from("build/adapters/ethernet-tap/vds4e-ethernet-tap"),
-                PathBuf::from("/usr/local/bin/vds4e-ethernet-tap"),
-                PathBuf::from("/usr/bin/vds4e-ethernet-tap"),
-            ].into_iter().find(|path| path.is_file()).unwrap_or_else(
-                || PathBuf::from("build/adapters/ethernet-tap/vds4e-ethernet-tap")
-            ), PathBuf::from,
+            || {
+                [
+                    PathBuf::from("build/adapters/ethernet-tap/vds4e-ethernet-tap"),
+                    PathBuf::from("/usr/local/bin/vds4e-ethernet-tap"),
+                    PathBuf::from("/usr/bin/vds4e-ethernet-tap"),
+                ]
+                .into_iter()
+                .find(|path| path.is_file())
+                .unwrap_or_else(|| PathBuf::from("build/adapters/ethernet-tap/vds4e-ethernet-tap"))
+            },
+            PathBuf::from,
         );
-        Self { executable, socket_path: config.data_plane.unix_socket.clone(), children: Mutex::new(HashMap::new()) }
+        Self {
+            executable,
+            socket_path: config.data_plane.unix_socket.clone(),
+            children: Mutex::new(HashMap::new()),
+        }
     }
 }
 
@@ -289,9 +306,13 @@ impl AdapterDriver for SystemEthernetTapDriver {
             DriverReadiness::Unavailable
         } else if fs::read_to_string("/proc/self/status")
             .ok()
-            .and_then(|status| status.lines().find(|line| line.starts_with("CapEff:"))
-                .and_then(|line| line.split_whitespace().nth(1))
-                .and_then(|value| u64::from_str_radix(value, 16).ok()))
+            .and_then(|status| {
+                status
+                    .lines()
+                    .find(|line| line.starts_with("CapEff:"))
+                    .and_then(|line| line.split_whitespace().nth(1))
+                    .and_then(|value| u64::from_str_radix(value, 16).ok())
+            })
             .is_some_and(|bits| bits & (1 << 12) != 0)
         {
             DriverReadiness::Ready
@@ -300,19 +321,28 @@ impl AdapterDriver for SystemEthernetTapDriver {
         }
     }
     fn loaded_device_path(&self, adapter: &AdapterSnapshot) -> Option<String> {
-        self.children.lock().ok()?.get(&adapter.id).map(|child| child.device_path.clone())
+        self.children
+            .lock()
+            .ok()?
+            .get(&adapter.id)
+            .map(|child| child.device_path.clone())
     }
     fn load(&self, adapter: &AdapterSnapshot) -> Result<Vec<u32>, AdapterError> {
         if !self.executable.is_file() {
             return Err(AdapterError::DriverUnavailable(format!(
-                "Ethernet TAP executable '{}' is unavailable", self.executable.display()
+                "Ethernet TAP executable '{}' is unavailable",
+                self.executable.display()
             )));
         }
-        let binding = adapter.bindings.first().ok_or_else(|| AdapterError::Conflict(
-            "attach an Ethernet device before loading its TAP adapter".to_owned()
-        ))?;
+        let binding = adapter.bindings.first().ok_or_else(|| {
+            AdapterError::Conflict(
+                "attach an Ethernet device before loading its TAP adapter".to_owned(),
+            )
+        })?;
         let privileged = self.readiness() == DriverReadiness::AuthorizationRequired;
-        let executable = self.executable.canonicalize()
+        let executable = self
+            .executable
+            .canonicalize()
             .map_err(|error| AdapterError::DriverUnavailable(error.to_string()))?;
         let mut command = if privileged {
             SystemCuseDriver::elevated_command(&executable)?
@@ -320,24 +350,38 @@ impl AdapterDriver for SystemEthernetTapDriver {
             Command::new(&executable)
         };
         let mut child = command
-            .arg("--device-id").arg(&binding.device_id)
-            .arg("--socket").arg(&self.socket_path)
-            .arg("--ifname").arg(format!("vds{}", adapter.bus_number))
-            .arg("--parent-pid").arg(std::process::id().to_string())
-            .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped())
-            .spawn().map_err(|error| AdapterError::Process(format!("failed to start Ethernet TAP helper: {error}")))?;
+            .arg("--device-id")
+            .arg(&binding.device_id)
+            .arg("--socket")
+            .arg(&self.socket_path)
+            .arg("--ifname")
+            .arg(format!("vds{}", adapter.bus_number))
+            .arg("--parent-pid")
+            .arg(std::process::id().to_string())
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| {
+                AdapterError::Process(format!("failed to start Ethernet TAP helper: {error}"))
+            })?;
         let mut name = String::new();
-        let result = child.stdout.take().ok_or_else(|| AdapterError::Process(
-            "Ethernet TAP helper has no stdout".to_owned()
-        ))?;
-        BufReader::new(result).read_line(&mut name).map_err(|error|
-            AdapterError::Process(format!("cannot read TAP interface name: {error}")))?;
+        let result = child
+            .stdout
+            .take()
+            .ok_or_else(|| AdapterError::Process("Ethernet TAP helper has no stdout".to_owned()))?;
+        BufReader::new(result)
+            .read_line(&mut name)
+            .map_err(|error| {
+                AdapterError::Process(format!("cannot read TAP interface name: {error}"))
+            })?;
         let name = name.trim().to_owned();
         if name != format!("vds{}", adapter.bus_number) {
             let _ = child.kill();
             let _ = child.wait();
             return Err(AdapterError::AuthorizationRequired(
-                "Ethernet TAP interface was not created; check /dev/net/tun and CAP_NET_ADMIN".to_owned(),
+                "Ethernet TAP interface was not created; check /dev/net/tun and CAP_NET_ADMIN"
+                    .to_owned(),
             ));
         }
         if let Some(stderr) = child.stderr.take() {
@@ -350,32 +394,67 @@ impl AdapterDriver for SystemEthernetTapDriver {
                 });
         }
         let pid = child.id();
-        self.children.lock().map_err(|_| AdapterError::Process("Ethernet adapter lock poisoned".to_owned()))?
-            .insert(adapter.id.clone(), ManagedEthernetTap { child, device_path: name, privileged });
+        self.children
+            .lock()
+            .map_err(|_| AdapterError::Process("Ethernet adapter lock poisoned".to_owned()))?
+            .insert(
+                adapter.id.clone(),
+                ManagedEthernetTap {
+                    child,
+                    device_path: name,
+                    privileged,
+                },
+            );
         Ok(vec![pid])
     }
-    fn attach_endpoint(&self, _adapter: &AdapterSnapshot, _binding: &AdapterBinding) -> Result<u32, AdapterError> {
-        Err(AdapterError::Conflict("unload Ethernet TAP before changing its binding".to_owned()))
+    fn attach_endpoint(
+        &self,
+        _adapter: &AdapterSnapshot,
+        _binding: &AdapterBinding,
+    ) -> Result<u32, AdapterError> {
+        Err(AdapterError::Conflict(
+            "unload Ethernet TAP before changing its binding".to_owned(),
+        ))
     }
-    fn detach_endpoint(&self, _adapter: &AdapterSnapshot, _binding: &AdapterBinding) -> Result<u32, AdapterError> {
-        Err(AdapterError::Conflict("unload Ethernet TAP before changing its binding".to_owned()))
+    fn detach_endpoint(
+        &self,
+        _adapter: &AdapterSnapshot,
+        _binding: &AdapterBinding,
+    ) -> Result<u32, AdapterError> {
+        Err(AdapterError::Conflict(
+            "unload Ethernet TAP before changing its binding".to_owned(),
+        ))
     }
     fn unload(&self, adapter: &AdapterSnapshot) -> Result<(), AdapterError> {
-        if let Some(mut managed) = self.children.lock()
+        if let Some(mut managed) = self
+            .children
+            .lock()
             .map_err(|_| AdapterError::Process("Ethernet adapter lock poisoned".to_owned()))?
-            .remove(&adapter.id) {
-            if managed.child.try_wait().map_err(|e| AdapterError::Process(e.to_string()))?.is_none() {
+            .remove(&adapter.id)
+        {
+            if managed
+                .child
+                .try_wait()
+                .map_err(|e| AdapterError::Process(e.to_string()))?
+                .is_none()
+            {
                 if managed.privileged {
                     let success = SystemCuseDriver::elevated_command("/bin/kill")?
-                        .arg("-TERM").arg(managed.child.id().to_string())
-                        .status().map_err(|e| AdapterError::Process(e.to_string()))?.success();
+                        .arg("-TERM")
+                        .arg(managed.child.id().to_string())
+                        .status()
+                        .map_err(|e| AdapterError::Process(e.to_string()))?
+                        .success();
                     if !success {
                         return Err(AdapterError::AuthorizationRequired(
-                            "Ethernet helper shutdown authorization failed".to_owned()
+                            "Ethernet helper shutdown authorization failed".to_owned(),
                         ));
                     }
                 } else {
-                    managed.child.kill().map_err(|e| AdapterError::Process(e.to_string()))?;
+                    managed
+                        .child
+                        .kill()
+                        .map_err(|e| AdapterError::Process(e.to_string()))?;
                 }
             }
             let _ = managed.child.wait();
@@ -1518,8 +1597,10 @@ impl AdapterManager {
                     persisted.id
                 )));
             }
-            if matches!(persisted.bus_type.as_str(), "spi" | "i2c" | "uart" | "ethernet")
-                && !assigned_buses.insert((persisted.bus_type.clone(), persisted.bus_number))
+            if matches!(
+                persisted.bus_type.as_str(),
+                "spi" | "i2c" | "uart" | "ethernet"
+            ) && !assigned_buses.insert((persisted.bus_type.clone(), persisted.bus_number))
             {
                 return Err(AdapterError::Persistence(format!(
                     "persisted {} bus number {} is assigned more than once",
@@ -1930,23 +2011,44 @@ impl AdapterManager {
     }
 
     /// Creates an Ethernet TAP adapter that binds one virtual host.
+    ///
+    /// # Errors
+    /// Returns an error when the id is invalid, the bus number is above 9999,
+    /// the id or TAP interface is already assigned, or the adapter list cannot
+    /// be persisted.
     pub fn create_ethernet(
-        &self, id: String, name: String, bus_number: u16,
+        &self,
+        id: String,
+        name: String,
+        bus_number: u16,
     ) -> Result<AdapterSnapshot, AdapterError> {
         if !valid_id(&id) {
-            return Err(AdapterError::Invalid("invalid Ethernet adapter id".to_owned()));
+            return Err(AdapterError::Invalid(
+                "invalid Ethernet adapter id".to_owned(),
+            ));
         }
         if bus_number > 9999 {
-            return Err(AdapterError::Invalid("Ethernet bus number must be 0..9999".to_owned()));
+            return Err(AdapterError::Invalid(
+                "Ethernet bus number must be 0..9999".to_owned(),
+            ));
         }
         let snapshot = {
-            let mut adapters = self.adapters.lock()
+            let mut adapters = self
+                .adapters
+                .lock()
                 .map_err(|_| AdapterError::Process("adapter state lock is poisoned".to_owned()))?;
             if adapters.contains_key(&id) {
-                return Err(AdapterError::Duplicate(format!("adapter '{id}' already exists")));
+                return Err(AdapterError::Duplicate(format!(
+                    "adapter '{id}' already exists"
+                )));
             }
-            if adapters.values().any(|item| item.bus_type == "ethernet" && item.bus_number == bus_number) {
-                return Err(AdapterError::Conflict(format!("Ethernet TAP vds{bus_number} is already assigned")));
+            if adapters
+                .values()
+                .any(|item| item.bus_type == "ethernet" && item.bus_number == bus_number)
+            {
+                return Err(AdapterError::Conflict(format!(
+                    "Ethernet TAP vds{bus_number} is already assigned"
+                )));
             }
             let mut snapshot = AdapterSnapshot::ethernet(id.clone(), name, bus_number);
             snapshot.readiness = self.driver.readiness_for(&snapshot);
@@ -2095,9 +2197,12 @@ impl AdapterManager {
                     "unload the GPIO adapter before changing its runtime binding".to_owned(),
                 ));
             }
-            if matches!(adapter.bus_type.as_str(), "uart" | "ethernet") && adapter.state == AdapterState::Loaded {
+            if matches!(adapter.bus_type.as_str(), "uart" | "ethernet")
+                && adapter.state == AdapterState::Loaded
+            {
                 return Err(AdapterError::Conflict(
-                    "unload the UART or Ethernet adapter before changing its runtime binding".to_owned(),
+                    "unload the UART or Ethernet adapter before changing its runtime binding"
+                        .to_owned(),
                 ));
             }
             let binding = adapter
@@ -2384,7 +2489,9 @@ fn validate_new_binding(adapter: &AdapterSnapshot, endpoint: u16) -> Result<(), 
             "a GPIO adapter can bind exactly one GPIO bank device".to_owned(),
         ));
     }
-    if matches!(adapter.bus_type.as_str(), "uart" | "ethernet") && (endpoint != 0 || !adapter.bindings.is_empty()) {
+    if matches!(adapter.bus_type.as_str(), "uart" | "ethernet")
+        && (endpoint != 0 || !adapter.bindings.is_empty())
+    {
         return Err(AdapterError::Conflict(
             "UART and Ethernet adapters bind one device at endpoint zero".to_owned(),
         ));
